@@ -35,11 +35,25 @@ Manual steps the platform owner needs to do. Kept up to date as new phases add n
 
 8. Visit `/admin` (as the platform admin) to create and view tenants.
 
+## Phase 1 — Website widget MVP
+
+1. **LLM provider — temporarily Groq, not Anthropic.** Anthropic has no free API tier (needs a paid credit top-up); Groq does. `GROQ_API_KEY` is set (console.groq.com). To switch to Anthropic later: add `ANTHROPIC_API_KEY` with some credit, then rewrite `lib/agent/model.ts`'s internals to call `@anthropic-ai/sdk` with `claude-haiku-4-5-20251001` instead of Groq's REST API — its exported `runAgentTurn()` signature is designed to stay the same, so nothing else in `lib/agent/` needs to change.
+   - Model note: `llama-3.3-70b-versatile` was deprecated on Groq; currently using `openai/gpt-oss-120b`, which supports tool-calling reliably. If Groq deprecates this too, check `GET https://api.groq.com/openai/v1/models` for models with `"tools"` in `supported_features`.
+
+2. **Voyage AI** (dash.voyageai.com): `VOYAGE_API_KEY` — free tier, powers embeddings for the knowledge base.
+
+3. **Upstash Redis**: provisioned via Vercel Marketplace (`vercel integration add upstash/upstash-kv`) — needed accepting Upstash's marketplace terms once in the browser first. Env vars are `KV_REST_API_URL` / `KV_REST_API_TOKEN` (Marketplace naming), not `UPSTASH_REDIS_REST_*`.
+
+4. **Build the widget bundle** (also runs automatically as part of `pnpm build`):
+   ```
+   pnpm build:widget
+   ```
+   Outputs `public/widget.js` (~3KB gzipped). Test it locally via `public/widget-demo.html` — replace `data-key` with a real tenant's `public_widget_key`.
+
+5. Knowledge base items added via `/dashboard/knowledge` are automatically re-embedded on save. Existing seeded items (from `pnpm seed-demo-salon`, run during Phase 0 before Voyage was set up) are **not** embedded — re-save them once through the dashboard, or re-run the seed script, to backfill embeddings.
+
 ## Later phases (not yet configured)
 
-- `ANTHROPIC_API_KEY` — console.anthropic.com (Phase 1)
-- `VOYAGE_API_KEY` — dash.voyageai.com (Phase 1)
-- `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` — Phase 1, rate limiting
 - `RESEND_API_KEY` — Phase 2, lead email notifications
 - `ENCRYPTION_KEY` — Phase 3, encrypting stored WhatsApp access tokens
 - Meta developer app + WhatsApp Cloud API + Business verification — Phase 3 (`META_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`)

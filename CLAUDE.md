@@ -16,6 +16,7 @@ The AI answers questions from each business's own knowledge base, captures leads
 - Next.js 15+ (App Router) + TypeScript (strict), deployed on Vercel
 - Supabase: Postgres, Auth, Row Level Security, pgvector, Storage
 - Anthropic SDK `@anthropic-ai/sdk`. Default model `claude-haiku-4-5-20251001`; optional premium model `claude-sonnet-5`, chosen per tenant in `agent_configs.model`
+  - **Temporary deviation (approved 2026-09-21):** Anthropic has no free API tier, so `lib/agent/model.ts` currently calls Groq (`openai/gpt-oss-120b`, free tier) instead, behind a provider-neutral interface (`runAgentTurn`) that the rest of `lib/agent/` doesn't know about. Swap `model.ts`'s internals back to `@anthropic-ai/sdk` once `ANTHROPIC_API_KEY` has billing set up — see `docs/SETUP.md`.
 - Embeddings: Voyage AI (`voyage-3.5-lite`, 1024 dims) behind an `embed()` interface so it can be swapped
 - Tailwind CSS + shadcn/ui for the dashboard
 - Widget: vanilla TypeScript bundled with esbuild into a single `public/widget.js` (no React), rendered in a Shadow DOM, target < 30 KB gzipped

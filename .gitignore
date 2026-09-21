@@ -45,3 +45,6 @@ next-env.d.ts
 /.agents/
 /.claude/skills/
 skills-lock.json
+
+# generated widget bundle — rebuilt by scripts/build-widget.mjs as part of `pnpm build`
+/public/widget.js

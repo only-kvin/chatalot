@@ -21,8 +21,7 @@ export default async function AdminLayout({
     .eq("user_id", user.id)
     .maybeSingle();
 
-  // /dashboard doesn't exist until Phase 2 — send non-admins home for now.
-  if (!adminRow) redirect("/");
+  if (!adminRow) redirect("/dashboard");
 
   return <div className="min-h-screen bg-zinc-50 dark:bg-black">{children}</div>;
 }
