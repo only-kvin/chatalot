@@ -52,20 +52,26 @@ async function streamOnce(
   maxTokens: number,
   onText: (text: string) => void,
 ): Promise<StreamResult> {
+  const body: Record<string, unknown> = {
+    model: GROQ_MODEL,
+    messages,
+    max_tokens: maxTokens,
+    stream: true,
+  };
+  // Omit tools/tool_choice entirely (rather than an empty array) when this
+  // call is forced text-only — some providers reject tool_choice with no tools.
+  if (tools.length > 0) {
+    body.tools = toOpenAiTools(tools);
+    body.tool_choice = "auto";
+  }
+
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      messages,
-      tools: toOpenAiTools(tools),
-      tool_choice: "auto",
-      max_tokens: maxTokens,
-      stream: true,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok || !res.body) {
@@ -124,7 +130,10 @@ async function streamOnce(
 // Runs a full turn, including the tool-call/tool-result round trip: if the model
 // calls a tool, `executeTool` runs it, its result is fed back as a proper OpenAI
 // `role: "tool"` message, and the model is called again for its next response —
-// up to MAX_TOOL_ITERATIONS times.
+// up to MAX_TOOL_ITERATIONS times. One further call is then always forced with
+// no tools available, guaranteeing a final text reply even if every tool-eligible
+// iteration was spent calling tools (e.g. re-checking availability, then booking,
+// leaves nothing left to say "you're booked" unless this final round exists).
 export async function* runAgentTurn(params: {
   system: string;
   messages: ChatMessage[];
@@ -137,11 +146,12 @@ export async function* runAgentTurn(params: {
     ...params.messages,
   ];
 
-  for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
+  for (let iteration = 0; iteration <= MAX_TOOL_ITERATIONS; iteration++) {
+    const tools = iteration < MAX_TOOL_ITERATIONS ? params.tools : [];
     let iterationText = "";
     const { calls: pendingCalls, usage } = await streamOnce(
       openAiMessages,
-      params.tools,
+      tools,
       params.maxTokens,
       (text) => {
         iterationText += text;

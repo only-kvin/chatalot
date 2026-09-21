@@ -18,6 +18,21 @@ const SECTIONS = [
     description:
       "Manage the FAQs, services, prices and policies your AI receptionist answers from.",
   },
+  {
+    href: "/dashboard/bookings",
+    title: "Bookings",
+    description: "See appointments your AI receptionist has booked, and update their status.",
+  },
+  {
+    href: "/dashboard/services",
+    title: "Services",
+    description: "What your AI receptionist can book appointments for, and how long each takes.",
+  },
+  {
+    href: "/dashboard/availability",
+    title: "Availability",
+    description: "Weekly open hours and one-off closures for bookings.",
+  },
 ];
 
 export default function DashboardPage() {

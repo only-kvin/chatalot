@@ -50,6 +50,39 @@ export const AGENT_TOOLS: ToolDef[] = [
       required: ["reason"],
     },
   },
+  {
+    name: "check_availability",
+    description:
+      "Look up open appointment times for a service on a given date. Always call this before proposing a specific time to a visitor. Use today's date (given above) to resolve relative dates like 'tomorrow' or 'Friday' into a YYYY-MM-DD date.",
+    parameters: {
+      type: "object",
+      properties: {
+        service: { type: "string", description: "The service name, e.g. 'Haircut'" },
+        date: { type: "string", description: "Date to check, as YYYY-MM-DD" },
+      },
+      required: ["service", "date"],
+    },
+  },
+  {
+    name: "create_booking",
+    description:
+      "Book an appointment. Only call this after confirming the exact date and time with the visitor (from a time check_availability actually returned), and after they've given their name, phone number, and consent to save their details.",
+    parameters: {
+      type: "object",
+      properties: {
+        service: { type: "string", description: "The service name, e.g. 'Haircut'" },
+        date: { type: "string", description: "Date to book, as YYYY-MM-DD" },
+        time: { type: "string", description: "Start time to book, as 24-hour HH:MM" },
+        name: { type: "string", description: "The visitor's name" },
+        phone: { type: "string", description: "The visitor's phone number" },
+        email: {
+          type: ["string", "null"],
+          description: "The visitor's email, if given, otherwise null",
+        },
+      },
+      required: ["service", "date", "time", "name", "phone"],
+    },
+  },
 ];
 
 export type ToolCall = {

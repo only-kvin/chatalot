@@ -50,6 +50,23 @@ const SAMPLE_KNOWLEDGE = [
   },
 ] as const;
 
+// Matches the "Haircuts" / "Colour" knowledge items above, so the AI receptionist's
+// answers and its actual bookable services stay consistent.
+const SAMPLE_SERVICES = [
+  { name: "Women's Cut & Blow-dry", description: "Wash, cut and blow-dry.", duration_minutes: 45, price_cents: 45000 },
+  { name: "Men's Cut", description: "Wash and cut.", duration_minutes: 30, price_cents: 25000 },
+  { name: "Full Colour", description: "All-over colour.", duration_minutes: 120, price_cents: 85000 },
+  { name: "Balayage", description: "Hand-painted balayage colour.", duration_minutes: 180, price_cents: 120000 },
+] as const;
+
+// "Tuesday to Saturday, 9am to 6pm" from the Hours knowledge item above.
+// weekday: 0 = Sunday ... 6 = Saturday.
+const SAMPLE_AVAILABILITY_RULES = [2, 3, 4, 5, 6].map((weekday) => ({
+  weekday,
+  start_time: "09:00",
+  end_time: "18:00",
+}));
+
 async function main() {
   const admin = createAdminClient();
 
@@ -87,6 +104,27 @@ async function main() {
   }
 
   console.log(`Seeded ${SAMPLE_KNOWLEDGE.length} knowledge items.`);
+
+  // Wipe and reseed services + availability_rules for the same idempotency.
+  await admin.from("services").delete().eq("tenant_id", tenant.id);
+  const { error: servicesError } = await admin.from("services").insert(
+    SAMPLE_SERVICES.map((service) => ({ ...service, tenant_id: tenant.id })),
+  );
+  if (servicesError) {
+    console.error("Failed to seed services:", servicesError.message);
+    process.exit(1);
+  }
+  console.log(`Seeded ${SAMPLE_SERVICES.length} services.`);
+
+  await admin.from("availability_rules").delete().eq("tenant_id", tenant.id);
+  const { error: rulesError } = await admin.from("availability_rules").insert(
+    SAMPLE_AVAILABILITY_RULES.map((rule) => ({ ...rule, tenant_id: tenant.id })),
+  );
+  if (rulesError) {
+    console.error("Failed to seed availability_rules:", rulesError.message);
+    process.exit(1);
+  }
+  console.log(`Seeded ${SAMPLE_AVAILABILITY_RULES.length} availability rules.`);
 }
 
 main();

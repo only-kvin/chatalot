@@ -80,6 +80,22 @@ Manual steps the platform owner needs to do. Kept up to date as new phases add n
 
 5. Once a real number is connected, test with a real WhatsApp message to it and check `/dashboard/conversations` for the `whatsapp`-channel entry.
 
-## Later phases (not yet configured)
+## Phase 4 — Bookings
 
-Nothing outstanding for Phase 4 (bookings) yet.
+**Design notes** (not manual steps, but worth knowing before you configure anything):
+
+- **Timezone is hardcoded to `Africa/Johannesburg`** (UTC+2, no DST) in `lib/agent/availability.ts` — every tenant is a South African business, so there's no per-tenant timezone column. If that ever changes, this is the one file to touch.
+- **Capacity model is a single shared calendar per tenant**: one booking at a time across the whole business, regardless of service (enforced by a Postgres exclusion constraint on `bookings`, not just app logic). There's no staff/resource concept — if a tenant needs multiple concurrent bookings (e.g. several chairs), that's a bigger schema change, not configuration.
+
+**Manual steps:**
+
+1. **Push the new migration** (adds `services`, `availability_rules`, `availability_exceptions`, `bookings`, and the `btree_gist` extension):
+   ```
+   pnpm exec supabase db push --db-url "$POSTGRES_URL_NON_POOLING"
+   ```
+
+2. **`CRON_SECRET`**: generate one (see `.env.example`) and set it in Vercel's Environment Variables. Vercel Cron automatically sends it as `Authorization: Bearer <CRON_SECRET>` to routes listed in `vercel.json` — no extra wiring needed once the env var is set and the project is deployed. The reminder cron (`/api/cron/send-booking-reminders`) is scheduled hourly there.
+
+3. **WhatsApp reminder template**: `send-booking-reminders` sends via `sendWhatsAppTemplate` using a template named `booking_reminder` (English) — this must be created and approved in Meta Business Manager (WhatsApp Manager -> Message Templates) before sends will actually succeed, same situation Phase 3 left `sendWhatsAppTemplate` in. Until it's approved, the cron route still runs end-to-end (queries bookings, attempts the send, logs the Graph API rejection, leaves `reminder_sent_at` null so it retries) — nothing breaks, it just won't deliver.
+
+4. Once services and weekly availability are set up per-tenant (`/dashboard/services`, `/dashboard/availability`), the agent can offer real booking slots — test via `public/widget-demo.html` or a WhatsApp conversation by asking to book something.
