@@ -33,6 +33,16 @@ const SECTIONS = [
     title: "Availability",
     description: "Weekly open hours and one-off closures for bookings.",
   },
+  {
+    href: "/dashboard/widget",
+    title: "Widget",
+    description: "Appearance, install snippet, and a live preview of your chat widget.",
+  },
+  {
+    href: "/dashboard/settings",
+    title: "Settings",
+    description: "Business info the AI receptionist uses, and which websites can load your widget.",
+  },
 ];
 
 export default function DashboardPage() {
