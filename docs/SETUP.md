@@ -64,7 +64,22 @@ Manual steps the platform owner needs to do. Kept up to date as new phases add n
 
 4. Fixed during this phase: `lib/security/origin-check.ts` was rejecting requests with **no** `Origin` header at all, even in development — same-origin `fetch()` calls often omit it entirely, which broke the documented `widget-demo.html` local-testing flow (served from this same app). Now a missing Origin is allowed in dev, still rejected in production. Covered by `tests/origin-check.test.ts`.
 
+## Phase 3 — WhatsApp
+
+**Code status**: fully built and verified with synthetic signed payloads — signature verification, channel routing, encrypted token storage, dedup, the full agent pipeline (retrieval + tool calls + token tracking), and all three keyword behaviors (`human`/`agent` handoff + owner email, `STOP` pause) all confirmed working. The only untested piece is the actual outbound send, since that needs a real Meta access token — a test call against the real Graph API correctly got rejected for an invalid token, confirming the request shape itself is right.
+
+**Still needed from you before this goes live** (per your spec's own "Setup, once for the platform" / "Per client" sections):
+
+1. **Meta Business Portfolio + Developer App**: create at developers.facebook.com, add the WhatsApp product. This gives you `META_APP_SECRET` (Settings → Basic → App Secret) — replace the placeholder currently in `.env.local` with the real value, and add it to Vercel too (it was deliberately *not* added to Vercel yet, to avoid a fake-looking secret sitting in production env vars).
+
+2. **Register the webhook URL** in the Meta app's WhatsApp → Configuration page: `https://<your-vercel-domain>/api/whatsapp/webhook`, verify token = the `WHATSAPP_VERIFY_TOKEN` already set (real value, not a placeholder — generated once and it's fine to keep). Subscribe to the `messages` field.
+
+3. **Business Verification**: needed to go past Meta's test-mode limits and onboard real clients (per your spec's notes).
+
+4. **Per client**: get them a number not already on the regular WhatsApp app, connect it in Meta (manually for now; Embedded Signup is a later nice-to-have), then go to `/admin/tenants/<tenant-id>` and enter its Phone Number ID + access token — stored encrypted (`ENCRYPTION_KEY`, already set) via `lib/security/crypto.ts`.
+
+5. Once a real number is connected, test with a real WhatsApp message to it and check `/dashboard/conversations` for the `whatsapp`-channel entry.
+
 ## Later phases (not yet configured)
 
-- `ENCRYPTION_KEY` — Phase 3, encrypting stored WhatsApp access tokens
-- Meta developer app + WhatsApp Cloud API + Business verification — Phase 3 (`META_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`)
+Nothing outstanding for Phase 4 (bookings) yet.

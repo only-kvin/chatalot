@@ -89,7 +89,11 @@ export default async function AdminPage() {
             <TableBody>
               {tenants?.map((t) => (
                 <TableRow key={t.id}>
-                  <TableCell>{t.name}</TableCell>
+                  <TableCell>
+                    <Link href={`/admin/tenants/${t.id}`} className="hover:underline">
+                      {t.name}
+                    </Link>
+                  </TableCell>
                   <TableCell>{t.slug}</TableCell>
                   <TableCell>{t.status}</TableCell>
                   <TableCell>{t.plan}</TableCell>

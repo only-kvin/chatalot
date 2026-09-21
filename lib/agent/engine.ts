@@ -4,6 +4,7 @@ import { runAgentTurn, type ChatMessage } from "./model";
 import { AGENT_TOOLS, type ToolCall } from "./tools";
 import { getRelevantKnowledge } from "./retrieval";
 import { notifyOwnerOfLead } from "@/lib/email/notify-lead";
+import { notifyOwnerHumanRequested } from "@/lib/email/notify-human-requested";
 
 const MAX_TOKENS = 400;
 const MAX_HISTORY = 10;
@@ -43,7 +44,15 @@ async function executeTool(
       .from("conversations")
       .update({ status: "human" })
       .eq("id", conversationId);
-    return error ? `Failed to flag conversation: ${error.message}` : "Flagged for a human to take over.";
+    if (error) return `Failed to flag conversation: ${error.message}`;
+
+    await notifyOwnerHumanRequested(
+      admin,
+      tenantId,
+      businessName,
+      String(call.input.reason ?? "Not specified"),
+    );
+    return "Flagged for a human to take over.";
   }
 
   return `Unknown tool: ${call.name}`;
