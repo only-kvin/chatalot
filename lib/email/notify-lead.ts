@@ -2,7 +2,15 @@ import { Resend } from "resend";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getTenantOwnerEmails } from "@/lib/db/tenant-owners";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy: the Resend constructor throws synchronously if the key is missing,
+// and this module is imported at Next.js build time (page-data collection)
+// — constructing eagerly here would crash the whole build in any environment
+// missing RESEND_API_KEY, instead of just failing this one send at runtime
+// (which is already caught below).
+let resend: Resend | undefined;
+function getResend(): Resend {
+  return (resend ??= new Resend(process.env.RESEND_API_KEY));
+}
 
 // Resend's default sender, works with no domain verification — but can only
 // deliver to the Resend account's own verified email until a real sending
@@ -19,7 +27,7 @@ export async function notifyOwnerOfLead(
   if (ownerEmails.length === 0) return;
 
   try {
-    await resend.emails.send({
+    await getResend().emails.send({
       from: FROM,
       to: ownerEmails,
       subject: `New lead: ${lead.name} (${businessName})`,

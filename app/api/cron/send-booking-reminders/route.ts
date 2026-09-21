@@ -8,10 +8,13 @@ import { sendWhatsAppTemplate } from "@/lib/channels/whatsapp";
 const REMINDER_TEMPLATE_NAME = "booking_reminder";
 const REMINDER_TEMPLATE_LANGUAGE = "en";
 
-// Run hourly (see vercel.json); a booking sits in this ~2h window for two
-// runs, so a single failed send still gets retried before aging out.
-const WINDOW_START_HOURS = 23;
-const WINDOW_END_HOURS = 25;
+// Runs once daily (see vercel.json — Vercel's Hobby plan only allows daily
+// cron schedules). Rather than a narrow "~24h out" window a once-a-day run
+// could easily straddle, this looks ahead a full 2 days: any booking that
+// far out or closer gets a reminder attempt every run until it's sent, so a
+// failed send (or a missed/delayed cron trigger) still gets retried the next
+// day instead of silently never firing.
+const LOOKAHEAD_HOURS = 48;
 
 export async function GET(request: Request) {
   if (request.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -19,9 +22,8 @@ export async function GET(request: Request) {
   }
 
   const admin = createAdminClient();
-  const now = Date.now();
-  const windowStart = new Date(now + WINDOW_START_HOURS * 60 * 60 * 1000).toISOString();
-  const windowEnd = new Date(now + WINDOW_END_HOURS * 60 * 60 * 1000).toISOString();
+  const windowStart = new Date().toISOString();
+  const windowEnd = new Date(Date.now() + LOOKAHEAD_HOURS * 60 * 60 * 1000).toISOString();
 
   const { data: bookings, error } = await admin
     .from("bookings")
@@ -72,7 +74,8 @@ export async function GET(request: Request) {
       sent++;
     } catch (err) {
       // Doesn't stop the rest of the batch — reminder_sent_at stays null so
-      // this booking is retried next hour, until it ages out of the window.
+      // this booking is retried on tomorrow's run, until it's sent or it
+      // falls out of the lookahead window entirely.
       console.error(`Reminder failed for booking ${booking.id}:`, err);
     }
   }
