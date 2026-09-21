@@ -3,6 +3,7 @@ import { buildSystemPrompt, type AgentConfig } from "./prompt";
 import { runAgentTurn, type ChatMessage } from "./model";
 import { AGENT_TOOLS, type ToolCall } from "./tools";
 import { getRelevantKnowledge } from "./retrieval";
+import { notifyOwnerOfLead } from "@/lib/email/notify-lead";
 
 const MAX_TOKENS = 400;
 const MAX_HISTORY = 10;
@@ -13,21 +14,28 @@ type AdminClient = ReturnType<typeof createAdminClient>;
 async function executeTool(
   admin: AdminClient,
   tenantId: string,
+  businessName: string,
   conversationId: string,
   call: ToolCall,
 ): Promise<string> {
   if (call.name === "save_lead") {
+    const lead = {
+      name: String(call.input.name ?? ""),
+      phone: String(call.input.phone ?? ""),
+      email: call.input.email || null,
+      interest: String(call.input.interest ?? ""),
+      summary: String(call.input.summary ?? ""),
+    };
     const { error } = await admin.from("leads").insert({
       tenant_id: tenantId,
       conversation_id: conversationId,
-      name: call.input.name,
-      phone: call.input.phone,
-      email: call.input.email || null,
-      interest: call.input.interest,
-      summary: call.input.summary,
+      ...lead,
       source: "web",
     });
-    return error ? `Failed to save: ${error.message}` : "Lead saved successfully.";
+    if (error) return `Failed to save: ${error.message}`;
+
+    await notifyOwnerOfLead(admin, tenantId, businessName, lead);
+    return "Lead saved successfully.";
   }
 
   if (call.name === "request_human") {
@@ -94,6 +102,8 @@ export async function* runAgent(params: {
   const system = buildSystemPrompt(agentConfig as AgentConfig, knowledgeText);
 
   let fullText = "";
+  let tokensIn = 0;
+  let tokensOut = 0;
 
   try {
     for await (const event of runAgentTurn({
@@ -101,11 +111,17 @@ export async function* runAgent(params: {
       messages,
       tools: AGENT_TOOLS,
       maxTokens: MAX_TOKENS,
-      executeTool: (call) => executeTool(admin, params.tenantId, params.conversationId, call),
+      executeTool: (call) =>
+        executeTool(admin, params.tenantId, agentConfig.business_name, params.conversationId, call),
     })) {
       if (event.type === "text-delta") {
         fullText += event.text;
         yield event.text;
+      } else if (event.type === "usage") {
+        // Each iteration of the tool loop is a separate billed API call, so
+        // totals across iterations are summed, not overwritten.
+        tokensIn += event.promptTokens;
+        tokensOut += event.completionTokens;
       }
     }
   } catch {
@@ -122,6 +138,8 @@ export async function* runAgent(params: {
       tenant_id: params.tenantId,
       role: "assistant",
       content: fullText,
+      tokens_in: tokensIn,
+      tokens_out: tokensOut,
     });
   }
 }

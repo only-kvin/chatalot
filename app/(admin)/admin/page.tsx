@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/db/supabase-server";
 import { createTenantAction } from "./actions";
 import { Button } from "@/components/ui/button";
@@ -28,7 +29,12 @@ export default async function AdminPage() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-8 p-8">
-      <h1 className="text-2xl font-semibold">Tenants</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Tenants</h1>
+        <Link href="/admin/usage" className="text-sm text-zinc-500 hover:underline">
+          Usage →
+        </Link>
+      </div>
 
       <Card>
         <CardHeader>

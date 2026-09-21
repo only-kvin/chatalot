@@ -13,7 +13,8 @@ export type ChatMessage = { role: "user" | "assistant"; content: string };
 
 export type AgentTurnEvent =
   | { type: "text-delta"; text: string }
-  | { type: "tool-executed"; call: ToolCall };
+  | { type: "tool-executed"; call: ToolCall }
+  | { type: "usage"; promptTokens: number; completionTokens: number };
 
 const GROQ_MODEL = "openai/gpt-oss-120b";
 const MAX_TOOL_ITERATIONS = 3;
@@ -40,12 +41,17 @@ type OpenAiMessage =
 
 type PendingCall = { id: string; name: string; args: string };
 
+type StreamResult = {
+  calls: PendingCall[];
+  usage: { promptTokens: number; completionTokens: number };
+};
+
 async function streamOnce(
   messages: OpenAiMessage[],
   tools: ToolDef[],
   maxTokens: number,
   onText: (text: string) => void,
-): Promise<PendingCall[]> {
+): Promise<StreamResult> {
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -68,6 +74,7 @@ async function streamOnce(
   }
 
   const pending = new Map<number, PendingCall>();
+  const usage = { promptTokens: 0, completionTokens: 0 };
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -90,6 +97,10 @@ async function streamOnce(
       if (chunk.error) {
         throw new Error(`Groq stream error: ${chunk.error.message}`);
       }
+      if (chunk.usage) {
+        usage.promptTokens = chunk.usage.prompt_tokens ?? 0;
+        usage.completionTokens = chunk.usage.completion_tokens ?? 0;
+      }
       const delta = chunk.choices?.[0]?.delta;
       if (!delta) continue;
 
@@ -107,7 +118,7 @@ async function streamOnce(
     }
   }
 
-  return [...pending.values()];
+  return { calls: [...pending.values()], usage };
 }
 
 // Runs a full turn, including the tool-call/tool-result round trip: if the model
@@ -128,7 +139,7 @@ export async function* runAgentTurn(params: {
 
   for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
     let iterationText = "";
-    const pendingCalls = await streamOnce(
+    const { calls: pendingCalls, usage } = await streamOnce(
       openAiMessages,
       params.tools,
       params.maxTokens,
@@ -136,6 +147,8 @@ export async function* runAgentTurn(params: {
         iterationText += text;
       },
     );
+
+    yield { type: "usage", promptTokens: usage.promptTokens, completionTokens: usage.completionTokens };
 
     if (iterationText) yield { type: "text-delta", text: iterationText };
 
