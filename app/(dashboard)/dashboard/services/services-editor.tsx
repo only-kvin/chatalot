@@ -134,7 +134,7 @@ export function ServicesEditor({ initialServices }: { initialServices: Service[]
               />
               <Label htmlFor="active">Bookable by the AI receptionist</Label>
             </div>
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && <p className="feedback-enter text-sm text-red-600">{error}</p>}
             <div className="flex gap-2">
               <Button type="submit" disabled={pending}>
                 {pending ? "Saving…" : isEditing ? "Update service" : "Add service"}

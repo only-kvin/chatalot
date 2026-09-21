@@ -167,7 +167,7 @@ export function WidgetEditor({
                   Shown as a &quot;Chat on WhatsApp&quot; button in the widget, if set.
                 </p>
               </div>
-              {error && <p className="text-sm text-red-600">{error}</p>}
+              {error && <p className="feedback-enter text-sm text-red-600">{error}</p>}
               <div>
                 <Button type="submit" disabled={pending}>
                   {pending ? "Saving…" : "Save appearance"}

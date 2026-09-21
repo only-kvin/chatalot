@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { BookingsTable } from "./bookings-table";
 
 export default async function BookingsPage() {
@@ -26,7 +27,7 @@ export default async function BookingsPage() {
 
   return (
     <div className="mx-auto max-w-4xl p-8">
-      <h1 className="mb-6 text-2xl font-semibold">Bookings</h1>
+      <PageHeader title="Bookings" />
       <BookingsTable bookings={rows} />
     </div>
   );

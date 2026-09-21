@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/dashboard/page-header";
 import {
   Table,
   TableBody,
@@ -25,7 +26,7 @@ export default async function ConversationsPage() {
 
   return (
     <div className="mx-auto max-w-4xl p-8">
-      <h1 className="mb-6 text-2xl font-semibold">Conversations</h1>
+      <PageHeader title="Conversations" />
       <Table>
         <TableHeader>
           <TableRow>

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { LeadsTable } from "./leads-table";
 
 export default async function LeadsPage() {
@@ -16,7 +17,7 @@ export default async function LeadsPage() {
 
   return (
     <div className="mx-auto max-w-4xl p-8">
-      <h1 className="mb-6 text-2xl font-semibold">Leads</h1>
+      <PageHeader title="Leads" />
       <LeadsTable leads={leads ?? []} />
     </div>
   );

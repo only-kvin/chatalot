@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { WidgetEditor } from "./widget-editor";
 
 export default async function WidgetPage() {
@@ -22,7 +23,7 @@ export default async function WidgetPage() {
 
   return (
     <div className="mx-auto max-w-5xl p-8">
-      <h1 className="mb-6 text-2xl font-semibold">Widget</h1>
+      <PageHeader title="Widget" />
       <WidgetEditor
         snippet={snippet}
         initialSettings={{

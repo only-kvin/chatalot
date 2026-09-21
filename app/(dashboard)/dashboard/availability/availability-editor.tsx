@@ -135,7 +135,7 @@ export function AvailabilityEditor({
               Add
             </Button>
           </form>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="feedback-enter text-sm text-red-600">{error}</p>}
           <Table>
             <TableHeader>
               <TableRow>

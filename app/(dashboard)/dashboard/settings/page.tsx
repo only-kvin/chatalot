@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { SettingsForm } from "./settings-form";
 
 export default async function SettingsPage() {
@@ -19,7 +20,7 @@ export default async function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-2xl p-8">
-      <h1 className="mb-6 text-2xl font-semibold">Settings</h1>
+      <PageHeader title="Settings" />
       <SettingsForm
         initialSettings={{
           business_name: config?.business_name ?? "",

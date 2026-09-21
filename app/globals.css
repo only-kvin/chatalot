@@ -49,6 +49,7 @@
 }
 
 :root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -126,5 +127,54 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+/* Dashboard page-content entrance, and inline save/copy feedback — see
+   components/dashboard/page-header.tsx and the *-form/*-editor components. */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes feedback-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.page-enter {
+  animation: page-enter 180ms var(--ease-out);
+}
+
+.feedback-enter {
+  animation: feedback-enter 150ms var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter,
+  .feedback-enter {
+    animation-name: fade-in;
+    animation-duration: 120ms;
   }
 }

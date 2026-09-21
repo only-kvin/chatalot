@@ -130,7 +130,7 @@ export function KnowledgeEditor({ initialItems }: { initialItems: KnowledgeItem[
                 placeholder="We're open Tuesday to Saturday, 9am to 6pm."
               />
             </div>
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && <p className="feedback-enter text-sm text-red-600">{error}</p>}
             <div className="flex gap-2">
               <Button type="submit" disabled={pending}>
                 {pending ? "Saving…" : isEditing ? "Update item" : "Add item"}

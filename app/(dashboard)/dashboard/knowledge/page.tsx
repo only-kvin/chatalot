@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { KnowledgeEditor } from "./knowledge-editor";
 
 export default async function KnowledgePage() {
@@ -16,7 +17,10 @@ export default async function KnowledgePage() {
 
   return (
     <div className="mx-auto max-w-2xl p-8">
-      <h1 className="mb-6 text-2xl font-semibold">Knowledge base</h1>
+      <PageHeader
+        title="Knowledge base"
+        description="FAQs, services, prices and policies your AI receptionist answers from."
+      />
       <KnowledgeEditor initialItems={items ?? []} />
     </div>
   );
