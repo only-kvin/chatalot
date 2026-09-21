@@ -29,7 +29,10 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/callback`,
+        // window.location.origin, not NEXT_PUBLIC_APP_URL — that's only ever
+        // correct for one environment (it's set to localhost for dev), and
+        // Preview deployments each get a unique hostname anyway.
+        emailRedirectTo: `${window.location.origin}/callback`,
       },
     });
 
