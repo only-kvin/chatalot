@@ -10,7 +10,8 @@
     "lint": "eslint",
     "test": "dotenv -e .env.local -- vitest run",
     "bootstrap-admin": "dotenv -e .env.local -- tsx scripts/bootstrap-platform-admin.ts",
-    "seed-demo-salon": "dotenv -e .env.local -- tsx scripts/seed-demo-salon.ts"
+    "seed-demo-salon": "dotenv -e .env.local -- tsx scripts/seed-demo-salon.ts",
+    "reembed-tenant": "dotenv -e .env.local -- tsx scripts/reembed-tenant.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
