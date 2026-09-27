@@ -4,6 +4,7 @@ import { redis } from "@/lib/redis";
 import { isWithinServiceWindow, sendWhatsAppText } from "./whatsapp";
 import { customerTurns, redisTurnStore } from "./customer-lock";
 import { runAgent } from "@/lib/agent/engine";
+import { checkDailyTenantCap } from "@/lib/security/rate-limit";
 import { notifyOwnerHumanRequested } from "@/lib/email/notify-human-requested";
 
 type WhatsAppMessage = {
@@ -124,10 +125,11 @@ async function handleMessage(
 
   const { data: agentConfig } = await admin
     .from("agent_configs")
-    .select("business_name")
+    .select("business_name, handoff_contact")
     .eq("tenant_id", tenantId)
     .single();
   const businessName = agentConfig?.business_name ?? "";
+  const handoffContact = agentConfig?.handoff_contact ?? "";
 
   if (normalized === "human" || normalized === "agent") {
     const confirmation = "A team member will get back to you shortly.";
@@ -163,6 +165,22 @@ async function handleMessage(
     // message's turn answers this one too.
     if (current?.status === "human" || (await turns.isSuperseded(message.id))) {
       await saveMessage(admin, tenantId, conversation.id, "user", text);
+      return;
+    }
+
+    // Checked under the lock so a burst can't race past the cap.
+    const { allowed } = await checkDailyTenantCap(admin, tenantId);
+    if (!allowed) {
+      await handOffAtCap(admin, {
+        tenantId,
+        phoneNumberId,
+        accessToken,
+        customerPhone,
+        businessName,
+        handoffContact,
+        conversationId: conversation.id,
+        text,
+      });
       return;
     }
 
@@ -252,6 +270,39 @@ async function replyWithAgent(
     if (ownerNotified) return;
     await handOffAfterFailure(admin, p.tenantId, p.businessName, p.conversationId, "the AI's reply could not be generated or sent");
   }
+}
+
+// Over the daily cap the AI can't answer, but going silent on WhatsApp would
+// leave the customer waiting with no reply. Handing off to a person means
+// the customer is told once, the owner is emailed once, and further messages
+// in this conversation are saved quietly for the owner to answer.
+async function handOffAtCap(
+  admin: AdminClient,
+  p: {
+    tenantId: string;
+    phoneNumberId: string;
+    accessToken: string;
+    customerPhone: string;
+    businessName: string;
+    handoffContact: string;
+    conversationId: string;
+    text: string;
+  },
+) {
+  await saveMessage(admin, p.tenantId, p.conversationId, "user", p.text);
+  await setHuman(admin, p.tenantId, p.conversationId);
+  await notifyOwnerHumanRequested(
+    admin,
+    p.tenantId,
+    p.businessName,
+    "Your daily AI message limit was reached, so a WhatsApp customer needs a reply from you.",
+  );
+
+  const notice = `Thanks for your message! A team member will get back to you as soon as possible${
+    p.handoffContact ? `, or you can reach us at ${p.handoffContact}` : ""
+  }.`;
+  await sendWhatsAppText(p.phoneNumberId, p.accessToken, p.customerPhone, notice);
+  await saveMessage(admin, p.tenantId, p.conversationId, "assistant", notice);
 }
 
 async function setHuman(admin: AdminClient, tenantId: string, conversationId: string) {

@@ -40,11 +40,17 @@ export async function checkDailyTenantCap(
   // SA midnight, not the server's (UTC on Vercel, which would reset the cap at 02:00 SA time).
   const startOfDay = startOfLocalDay(new Date());
 
+  // Counts AI turns, not customer messages: each turn that reached the model
+  // records its token usage on exactly one row (the reply, or the customer's
+  // message if the reply was discarded). Messages that never run the AI —
+  // ones received while a person is handling the chat, voice-note
+  // placeholders, burst messages answered by a later turn — don't use up
+  // the cap.
   const { count } = await supabase
     .from("messages")
     .select("id", { count: "exact", head: true })
     .eq("tenant_id", tenantId)
-    .eq("role", "user")
+    .gt("tokens_in", 0)
     .gte("created_at", startOfDay.toISOString());
 
   return { allowed: (count ?? 0) < cap };
