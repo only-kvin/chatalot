@@ -46,6 +46,11 @@ export async function sendOwnerReplyAction(input: {
   const { conversationId, text } = parsed.data;
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authorized." };
+
   const { data: conversation } = await supabase
     .from("conversations")
     .select("id, channel, external_id, status, last_inbound_at")
@@ -101,12 +106,14 @@ export async function sendOwnerReplyAction(input: {
   }
 
   // Stored as an assistant message, so if the owner hands back to the AI it
-  // sees these replies as the business's side of the conversation.
+  // sees these replies as the business's side of the conversation; sent_by
+  // is what marks it as theirs in the transcript.
   const { error: saveError } = await supabase.from("messages").insert({
     tenant_id: tenantId,
     conversation_id: conversationId,
     role: "assistant",
     content: text,
+    sent_by: user.id,
   });
   if (saveError) console.error(`Owner reply for ${conversationId} sent but not saved:`, saveError);
 

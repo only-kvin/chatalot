@@ -17,6 +17,10 @@ export default async function ConversationPage({
   if (!tenantId) redirect("/");
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   const { data: conversation } = await supabase
     .from("conversations")
     .select("id, channel, status, external_id, last_inbound_at")
@@ -27,12 +31,19 @@ export default async function ConversationPage({
 
   const { data: messages } = await supabase
     .from("messages")
-    .select("id, role, content, created_at")
+    .select("id, role, content, created_at, sent_by")
     .eq("conversation_id", id)
     .eq("tenant_id", tenantId)
     .order("created_at", { ascending: true });
 
   const nextStatus = conversation.status === "human" ? "ai" : "human";
+
+  // Business-side messages without a sender are the AI's (or automatic
+  // system replies); ones with a sender were typed in this dashboard.
+  function senderLabel(sentBy: string | null): string {
+    if (!sentBy) return "AI";
+    return sentBy === user?.id ? "You" : "Team member";
+  }
 
   return (
     <div className="mx-auto max-w-2xl p-8">
@@ -53,19 +64,27 @@ export default async function ConversationPage({
       </div>
 
       <div className="flex flex-col gap-3">
-        {messages?.map((m) => (
-          <div
-            key={m.id}
-            className={`max-w-[80%] rounded-lg px-4 py-2 text-sm ${
-              m.role === "user"
-                ? "self-start bg-zinc-100 dark:bg-zinc-800"
-                : "self-end bg-indigo-600 text-white"
-            }`}
-            style={{ marginLeft: m.role === "user" ? 0 : "auto" }}
-          >
-            {m.content}
-          </div>
-        ))}
+        {messages?.map((m) =>
+          m.role === "user" ? (
+            <div
+              key={m.id}
+              className="max-w-[80%] self-start rounded-lg bg-zinc-100 px-4 py-2 text-sm dark:bg-zinc-800"
+            >
+              {m.content}
+            </div>
+          ) : (
+            <div key={m.id} className="flex max-w-[80%] flex-col items-end gap-1 self-end">
+              <span className="text-xs text-zinc-500">{senderLabel(m.sent_by)}</span>
+              <div
+                className={`rounded-lg px-4 py-2 text-sm text-white ${
+                  m.sent_by ? "bg-emerald-600" : "bg-indigo-600"
+                }`}
+              >
+                {m.content}
+              </div>
+            </div>
+          ),
+        )}
         {!messages?.length && (
           <p className="text-center text-zinc-500">No messages yet.</p>
         )}
