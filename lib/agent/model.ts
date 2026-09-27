@@ -50,6 +50,7 @@ async function streamOnce(
   messages: OpenAiMessage[],
   tools: ToolDef[],
   maxTokens: number,
+  signal: AbortSignal,
   onText: (text: string) => void,
 ): Promise<StreamResult> {
   const body: Record<string, unknown> = {
@@ -72,6 +73,9 @@ async function streamOnce(
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
+    // Aborting also cancels the in-flight body stream, so a stalled stream
+    // rejects the pending reader.read() below rather than hanging.
+    signal,
   });
 
   if (!res.ok || !res.body) {
@@ -127,6 +131,18 @@ async function streamOnce(
   return { calls: [...pending.values()], usage };
 }
 
+// Malformed argument JSON becomes `undefined`, which the engine's input
+// validation rejects with a message the model can correct from — rather than
+// throwing and failing the whole turn.
+function parseToolArgs(args: string): unknown {
+  if (!args) return {};
+  try {
+    return JSON.parse(args);
+  } catch {
+    return undefined;
+  }
+}
+
 // Runs a full turn, including the tool-call/tool-result round trip: if the model
 // calls a tool, `executeTool` runs it, its result is fed back as a proper OpenAI
 // `role: "tool"` message, and the model is called again for its next response —
@@ -139,6 +155,8 @@ export async function* runAgentTurn(params: {
   messages: ChatMessage[];
   tools: ToolDef[];
   maxTokens: number;
+  // Deadline for the whole turn; aborting it throws out of this generator.
+  signal: AbortSignal;
   executeTool: (call: ToolCall) => Promise<string>;
 }): AsyncGenerator<AgentTurnEvent> {
   const openAiMessages: OpenAiMessage[] = [
@@ -153,6 +171,7 @@ export async function* runAgentTurn(params: {
       openAiMessages,
       tools,
       params.maxTokens,
+      params.signal,
       (text) => {
         iterationText += text;
       },
@@ -175,7 +194,7 @@ export async function* runAgentTurn(params: {
     });
 
     for (const call of pendingCalls) {
-      const toolCall: ToolCall = { name: call.name, input: call.args ? JSON.parse(call.args) : {} };
+      const toolCall: ToolCall = { name: call.name, input: parseToolArgs(call.args) };
       const result = await params.executeTool(toolCall);
       yield { type: "tool-executed", call: toolCall };
       openAiMessages.push({ role: "tool", tool_call_id: call.id, content: result });

@@ -1,7 +1,7 @@
 import { createAdminClient } from "@/lib/db/supabase-admin";
 import { buildSystemPrompt, type AgentConfig } from "./prompt";
 import { runAgentTurn, type ChatMessage } from "./model";
-import { AGENT_TOOLS, type ToolCall } from "./tools";
+import { AGENT_TOOLS, parseToolInput, type ToolCall } from "./tools";
 import { getRelevantKnowledge } from "./retrieval";
 import {
   findServiceByName,
@@ -15,11 +15,20 @@ import { notifyOwnerOfBooking } from "@/lib/email/notify-booking";
 
 const MAX_TOKENS = 400;
 const MAX_HISTORY = 10;
+// Hard deadline for the whole turn (every model call in the tool loop), per spec.
+const TURN_TIMEOUT_MS = 20_000;
+
+// What happened during a turn, for callers that need more than the text —
+// e.g. WhatsApp hands off to a human when the AI failed to answer.
+export type AgentOutcome = {
+  // The model errored or timed out; the reply is the canned fallback.
+  failed: boolean;
+  // request_human ran this turn, so the conversation is now `human` by the
+  // AI's own doing (vs. the owner taking over mid-turn).
+  handedOff: boolean;
+};
 
 type AdminClient = ReturnType<typeof createAdminClient>;
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 // Resolves a service by name, or a ready-to-return error string listing what
 // is actually bookable — callers just return it as-is when it's a string.
@@ -37,29 +46,37 @@ async function resolveService(
     : "This business hasn't set up any bookable services yet.";
 }
 
+// Generic tool failure text for the model. The real error is logged, never
+// passed back — the model could otherwise repeat DB internals to a customer.
+const TOOL_FAILED =
+  "That action failed due to a technical problem. Apologise briefly and offer to have a person follow up.";
+
+function toolFailed(tool: string, err: unknown): string {
+  console.error(`Agent tool ${tool} failed:`, err);
+  return TOOL_FAILED;
+}
+
 // Returns a short text result fed back to the model as the tool's outcome.
 async function executeTool(
   admin: AdminClient,
   tenantId: string,
   businessName: string,
   conversationId: string,
-  call: ToolCall,
+  rawCall: ToolCall,
 ): Promise<string> {
+  const parsed = parseToolInput(rawCall);
+  if (!parsed.ok) return parsed.error;
+  const call = parsed.call;
+
   if (call.name === "save_lead") {
-    const lead = {
-      name: String(call.input.name ?? ""),
-      phone: String(call.input.phone ?? ""),
-      email: call.input.email || null,
-      interest: String(call.input.interest ?? ""),
-      summary: String(call.input.summary ?? ""),
-    };
+    const lead = call.input;
     const { error } = await admin.from("leads").insert({
       tenant_id: tenantId,
       conversation_id: conversationId,
       ...lead,
       source: "web",
     });
-    if (error) return `Failed to save: ${error.message}`;
+    if (error) return toolFailed(call.name, error);
 
     await notifyOwnerOfLead(admin, tenantId, businessName, lead);
     return "Lead saved successfully.";
@@ -69,23 +86,17 @@ async function executeTool(
     const { error } = await admin
       .from("conversations")
       .update({ status: "human" })
-      .eq("id", conversationId);
-    if (error) return `Failed to flag conversation: ${error.message}`;
+      .eq("id", conversationId)
+      .eq("tenant_id", tenantId);
+    if (error) return toolFailed(call.name, error);
 
-    await notifyOwnerHumanRequested(
-      admin,
-      tenantId,
-      businessName,
-      String(call.input.reason ?? "Not specified"),
-    );
+    await notifyOwnerHumanRequested(admin, tenantId, businessName, call.input.reason);
     return "Flagged for a human to take over.";
   }
 
   if (call.name === "check_availability") {
-    const date = String(call.input.date ?? "");
-    if (!DATE_RE.test(date)) return "Invalid date — use YYYY-MM-DD.";
-
-    const resolved = await resolveService(admin, tenantId, String(call.input.service ?? ""));
+    const { date } = call.input;
+    const resolved = await resolveService(admin, tenantId, call.input.service);
     if (typeof resolved === "string") return resolved;
 
     const result = await getOpenSlots(admin, tenantId, resolved.id, date);
@@ -95,87 +106,77 @@ async function executeTool(
     return `Available times on ${date} for ${resolved.name}: ${result.slots.join(", ")}.`;
   }
 
-  if (call.name === "create_booking") {
-    const date = String(call.input.date ?? "");
-    const time = String(call.input.time ?? "");
-    if (!DATE_RE.test(date) || !TIME_RE.test(time)) {
-      return "Invalid date or time — date must be YYYY-MM-DD, time must be 24-hour HH:MM.";
-    }
+  // create_booking
+  const { date, time, name, phone, email } = call.input;
+  const resolved = await resolveService(admin, tenantId, call.input.service);
+  if (typeof resolved === "string") return resolved;
 
-    const resolved = await resolveService(admin, tenantId, String(call.input.service ?? ""));
-    if (typeof resolved === "string") return resolved;
-
-    // Recomputed here even though the model should have just called
-    // check_availability — defends against a stale or made-up time.
-    const availability = await getOpenSlots(admin, tenantId, resolved.id, date);
-    if (!availability || !availability.slots.includes(time)) {
-      return `That time isn't available. Call check_availability again for ${date} and pick one of the returned times.`;
-    }
-
-    const name = String(call.input.name ?? "");
-    const phone = String(call.input.phone ?? "");
-    const email = call.input.email || null;
-    const startsAt = localToUtcDate(date, time);
-    const endsAt = new Date(startsAt.getTime() + resolved.duration_minutes * 60_000);
-
-    const { data: lead, error: leadError } = await admin
-      .from("leads")
-      .insert({
-        tenant_id: tenantId,
-        conversation_id: conversationId,
-        name,
-        phone,
-        email,
-        interest: resolved.name,
-        summary: `Booked ${resolved.name} on ${date} at ${time}`,
-        status: "booked",
-        source: "booking",
-      })
-      .select("id")
-      .single();
-    if (leadError) return `Failed to save booking: ${leadError.message}`;
-
-    const { error: bookingError } = await admin.from("bookings").insert({
-      tenant_id: tenantId,
-      service_id: resolved.id,
-      conversation_id: conversationId,
-      lead_id: lead.id,
-      name,
-      phone,
-      email,
-      starts_at: startsAt.toISOString(),
-      ends_at: endsAt.toISOString(),
-    });
-    if (bookingError) {
-      // Exclusion-violation: another booking took this slot between our
-      // availability check above and this insert.
-      if (bookingError.code === "23P01") {
-        return "That slot was just taken by someone else — please pick a different time.";
-      }
-      return `Failed to save booking: ${bookingError.message}`;
-    }
-
-    await notifyOwnerOfBooking(admin, tenantId, businessName, {
-      name,
-      phone,
-      email,
-      serviceName: resolved.name,
-      startsAtLabel: `${date} at ${time}`,
-    });
-
-    return `Booking confirmed: ${resolved.name} on ${date} at ${time}.`;
+  // Recomputed here even though the model should have just called
+  // check_availability — defends against a stale or made-up time.
+  const availability = await getOpenSlots(admin, tenantId, resolved.id, date);
+  if (!availability || !availability.slots.includes(time)) {
+    return `That time isn't available. Call check_availability again for ${date} and pick one of the returned times.`;
   }
 
-  return `Unknown tool: ${call.name}`;
+  const startsAt = localToUtcDate(date, time);
+  const endsAt = new Date(startsAt.getTime() + resolved.duration_minutes * 60_000);
+
+  const { data: lead, error: leadError } = await admin
+    .from("leads")
+    .insert({
+      tenant_id: tenantId,
+      conversation_id: conversationId,
+      name,
+      phone,
+      email,
+      interest: resolved.name,
+      summary: `Booked ${resolved.name} on ${date} at ${time}`,
+      status: "booked",
+      source: "booking",
+    })
+    .select("id")
+    .single();
+  if (leadError) return toolFailed(call.name, leadError);
+
+  const { error: bookingError } = await admin.from("bookings").insert({
+    tenant_id: tenantId,
+    service_id: resolved.id,
+    conversation_id: conversationId,
+    lead_id: lead.id,
+    name,
+    phone,
+    email,
+    starts_at: startsAt.toISOString(),
+    ends_at: endsAt.toISOString(),
+  });
+  if (bookingError) {
+    // Exclusion-violation: another booking took this slot between our
+    // availability check above and this insert.
+    if (bookingError.code === "23P01") {
+      return "That slot was just taken by someone else — please pick a different time.";
+    }
+    return toolFailed(call.name, bookingError);
+  }
+
+  await notifyOwnerOfBooking(admin, tenantId, businessName, {
+    name,
+    phone,
+    email,
+    serviceName: resolved.name,
+    startsAtLabel: `${date} at ${time}`,
+  });
+
+  return `Booking confirmed: ${resolved.name} on ${date} at ${time}.`;
 }
 
 // Streams the assistant's reply text as it's generated, persisting the user
 // message up front and the full assistant reply once streaming finishes.
+// The generator's return value reports how the turn went (see AgentOutcome).
 export async function* runAgent(params: {
   tenantId: string;
   conversationId: string;
   userMessage: string;
-}): AsyncGenerator<string> {
+}): AsyncGenerator<string, AgentOutcome> {
   const admin = createAdminClient();
 
   const { data: agentConfig, error: configError } = await admin
@@ -186,7 +187,7 @@ export async function* runAgent(params: {
 
   if (configError || !agentConfig) {
     yield "Sorry, something went wrong on our end. Please try again shortly.";
-    return;
+    return { failed: true, handedOff: false };
   }
 
   const { data: history } = await admin
@@ -224,6 +225,8 @@ export async function* runAgent(params: {
   let fullText = "";
   let tokensIn = 0;
   let tokensOut = 0;
+  let failed = false;
+  let handedOff = false;
 
   try {
     for await (const event of runAgentTurn({
@@ -231,6 +234,7 @@ export async function* runAgent(params: {
       messages,
       tools: AGENT_TOOLS,
       maxTokens: MAX_TOKENS,
+      signal: AbortSignal.timeout(TURN_TIMEOUT_MS),
       executeTool: (call) =>
         executeTool(admin, params.tenantId, agentConfig.business_name, params.conversationId, call),
     })) {
@@ -242,9 +246,13 @@ export async function* runAgent(params: {
         // totals across iterations are summed, not overwritten.
         tokensIn += event.promptTokens;
         tokensOut += event.completionTokens;
+      } else if (event.type === "tool-executed" && event.call.name === "request_human") {
+        handedOff = true;
       }
     }
-  } catch {
+  } catch (err) {
+    console.error("Agent turn failed:", err);
+    failed = true;
     const fallback = `Sorry, I'm having trouble responding right now. Please reach out directly${
       agentConfig.handoff_contact ? ` at ${agentConfig.handoff_contact}` : ""
     }.`;
@@ -262,4 +270,6 @@ export async function* runAgent(params: {
       tokens_out: tokensOut,
     });
   }
+
+  return { failed, handedOff };
 }

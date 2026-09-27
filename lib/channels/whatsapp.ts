@@ -22,6 +22,21 @@ async function callGraphApi(phoneNumberId: string, accessToken: string, body: un
   }
 }
 
+const SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+// Whether a free-form (non-template) message may be sent: Meta only allows it
+// within 24h of the customer's last inbound message. Check this before every
+// free-form send that isn't an immediate reply — e.g. a human replying from the
+// dashboard hours later.
+export function isWithinServiceWindow(
+  lastInboundAt: string | Date | null,
+  now: Date = new Date(),
+): boolean {
+  if (!lastInboundAt) return false;
+  const elapsed = now.getTime() - new Date(lastInboundAt).getTime();
+  return elapsed >= 0 && elapsed < SERVICE_WINDOW_MS;
+}
+
 // Free-form text reply. Only valid within the 24h customer service window
 // (i.e. in response to an inbound message) — Meta rejects it outside that window.
 export async function sendWhatsAppText(

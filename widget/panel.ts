@@ -130,11 +130,34 @@ export function createWidget(
   shadow.appendChild(panel);
 
   let sending = false;
+  let sentThisPageView = false;
+
+  // Re-renders this session's earlier messages after a page reload. Best-effort:
+  // if it fails, the visitor just sees a fresh greeting.
+  async function restoreHistory() {
+    try {
+      const params = new URLSearchParams({ key: publicKey, sessionId });
+      const res = await fetch(`${apiOrigin}/api/chat/history?${params}`);
+      if (!res.ok) return;
+      const { messages } = (await res.json()) as {
+        messages: { role: "user" | "assistant"; content: string }[];
+      };
+      // If the visitor already sent something in this page view, the server
+      // history includes it too — rendering it now would duplicate it.
+      if (!messages.length || sentThisPageView) return;
+
+      for (const m of messages) addMessage(m.role, m.content);
+    } catch {
+      // Ignore — see comment above.
+    }
+  }
+  restoreHistory();
 
   async function sendMessage(text: string) {
     const trimmed = text.trim();
     if (!trimmed || sending) return;
     sending = true;
+    sentThisPageView = true;
     sendBtn.disabled = true;
     textarea.value = "";
 

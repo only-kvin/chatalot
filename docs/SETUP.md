@@ -99,3 +99,20 @@ Manual steps the platform owner needs to do. Kept up to date as new phases add n
 3. **WhatsApp reminder template**: `send-booking-reminders` sends via `sendWhatsAppTemplate` using a template named `booking_reminder` (English) — this must be created and approved in Meta Business Manager (WhatsApp Manager -> Message Templates) before sends will actually succeed, same situation Phase 3 left `sendWhatsAppTemplate` in. Until it's approved, the cron route still runs end-to-end (queries bookings, attempts the send, logs the Graph API rejection, leaves `reminder_sent_at` null so it retries) — nothing breaks, it just won't deliver.
 
 4. Once services and weekly availability are set up per-tenant (`/dashboard/services`, `/dashboard/availability`), the agent can offer real booking slots — test via `public/widget-demo.html` or a WhatsApp conversation by asking to book something.
+
+## Reliability & safety hardening (2026-09-27)
+
+**Manual step:**
+
+1. **Push the new migration** (adds `conversations.last_inbound_at` for WhatsApp's 24-hour service window, backfilled from `last_message_at` for existing WhatsApp conversations):
+   ```
+   pnpm exec supabase db push --db-url "$POSTGRES_URL_NON_POOLING"
+   ```
+   Deploy *after* pushing — the WhatsApp webhook now writes this column, and would fail on every inbound message until it exists.
+
+**Behaviour changes worth knowing:**
+
+- **WhatsApp failures now hand off to a human.** If the AI times out or errors (or the reply can't be sent), the conversation is set to `human` and the owner gets the "human requested" email, so someone actually follows up. Hand it back to the AI from the conversation page once dealt with.
+- **"Take over" mid-reply wins.** If the owner takes over while the AI is still generating a WhatsApp reply, that reply is discarded instead of sent.
+- **Agent turns have a hard 20s deadline** (all model calls in the tool loop combined); past it the visitor gets the fallback reply with `handoff_contact`.
+- **The widget restores the visitor's last 50 messages** on reload, via `GET /api/chat/history` (same origin check as the rest of the widget API).

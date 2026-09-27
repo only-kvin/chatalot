@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 // Provider-neutral tool definitions. `model.ts` translates these into whatever
 // shape the active model provider expects (currently Groq's OpenAI-compatible
 // function-calling format; Anthropic's tool-use format later).
@@ -85,7 +87,66 @@ export const AGENT_TOOLS: ToolDef[] = [
   },
 ];
 
+// `input` is whatever the model produced — untrusted until parseToolInput accepts it.
 export type ToolCall = {
   name: string;
-  input: Record<string, string | null>;
+  input: unknown;
 };
+
+const requiredText = z.string().trim().min(1);
+// Models often send "" instead of null for an omitted optional field.
+const optionalText = z
+  .string()
+  .nullish()
+  .transform((v) => v?.trim() || null);
+const dateText = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "must be YYYY-MM-DD");
+const timeText = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "must be 24-hour HH:MM");
+
+// Zod mirrors of AGENT_TOOLS' JSON schemas above — model output is an API
+// boundary like any other, so every tool input is validated before it runs.
+export const TOOL_INPUT_SCHEMAS = {
+  save_lead: z.object({
+    name: requiredText,
+    phone: requiredText,
+    email: optionalText,
+    interest: requiredText,
+    summary: requiredText,
+  }),
+  request_human: z.object({ reason: requiredText }),
+  check_availability: z.object({ service: requiredText, date: dateText }),
+  create_booking: z.object({
+    service: requiredText,
+    date: dateText,
+    time: timeText,
+    name: requiredText,
+    phone: requiredText,
+    email: optionalText,
+  }),
+};
+
+export type ToolName = keyof typeof TOOL_INPUT_SCHEMAS;
+export type ToolInput<N extends ToolName> = z.infer<(typeof TOOL_INPUT_SCHEMAS)[N]>;
+
+export type ParsedToolCall = {
+  [N in ToolName]: { name: N; input: ToolInput<N> };
+}[ToolName];
+
+// On failure, `error` is a short message safe to hand back to the model so it
+// can correct itself (field names and rules only — no internal details).
+export function parseToolInput(
+  call: ToolCall,
+): { ok: true; call: ParsedToolCall } | { ok: false; error: string } {
+  // hasOwn, not `in` — `in` would accept inherited names like "toString".
+  if (!Object.hasOwn(TOOL_INPUT_SCHEMAS, call.name)) {
+    return { ok: false, error: `Unknown tool: ${call.name}` };
+  }
+  const name = call.name as ToolName;
+  const result = TOOL_INPUT_SCHEMAS[name].safeParse(call.input);
+  if (!result.success) {
+    const problems = result.error.issues
+      .map((i) => `${i.path.join(".") || "input"} ${i.message}`)
+      .join("; ");
+    return { ok: false, error: `Invalid input for ${name}: ${problems}.` };
+  }
+  return { ok: true, call: { name, input: result.data } as ParsedToolCall };
+}
