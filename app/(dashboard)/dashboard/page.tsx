@@ -8,12 +8,19 @@ import {
   ClockIcon,
   MessageCircleIcon,
   SettingsIcon,
+  ContactRoundIcon,
   type LucideIcon,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/dashboard/page-header";
 
 const SECTIONS: { href: string; title: string; description: string; icon: LucideIcon }[] = [
+  {
+    href: "/dashboard/customers",
+    title: "Customers",
+    description: "Everyone who has contacted you, with their chats, leads and bookings in one place.",
+    icon: ContactRoundIcon,
+  },
   {
     href: "/dashboard/leads",
     title: "Leads",

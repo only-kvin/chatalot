@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { formatPhone } from "@/lib/contacts/phone";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
@@ -23,7 +25,7 @@ export default async function ConversationPage({
 
   const { data: conversation } = await supabase
     .from("conversations")
-    .select("id, channel, status, external_id, last_inbound_at")
+    .select("id, channel, status, external_id, last_inbound_at, contacts(id, name, phone_e164)")
     .eq("id", id)
     .eq("tenant_id", tenantId)
     .single();
@@ -37,6 +39,11 @@ export default async function ConversationPage({
     .order("created_at", { ascending: true });
 
   const nextStatus = conversation.status === "human" ? "ai" : "human";
+  const customer = conversation.contacts as unknown as {
+    id: string;
+    name: string | null;
+    phone_e164: string | null;
+  } | null;
 
   // Business-side messages without a sender are the AI's (or automatic
   // system replies); ones with a sender were typed in this dashboard.
@@ -52,6 +59,14 @@ export default async function ConversationPage({
           <h1 className="text-2xl font-semibold">Conversation</h1>
           <p className="text-sm text-zinc-500">
             {conversation.channel} · <Badge variant="secondary">{conversation.status}</Badge>
+            {customer && (
+              <>
+                {" · "}
+                <Link href={`/dashboard/customers/${customer.id}`} className="hover:underline">
+                  {customer.name || formatPhone(customer.phone_e164) || "View customer"}
+                </Link>
+              </>
+            )}
           </p>
         </div>
         <form action={toggleTakeOverAction}>

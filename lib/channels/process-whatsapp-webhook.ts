@@ -5,6 +5,7 @@ import { isWithinServiceWindow, sendWhatsAppText } from "./whatsapp";
 import { customerTurns, redisTurnStore } from "./customer-lock";
 import { runAgent } from "@/lib/agent/engine";
 import { wantsHuman } from "@/lib/agent/handoff-intent";
+import { linkConversation, upsertContact } from "@/lib/contacts/upsert";
 import { checkDailyTenantCap } from "@/lib/security/rate-limit";
 import { notifyOwnerHumanRequested } from "@/lib/email/notify-human-requested";
 
@@ -23,6 +24,8 @@ type WhatsAppStatus = {
 
 type WebhookValue = {
   metadata: { phone_number_id: string };
+  // The sender's WhatsApp profile, keyed by their number (wa_id).
+  contacts?: { wa_id: string; profile?: { name?: string } }[];
   messages?: WhatsAppMessage[];
   statuses?: WhatsAppStatus[];
 };
@@ -76,6 +79,7 @@ async function handleMessage(
   phoneNumberId: string,
   accessToken: string,
   message: WhatsAppMessage,
+  profileName: string | null,
 ) {
   const isText = message.type === "text" && !!message.text;
   const nonTextLabel = NON_TEXT_LABELS[message.type];
@@ -98,9 +102,25 @@ async function handleMessage(
       },
       { onConflict: "tenant_id,channel,external_id" },
     )
-    .select("id, status, last_inbound_at")
+    .select("id, status, last_inbound_at, contact_id")
     .single();
   if (!conversation) return;
+
+  // Their number is known, so every WhatsApp sender is a customer record.
+  const contactId = await upsertContact(admin, {
+    tenantId,
+    phone: customerPhone,
+    name: profileName,
+    nameSource: "whatsapp_profile",
+    channel: "whatsapp",
+    seenAt: receivedAt,
+  }).catch((err) => {
+    console.error("Recording WhatsApp customer failed:", err);
+    return null;
+  });
+  if (contactId && !conversation.contact_id) {
+    await linkConversation(admin, tenantId, conversation.id, contactId);
+  }
 
   if (!isText) {
     // Saved so the owner sees it in the transcript and the AI knows about it
@@ -361,7 +381,7 @@ export async function processWhatsAppWebhook(payload: WebhookPayload): Promise<v
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
       if (change.field !== "messages") continue;
-      const { metadata, messages, statuses } = change.value;
+      const { metadata, messages, statuses, contacts } = change.value;
       if (statuses?.length) logFailedStatuses(statuses);
       if (!messages?.length) continue;
 
@@ -384,6 +404,7 @@ export async function processWhatsAppWebhook(payload: WebhookPayload): Promise<v
             metadata.phone_number_id,
             accessToken,
             message,
+            contacts?.find((c) => c.wa_id === message.from)?.profile?.name ?? null,
           );
         } catch (err) {
           // This already returned 200 to Meta — there's no request left to fail.

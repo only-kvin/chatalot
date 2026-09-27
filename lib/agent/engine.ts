@@ -13,6 +13,7 @@ import {
 import { notifyOwnerOfLead } from "@/lib/email/notify-lead";
 import { notifyOwnerHumanRequested } from "@/lib/email/notify-human-requested";
 import { notifyOwnerOfBooking } from "@/lib/email/notify-booking";
+import { linkConversation, upsertContact } from "@/lib/contacts/upsert";
 
 const MAX_TOKENS = 400;
 const MAX_HISTORY = 10;
@@ -88,6 +89,31 @@ function webHandoffInstructions(whatsappAvailable: boolean): string {
     .join(" ");
 }
 
+// The visitor shared their details (with consent, per the tool rules): find
+// or create them as a customer and attach this conversation to them. A
+// website chat becomes a known customer here. Best-effort — never blocks the
+// lead or booking itself.
+async function rememberCustomer(
+  admin: AdminClient,
+  ctx: ToolContext,
+  details: { name: string; phone: string; email: string | null },
+): Promise<string | null> {
+  try {
+    const contactId = await upsertContact(admin, {
+      tenantId: ctx.tenantId,
+      ...details,
+      nameSource: "customer",
+      channel: ctx.channel,
+      consent: true,
+    });
+    if (contactId) await linkConversation(admin, ctx.tenantId, ctx.conversationId, contactId);
+    return contactId;
+  } catch (err) {
+    console.error("Remembering customer failed:", err);
+    return null;
+  }
+}
+
 async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall: ToolCall): Promise<string> {
   const { tenantId, businessName, conversationId } = ctx;
   const parsed = parseToolInput(rawCall);
@@ -96,9 +122,11 @@ async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall: ToolCa
 
   if (call.name === "save_lead") {
     const lead = call.input;
+    const contactId = await rememberCustomer(admin, ctx, lead);
     const { error } = await admin.from("leads").insert({
       tenant_id: tenantId,
       conversation_id: conversationId,
+      contact_id: contactId,
       ...lead,
       source: ctx.channel,
     });
@@ -151,6 +179,7 @@ async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall: ToolCa
     return `That time isn't available. Call check_availability again for ${date} and pick one of the returned times.`;
   }
 
+  const contactId = await rememberCustomer(admin, ctx, { name, phone, email });
   const startsAt = localToUtcDate(date, time);
   const endsAt = new Date(startsAt.getTime() + resolved.duration_minutes * 60_000);
 
@@ -159,6 +188,7 @@ async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall: ToolCa
     .insert({
       tenant_id: tenantId,
       conversation_id: conversationId,
+      contact_id: contactId,
       name,
       phone,
       email,
@@ -175,6 +205,7 @@ async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall: ToolCa
     tenant_id: tenantId,
     service_id: resolved.id,
     conversation_id: conversationId,
+    contact_id: contactId,
     lead_id: lead.id,
     name,
     phone,

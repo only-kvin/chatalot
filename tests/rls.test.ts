@@ -27,6 +27,7 @@ describe("RLS tenant isolation", () => {
   let userAId: string;
   let userBId: string;
   let clientA: SupabaseClient;
+  let contactBId: string;
 
   beforeAll(async () => {
     tenantA = await createTenant(admin, {
@@ -80,6 +81,14 @@ describe("RLS tenant isolation", () => {
     ]);
     if (knowledgeError) throw knowledgeError;
 
+    const { data: contactB, error: contactError } = await admin
+      .from("contacts")
+      .insert({ tenant_id: tenantB.id, name: "TENANT_B_CUSTOMER", phone_e164: "27990000002" })
+      .select("id")
+      .single();
+    if (contactError) throw contactError;
+    contactBId = contactB.id;
+
     clientA = scopedClient();
     const { error: signInError } = await clientA.auth.signInWithPassword({
       email: emailA,
@@ -110,6 +119,19 @@ describe("RLS tenant isolation", () => {
       .eq("tenant_id", tenantB.id);
     expect(error).toBeNull();
     expect(data).toEqual([]);
+  });
+
+  it("hides another tenant's customers", async () => {
+    const { data, error } = await clientA.from("contacts").select("name");
+    expect(error).toBeNull();
+    expect(data!.map((r) => r.name)).not.toContain("TENANT_B_CUSTOMER");
+  });
+
+  it("can't delete another tenant's customer", async () => {
+    const { error } = await clientA.rpc("delete_contact_with_history", { p_contact_id: contactBId });
+    expect(error?.message).toContain("Customer not found");
+    const { data } = await admin.from("contacts").select("id").eq("id", contactBId);
+    expect(data).toHaveLength(1);
   });
 
   it("rejects writes into another tenant", async () => {

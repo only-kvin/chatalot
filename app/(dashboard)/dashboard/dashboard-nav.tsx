@@ -13,6 +13,7 @@ import {
   MessageCircleIcon,
   SettingsIcon,
   ShieldIcon,
+  ContactRoundIcon,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "cn";
@@ -22,6 +23,7 @@ type NavItem = { href: string; label: string; icon: LucideIcon; exact?: boolean 
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboardIcon, exact: true },
+  { href: "/dashboard/customers", label: "Customers", icon: ContactRoundIcon },
   { href: "/dashboard/leads", label: "Leads", icon: UsersIcon },
   { href: "/dashboard/conversations", label: "Conversations", icon: MessageSquareIcon },
   { href: "/dashboard/knowledge", label: "Knowledge", icon: BookOpenIcon },

@@ -85,7 +85,7 @@ export async function POST(request: Request) {
       { tenant_id: tenant.id, channel: "web", external_id: sessionId, last_message_at: new Date().toISOString() },
       { onConflict: "tenant_id,channel,external_id" },
     )
-    .select("id, status")
+    .select("id, status, contact_id")
     .single();
 
   if (!conversation) {
@@ -93,6 +93,15 @@ export async function POST(request: Request) {
       { error: "Could not start conversation" },
       { status: 500, headers: corsHeaders(origin) },
     );
+  }
+
+  if (conversation.contact_id) {
+    // A visitor who shared their details earlier: keep "last seen" current.
+    await admin
+      .from("contacts")
+      .update({ last_seen_at: new Date().toISOString() })
+      .eq("id", conversation.contact_id)
+      .eq("tenant_id", tenant.id);
   }
 
   const [{ data: widgetSettings }, { data: agentConfig }] = await Promise.all([
