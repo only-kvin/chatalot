@@ -43,7 +43,7 @@ export const AGENT_TOOLS: ToolDef[] = [
   {
     name: "request_human",
     description:
-      "Flag this conversation for a human to take over — call when the visitor explicitly asks for a person, or when you're unsure how to answer from the available knowledge.",
+      "Alert the team that this visitor needs a person. Call it immediately when the visitor asks for a person (don't ask whether they'd like you to), or when they accept your offer of one. Follow the instructions in the result.",
     parameters: {
       type: "object",
       properties: {

@@ -3,6 +3,15 @@ import { createAdminClient } from "@/lib/db/supabase-admin";
 import { isOriginAllowed } from "@/lib/security/origin-check";
 import { checkRateLimit, checkDailyTenantCap } from "@/lib/security/rate-limit";
 import { runAgent } from "@/lib/agent/engine";
+import { wantsHuman } from "@/lib/agent/handoff-intent";
+import { notifyOwnerHumanRequested } from "@/lib/email/notify-human-requested";
+import {
+  type ChatAction,
+  webHandoffMessage,
+  webTakenOverMessage,
+  whatsappAction,
+  whatsappContinueUrl,
+} from "@/lib/channels/web-handoff";
 
 const bodySchema = z.object({
   key: z.string().min(1),
@@ -69,14 +78,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const { allowed: capOk } = await checkDailyTenantCap(admin, tenant.id);
-  if (!capOk) {
-    return Response.json(
-      { error: "This business has reached its daily message limit. Please try again tomorrow." },
-      { status: 429, headers: corsHeaders(origin) },
-    );
-  }
-
   // One conversation per (tenant, channel, session).
   const { data: conversation } = await admin
     .from("conversations")
@@ -94,42 +95,102 @@ export async function POST(request: Request) {
     );
   }
 
+  const [{ data: widgetSettings }, { data: agentConfig }] = await Promise.all([
+    admin.from("widget_settings").select("whatsapp_link").eq("tenant_id", tenant.id).maybeSingle(),
+    admin.from("agent_configs").select("business_name, handoff_contact").eq("tenant_id", tenant.id).maybeSingle(),
+  ]);
+  const whatsappUrl = whatsappContinueUrl(widgetSettings?.whatsapp_link);
+  const handoff = { whatsapp: whatsappUrl !== null, handoffContact: agentConfig?.handoff_contact || null };
+  const headers = {
+    ...corsHeaders(origin),
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+  };
+
+  const saveMessage = (role: "user" | "assistant", content: string) =>
+    admin.from("messages").insert({ tenant_id: tenant.id, conversation_id: conversation.id, role, content });
+
+  // Nobody can reply in the widget, so neither case below locks the visitor
+  // out: their message is kept for the owner, and they get a fixed reply with
+  // a way to reach a person (WhatsApp button, callback details).
   if (conversation.status === "human") {
-    // A human has taken over — don't let the AI reply.
+    // The owner took over from the dashboard.
+    const reply = webTakenOverMessage(handoff);
+    await saveMessage("user", message);
+    await saveMessage("assistant", reply);
+    return new Response(fixedReplyStream(reply, whatsappAction(whatsappUrl)), { headers });
+  }
+
+  if (wantsHuman(message)) {
+    // Handled in code: the model sometimes only offers a handoff.
+    const reply = webHandoffMessage(handoff);
+    await saveMessage("user", message);
+    await notifyOwnerHumanRequested(
+      admin,
+      tenant.id,
+      agentConfig?.business_name ?? "",
+      "A website visitor asked to speak to a person.",
+      conversation.id,
+    );
+    await saveMessage("assistant", reply);
+    return new Response(fixedReplyStream(reply, whatsappAction(whatsappUrl)), { headers });
+  }
+
+  // The cap limits AI replies only, so it's checked after the fixed replies above.
+  const { allowed: capOk } = await checkDailyTenantCap(admin, tenant.id);
+  if (!capOk) {
     return Response.json(
-      { error: "This conversation is being handled by a person." },
-      { status: 409, headers: corsHeaders(origin) },
+      { error: "This business has reached its daily message limit. Please try again tomorrow." },
+      { status: 429, headers: corsHeaders(origin) },
     );
   }
 
-  const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        for await (const chunk of runAgent({
+        const agent = runAgent({
           tenantId: tenant.id,
           conversationId: conversation.id,
           userMessage: message,
-        })) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: chunk })}\n\n`));
+          channel: "web",
+          whatsappAvailable: whatsappUrl !== null,
+        });
+        let step = await agent.next();
+        while (!step.done) {
+          controller.enqueue(sse({ text: step.value }));
+          step = await agent.next();
         }
+        // The AI handed off itself: show the button its reply points to.
+        const action = step.value.handedOff ? whatsappAction(whatsappUrl) : null;
+        if (action) controller.enqueue(sse({ action }));
       } catch {
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ error: "Something went wrong." })}\n\n`),
-        );
+        controller.enqueue(sse({ error: "Something went wrong." }));
       } finally {
-        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        controller.enqueue(DONE);
         controller.close();
       }
     },
   });
 
-  return new Response(stream, {
-    headers: {
-      ...corsHeaders(origin),
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
+  return new Response(stream, { headers });
+}
+
+const encoder = new TextEncoder();
+const DONE = encoder.encode("data: [DONE]\n\n");
+
+function sse(payload: { text?: string; action?: ChatAction; error?: string }): Uint8Array {
+  return encoder.encode(`data: ${JSON.stringify(payload)}\n\n`);
+}
+
+// A reply that doesn't come from the model, in the same SSE shape the widget reads.
+function fixedReplyStream(text: string, action: ChatAction | null): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(sse({ text }));
+      if (action) controller.enqueue(sse({ action }));
+      controller.enqueue(DONE);
+      controller.close();
     },
   });
 }

@@ -60,13 +60,13 @@ export function WidgetEditor({
   function handleSubmit(formData: FormData) {
     setError(null);
     startTransition(async () => {
-      try {
-        await updateWidgetSettingsAction(formData);
-        // Remount the preview iframe so it reloads against the saved settings.
-        setPreviewKey((k) => k + 1);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Something went wrong");
+      const result = await updateWidgetSettingsAction(formData);
+      if (result.error) {
+        setError(result.error);
+        return;
       }
+      // Remount the preview iframe so it reloads against the saved settings.
+      setPreviewKey((k) => k + 1);
     });
   }
 
@@ -164,7 +164,9 @@ export function WidgetEditor({
                   placeholder="https://wa.me/27..."
                 />
                 <p className="text-xs text-zinc-500">
-                  Shown as a &quot;Chat on WhatsApp&quot; button in the widget, if set.
+                  Shown as a &quot;Chat on WhatsApp&quot; button in the widget, and offered to visitors
+                  who ask to speak to a person, since you can reply to them on WhatsApp from
+                  Conversations.
                 </p>
               </div>
               {error && <p className="feedback-enter text-sm text-red-600">{error}</p>}

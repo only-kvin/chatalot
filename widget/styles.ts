@@ -97,6 +97,19 @@ export function buildStyles(primaryColor: string): string {
     }
     .msg.assistant { background: #f4f4f5; color: #18181b; align-self: flex-start; }
     .msg.user { background: ${primaryColor}; color: white; align-self: flex-end; }
+    /* A button under an assistant reply, e.g. "Continue on WhatsApp" on handoff. */
+    .msg-action {
+      align-self: flex-start;
+      display: inline-block;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: #25d366;
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .msg-action:focus-visible { outline: 2px solid ${primaryColor}; outline-offset: 2px; }
 
     .quick-replies {
       display: flex;

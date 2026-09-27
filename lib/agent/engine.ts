@@ -24,8 +24,9 @@ const TURN_TIMEOUT_MS = 20_000;
 export type AgentOutcome = {
   // The model errored or timed out; the reply is the canned fallback.
   failed: boolean;
-  // request_human ran this turn, so the conversation is now `human` by the
-  // AI's own doing (vs. the owner taking over mid-turn).
+  // request_human ran this turn. On WhatsApp the conversation is now `human`
+  // by the AI's own doing (vs. the owner taking over mid-turn); on the web the
+  // chat stays open and the caller offers the WhatsApp button.
   handedOff: boolean;
   // The caller's keepReply said the reply won't be delivered, so it wasn't
   // saved to the transcript.
@@ -61,13 +62,34 @@ function toolFailed(tool: string, err: unknown): string {
 }
 
 // Returns a short text result fed back to the model as the tool's outcome.
-async function executeTool(
-  admin: AdminClient,
-  tenantId: string,
-  businessName: string,
-  conversationId: string,
-  rawCall: ToolCall,
-): Promise<string> {
+export type Channel = "web" | "whatsapp";
+
+type ToolContext = {
+  tenantId: string;
+  businessName: string;
+  conversationId: string;
+  channel: Channel;
+  // Web only: the tenant has a WhatsApp link the widget can offer on handoff.
+  whatsappAvailable: boolean;
+};
+
+// Tool result for request_human on the website, where the owner can't reply
+// in the chat: the model steers the visitor to a channel that reaches a person.
+function webHandoffInstructions(whatsappAvailable: boolean): string {
+  return [
+    "The team has been notified, but they can't reply in this website chat.",
+    whatsappAvailable
+      ? "Tell the visitor the quickest way to reach a person is WhatsApp, using the button shown under your reply."
+      : "",
+    "Offer to take their name and phone number so the team can contact them. If they share them, ask their permission, then call save_lead with interest 'Callback request'.",
+    "Do not say someone will reply in this chat.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall: ToolCall): Promise<string> {
+  const { tenantId, businessName, conversationId } = ctx;
   const parsed = parseToolInput(rawCall);
   if (!parsed.ok) return parsed.error;
   const call = parsed.call;
@@ -78,7 +100,7 @@ async function executeTool(
       tenant_id: tenantId,
       conversation_id: conversationId,
       ...lead,
-      source: "web",
+      source: ctx.channel,
     });
     if (error) return toolFailed(call.name, error);
 
@@ -87,6 +109,13 @@ async function executeTool(
   }
 
   if (call.name === "request_human") {
+    if (ctx.channel === "web") {
+      // No human can answer in the widget, so the chat stays with the AI —
+      // locking it would strand the visitor. The owner is alerted either way.
+      await notifyOwnerHumanRequested(admin, tenantId, businessName, call.input.reason, conversationId);
+      return webHandoffInstructions(ctx.whatsappAvailable);
+    }
+
     const { error } = await admin
       .from("conversations")
       .update({ status: "human" })
@@ -185,6 +214,9 @@ export async function* runAgent(params: {
   tenantId: string;
   conversationId: string;
   userMessage: string;
+  channel: Channel;
+  // Web only: whether the widget can offer a WhatsApp button on handoff.
+  whatsappAvailable?: boolean;
   keepReply?: (outcome: Omit<AgentOutcome, "discarded">) => Promise<boolean>;
 }): AsyncGenerator<string, AgentOutcome> {
   const admin = createAdminClient();
@@ -251,7 +283,17 @@ export async function* runAgent(params: {
       maxTokens: MAX_TOKENS,
       signal: AbortSignal.timeout(TURN_TIMEOUT_MS),
       executeTool: (call) =>
-        executeTool(admin, params.tenantId, agentConfig.business_name, params.conversationId, call),
+        executeTool(
+          admin,
+          {
+            tenantId: params.tenantId,
+            businessName: agentConfig.business_name,
+            conversationId: params.conversationId,
+            channel: params.channel,
+            whatsappAvailable: params.whatsappAvailable ?? false,
+          },
+          call,
+        ),
     })) {
       if (event.type === "text-delta") {
         fullText += event.text;

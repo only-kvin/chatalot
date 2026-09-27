@@ -4,6 +4,7 @@ import { redis } from "@/lib/redis";
 import { isWithinServiceWindow, sendWhatsAppText } from "./whatsapp";
 import { customerTurns, redisTurnStore } from "./customer-lock";
 import { runAgent } from "@/lib/agent/engine";
+import { wantsHuman } from "@/lib/agent/handoff-intent";
 import { checkDailyTenantCap } from "@/lib/security/rate-limit";
 import { notifyOwnerHumanRequested } from "@/lib/email/notify-human-requested";
 
@@ -131,7 +132,7 @@ async function handleMessage(
   const businessName = agentConfig?.business_name ?? "";
   const handoffContact = agentConfig?.handoff_contact ?? "";
 
-  if (normalized === "human" || normalized === "agent") {
+  if (wantsHuman(text)) {
     const confirmation = "A team member will get back to you shortly.";
     await saveMessage(admin, tenantId, conversation.id, "user", text);
     await setHuman(admin, tenantId, conversation.id);
@@ -227,6 +228,7 @@ async function replyWithAgent(
       tenantId: p.tenantId,
       conversationId: p.conversationId,
       userMessage: p.text,
+      channel: "whatsapp",
       keepReply: async ({ failed, handedOff }) => {
         // A failure's fallback text (with handoff_contact) always goes out.
         // So does the AI's own "someone will be in touch" after request_human.

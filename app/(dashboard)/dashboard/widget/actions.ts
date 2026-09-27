@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
+import { whatsappContinueUrl } from "@/lib/channels/web-handoff";
 
 const widgetSchema = z.object({
   primary_color: z
@@ -14,12 +15,21 @@ const widgetSchema = z.object({
   launcher_text: z.string().min(1, "Launcher text is required"),
   teaser_text: z.string(),
   quick_replies: z.string(),
-  whatsapp_link: z.string(),
+  // Must be a wa.me (or api.whatsapp.com) link: the widget offers it as the
+  // way to reach a person when a visitor asks for one.
+  whatsapp_link: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || whatsappContinueUrl(v) !== null, {
+      message: "Use a WhatsApp link like https://wa.me/27821234567 (country code, no + or spaces).",
+    }),
 });
 
-export async function updateWidgetSettingsAction(formData: FormData) {
+// Returns errors rather than throwing: Next.js hides thrown server action
+// messages in production, and these are meant for the owner to read.
+export async function updateWidgetSettingsAction(formData: FormData): Promise<{ error: string | null }> {
   const tenantId = await getCurrentTenantId();
-  if (!tenantId) throw new Error("Not authorized");
+  if (!tenantId) return { error: "Not authorized." };
 
   const parsed = widgetSchema.safeParse({
     primary_color: formData.get("primary_color"),
@@ -30,7 +40,7 @@ export async function updateWidgetSettingsAction(formData: FormData) {
     quick_replies: formData.get("quick_replies") ?? "",
     whatsapp_link: formData.get("whatsapp_link") ?? "",
   });
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
 
   const quickReplies = parsed.data.quick_replies
     .split("\n")
@@ -51,8 +61,12 @@ export async function updateWidgetSettingsAction(formData: FormData) {
       updated_at: new Date().toISOString(),
     })
     .eq("tenant_id", tenantId);
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.error(`Saving widget settings for ${tenantId} failed:`, error);
+    return { error: "Couldn't save your settings. Please try again." };
+  }
 
   revalidatePath("/dashboard/widget");
   revalidatePath("/dashboard/widget/preview");
+  return { error: null };
 }

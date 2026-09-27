@@ -156,6 +156,20 @@ export function createWidget(
   }
   restoreHistory();
 
+  // A link button under the latest reply, e.g. "Continue on WhatsApp" when the
+  // visitor asks for a person. Only https links from our own API are shown.
+  function addAction(action: { type?: string; label?: string; url?: string }) {
+    if (action.type !== "link" || !action.label || !action.url?.startsWith("https://")) return;
+    const a = document.createElement("a");
+    a.className = "msg-action";
+    a.href = action.url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.textContent = action.label;
+    messagesEl.appendChild(a);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
   async function sendMessage(text: string) {
     const trimmed = text.trim();
     if (!trimmed || sending) return;
@@ -202,6 +216,7 @@ export function createWidget(
             replyEl.textContent += payload.text;
             messagesEl.scrollTop = messagesEl.scrollHeight;
           }
+          if (payload.action) addAction(payload.action);
         }
       }
     } catch {
