@@ -1,3 +1,4 @@
+import { appUrl } from "@/lib/app-url";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/db/supabase-server";
 import { connectWhatsAppChannelAction, disconnectWhatsAppChannelAction } from "./actions";
@@ -108,7 +109,7 @@ export default async function TenantDetailPage({
         </CardHeader>
         <CardContent>
           <code className="block rounded bg-zinc-100 p-3 text-xs dark:bg-zinc-800">
-            {`<script src="${process.env.NEXT_PUBLIC_APP_URL}/widget.js" data-key="${tenant.public_widget_key}" async></script>`}
+            {`<script src="${appUrl("/widget.js")}" data-key="${tenant.public_widget_key}" async></script>`}
           </code>
         </CardContent>
       </Card>

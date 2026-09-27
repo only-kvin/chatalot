@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeOpenSlots, localToUtcDate, startOfLocalDay } from "../lib/agent/availability";
+import { computeOpenSlots, localToUtcDate, matchService, startOfLocalDay } from "../lib/agent/availability";
 
 const DATE = "2026-09-24";
 const FAR_PAST = new Date("2000-01-01T00:00:00Z");
@@ -95,5 +95,33 @@ describe("startOfLocalDay", () => {
     expect(startOfLocalDay(new Date("2026-09-27T23:30:00Z")).toISOString()).toBe("2026-09-27T22:00:00.000Z");
     // 21:59 UTC is still 23:59 the same SA day.
     expect(startOfLocalDay(new Date("2026-09-27T21:59:00Z")).toISOString()).toBe("2026-09-26T22:00:00.000Z");
+  });
+});
+
+describe("matchService", () => {
+  const services = [
+    { name: "Women's Cut & Blow-dry" },
+    { name: "Men's Cut" },
+    { name: "Full Colour" },
+    { name: "Balayage" },
+  ];
+  const match = (q: string) => matchService(services, q)?.name ?? null;
+
+  it("never matches men's cut to the women's service", () => {
+    expect(match("Men's Cut")).toBe("Men's Cut");
+    expect(match("men's cut")).toBe("Men's Cut");
+    expect(match("Men’s Cut")).toBe("Men's Cut"); // curly apostrophe
+  });
+
+  it("matches a unique whole-word part of a name", () => {
+    expect(match("colour")).toBe("Full Colour");
+    expect(match("women's cut")).toBe("Women's Cut & Blow-dry");
+  });
+
+  it("refuses ambiguous or unknown names instead of guessing", () => {
+    expect(match("cut")).toBeNull(); // both cuts
+    expect(match("Haircut")).toBeNull();
+    expect(match("Men's Cut + Full Colour")).toBeNull();
+    expect(match("")).toBeNull();
   });
 });

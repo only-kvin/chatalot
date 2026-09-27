@@ -16,6 +16,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "cn";
+import { NotificationsBell } from "./notifications-bell";
 
 type NavItem = { href: string; label: string; icon: LucideIcon; exact?: boolean };
 
@@ -51,8 +52,9 @@ export function DashboardNav({ isPlatformAdmin }: { isPlatformAdmin: boolean }) 
         "md:sticky md:top-0 md:h-screen md:w-56 md:flex-col md:overflow-visible md:border-b-0 md:border-r md:p-4",
       )}
     >
-      <div className="hidden px-2 pb-4 text-sm font-semibold tracking-tight md:block">
-        ChatAlot
+      <div className="flex shrink-0 items-center md:justify-between md:pb-4 md:pl-2">
+        <span className="hidden text-sm font-semibold tracking-tight md:block">ChatAlot</span>
+        <NotificationsBell />
       </div>
       {(isPlatformAdmin ? [...NAV_ITEMS, ADMIN_ITEM] : NAV_ITEMS).map((item) => {
         const active = isActive(pathname, item.href, item.exact);

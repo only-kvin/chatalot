@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/db/supabase-browser";
+import { safeNextPath } from "@/lib/safe-next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,7 +33,11 @@ export default function LoginPage() {
         // window.location.origin, not NEXT_PUBLIC_APP_URL — that's only ever
         // correct for one environment (it's set to localhost for dev), and
         // Preview deployments each get a unique hostname anyway.
-        emailRedirectTo: `${window.location.origin}/callback`,
+        // Carries ?next= through the magic link, so someone who arrived from
+        // an email notification lands back on that page after signing in.
+        emailRedirectTo: `${window.location.origin}/callback?next=${encodeURIComponent(
+          safeNextPath(new URLSearchParams(window.location.search).get("next")),
+        )}`,
       },
     });
 

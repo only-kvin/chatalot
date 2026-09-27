@@ -7,6 +7,7 @@ import {
   findServiceByName,
   getOpenSlots,
   listActiveServiceNames,
+  listActiveServices,
   localToUtcDate,
 } from "./availability";
 import { notifyOwnerOfLead } from "@/lib/email/notify-lead";
@@ -81,7 +82,7 @@ async function executeTool(
     });
     if (error) return toolFailed(call.name, error);
 
-    await notifyOwnerOfLead(admin, tenantId, businessName, lead);
+    await notifyOwnerOfLead(admin, tenantId, businessName, lead, conversationId);
     return "Lead saved successfully.";
   }
 
@@ -93,7 +94,7 @@ async function executeTool(
       .eq("tenant_id", tenantId);
     if (error) return toolFailed(call.name, error);
 
-    await notifyOwnerHumanRequested(admin, tenantId, businessName, call.input.reason);
+    await notifyOwnerHumanRequested(admin, tenantId, businessName, call.input.reason, conversationId);
     return "Flagged for a human to take over.";
   }
 
@@ -167,7 +168,7 @@ async function executeTool(
     email,
     serviceName: resolved.name,
     startsAtLabel: `${date} at ${time}`,
-  });
+  }, conversationId);
 
   return `Booking confirmed: ${resolved.name} on ${date} at ${time}.`;
 }
@@ -233,7 +234,8 @@ export async function* runAgent(params: {
     // to just the tenant layer of the prompt.
   }
 
-  const system = buildSystemPrompt(agentConfig as AgentConfig, knowledgeText);
+  const services = await listActiveServices(admin, params.tenantId);
+  const system = buildSystemPrompt(agentConfig as AgentConfig, knowledgeText, services);
 
   let fullText = "";
   let tokensIn = 0;

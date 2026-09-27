@@ -135,7 +135,13 @@ async function handleMessage(
     const confirmation = "A team member will get back to you shortly.";
     await saveMessage(admin, tenantId, conversation.id, "user", text);
     await setHuman(admin, tenantId, conversation.id);
-    await notifyOwnerHumanRequested(admin, tenantId, businessName, "Visitor asked for a person on WhatsApp");
+    await notifyOwnerHumanRequested(
+      admin,
+      tenantId,
+      businessName,
+      "Visitor asked for a person on WhatsApp",
+      conversation.id,
+    );
     await sendWhatsAppText(phoneNumberId, accessToken, customerPhone, confirmation);
     await saveMessage(admin, tenantId, conversation.id, "assistant", confirmation);
     return;
@@ -296,6 +302,7 @@ async function handOffAtCap(
     p.tenantId,
     p.businessName,
     "Your daily AI message limit was reached, so a WhatsApp customer needs a reply from you.",
+    p.conversationId,
   );
 
   const notice = `Thanks for your message! A team member will get back to you as soon as possible${
@@ -328,6 +335,7 @@ async function handOffAfterFailure(
       tenantId,
       businessName,
       `A WhatsApp customer needs a reply — ${reason}.`,
+      conversationId,
     );
   } catch (err) {
     console.error(`Failure handoff for conversation ${conversationId} failed:`, err);

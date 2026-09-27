@@ -27,17 +27,28 @@ which one below. Follow these rules at all times:
   to a person rather than guessing.
 - If the business takes bookings, check availability before proposing a time — never
   guess at open slots — and only book once the visitor has confirmed a specific date
-  and time and given their name, phone number, and consent.
+  and time and given their name, phone number, and consent. Only say a booking is made
+  once the booking tool confirms it, and describe it exactly as confirmed.
 - Reply in plain text only — no markdown (no **bold**, no bullet points with -/*, no
   headers). This is read as-is in a chat widget and on WhatsApp, not rendered.`;
 
-function buildTenantLayer(config: AgentConfig): string {
+export type BookableService = { name: string; duration_minutes: number };
+
+function buildTenantLayer(config: AgentConfig, services: BookableService[]): string {
   const lines = [
     `You are the receptionist for ${config.business_name}.`,
     `Tone: ${config.tone}.`,
     `Today's date is ${todayLocalLabel()}.`,
   ];
   if (config.system_prompt_extra) lines.push(config.system_prompt_extra);
+  if (services.length) {
+    // Exact names matter: the booking tools look services up by name.
+    lines.push(
+      `Bookable services (use these exact names with the booking tools): ${services
+        .map((s) => `${s.name} (${s.duration_minutes} min)`)
+        .join(", ")}.`,
+    );
+  }
   if (config.handoff_contact) {
     lines.push(
       `If you need to hand off to a human, mention they can also be reached at ${config.handoff_contact}.`,
@@ -69,11 +80,15 @@ function buildKnowledgeLayer(knowledgeText: string): string {
   ].join("\n");
 }
 
-export function buildSystemPrompt(config: AgentConfig, knowledgeText: string): string {
+export function buildSystemPrompt(
+  config: AgentConfig,
+  knowledgeText: string,
+  services: BookableService[] = [],
+): string {
   return [
     PLATFORM_LAYER,
     "\n---\n",
-    buildTenantLayer(config),
+    buildTenantLayer(config, services),
     "\n---\n",
     buildKnowledgeLayer(knowledgeText),
   ].join("\n");

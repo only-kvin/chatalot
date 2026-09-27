@@ -1,3 +1,4 @@
+import { appUrl } from "@/lib/app-url";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
@@ -18,8 +19,7 @@ export default async function WidgetPage() {
     supabase.from("tenants").select("public_widget_key").eq("id", tenantId).single(),
   ]);
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
-  const snippet = `<script src="${appUrl}/widget.js" data-key="${tenant?.public_widget_key ?? ""}" async></script>`;
+  const snippet = `<script src="${appUrl("/widget.js")}" data-key="${tenant?.public_widget_key ?? ""}" async></script>`;
 
   return (
     <div className="mx-auto max-w-5xl p-8">

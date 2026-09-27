@@ -29,7 +29,20 @@ export async function proxy(request: NextRequest) {
   );
 
   // Triggers a token refresh if the current one is expired.
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Signed-out visits to the dashboard or admin go to login, remembering the
+  // page — e.g. a conversation link from a notification email — so sign-in
+  // returns there. (The layouts still enforce auth; this is about the return trip.)
+  const { pathname, search } = request.nextUrl;
+  if (!user && (pathname.startsWith("/dashboard") || pathname.startsWith("/admin"))) {
+    const login = request.nextUrl.clone();
+    login.pathname = "/login";
+    login.search = `?next=${encodeURIComponent(pathname + search)}`;
+    return NextResponse.redirect(login);
+  }
 
   return response;
 }

@@ -52,3 +52,17 @@ describe("buildSystemPrompt", () => {
     expect(buildSystemPrompt(config, "")).toContain("(No information on file yet.)");
   });
 });
+
+describe("buildSystemPrompt services", () => {
+  it("lists bookable services with their exact names", () => {
+    const prompt = buildSystemPrompt(config, "", [
+      { name: "Men's Cut", duration_minutes: 30 },
+      { name: "Full Colour", duration_minutes: 120 },
+    ]);
+    expect(prompt).toContain("Men's Cut (30 min), Full Colour (120 min)");
+  });
+
+  it("omits the services line when nothing is bookable", () => {
+    expect(buildSystemPrompt(config, "")).not.toContain("Bookable services");
+  });
+});

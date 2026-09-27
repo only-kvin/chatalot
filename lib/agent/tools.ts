@@ -59,7 +59,10 @@ export const AGENT_TOOLS: ToolDef[] = [
     parameters: {
       type: "object",
       properties: {
-        service: { type: "string", description: "The service name, e.g. 'Haircut'" },
+        service: {
+          type: "string",
+          description: "The exact name of one service from the bookable services list, e.g. \"Men's Cut\"",
+        },
         date: { type: "string", description: "Date to check, as YYYY-MM-DD" },
       },
       required: ["service", "date"],
@@ -68,11 +71,14 @@ export const AGENT_TOOLS: ToolDef[] = [
   {
     name: "create_booking",
     description:
-      "Book an appointment. Only call this after confirming the exact date and time with the visitor (from a time check_availability actually returned), and after they've given their name, phone number, and consent to save their details.",
+      "Book an appointment for one service. Only call this after confirming the exact date and time with the visitor (from a time check_availability actually returned), and after they've given their name, phone number, and consent to save their details. For several services, book each one separately at back-to-back times, checking availability for each. Afterwards, tell the visitor exactly what the result confirmed — service, date and time — never something else.",
     parameters: {
       type: "object",
       properties: {
-        service: { type: "string", description: "The service name, e.g. 'Haircut'" },
+        service: {
+          type: "string",
+          description: "The exact name of one service from the bookable services list, e.g. \"Men's Cut\"",
+        },
         date: { type: "string", description: "Date to book, as YYYY-MM-DD" },
         time: { type: "string", description: "Start time to book, as 24-hour HH:MM" },
         name: { type: "string", description: "The visitor's name" },
