@@ -80,6 +80,16 @@ Manual steps the platform owner needs to do. Kept up to date as new phases add n
 
 5. Once a real number is connected, test with a real WhatsApp message to it and check `/dashboard/conversations` for the `whatsapp`-channel entry.
 
+**Gotchas found during the first live setup (2026-09-27)** — each one silently stops messages arriving:
+
+- **Supabase Auth URL config**: Authentication → URL Configuration must have Site URL `https://chatalot.vercel.app` and Redirect URLs `https://chatalot.vercel.app/**` + `http://localhost:3000/**`. Otherwise magic links land on localhost.
+- **Verify token**: paste the value *without* the quotes it has in `.env.local`. Callback URL must be `https://…/api/whatsapp/webhook` exactly — no trailing slash (a 308 redirect fails Meta's check).
+- **Publish the app**: Meta delivers no real messages to an unpublished app. Publishing needs the Privacy Policy URL (`/privacy`), data deletion URL (`/data-deletion`), an icon and a category (App settings → Basic).
+- **Phone Number ID, not the phone number**: the admin form wants Meta's digits-only ID (API Setup → "Phone number ID"), not `+1 555-…`. The form now rejects the latter.
+- **System user needs the WhatsApp account assigned** (Business Settings → System users → Assign assets → WhatsApp accounts → Full control), not just the app.
+- **Subscribe the app to the WhatsApp Business Account** — the step that finally made messages arrive. Subscribing the `messages` webhook field is not enough: the WABA itself must list your app in `subscribed_apps`. Check with `GET /{waba-id}/subscribed_apps`; if your app is missing, `POST /{waba-id}/subscribed_apps` with the system-user token (Graph API Explorer works).
+- **Diagnosis**: no `POST /api/whatsapp/webhook` in Vercel logs = Meta isn't sending (publish / WABA subscription); `401` = wrong `META_APP_SECRET`; `200` but nothing in the dashboard = Phone Number ID doesn't match a channel.
+
 ## Phase 4 — Bookings
 
 **Design notes** (not manual steps, but worth knowing before you configure anything):
