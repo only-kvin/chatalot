@@ -12,10 +12,14 @@ import {
   ClockIcon,
   MessageCircleIcon,
   SettingsIcon,
+  ShieldIcon,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "cn";
 
-const NAV_ITEMS = [
+type NavItem = { href: string; label: string; icon: LucideIcon; exact?: boolean };
+
+const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboardIcon, exact: true },
   { href: "/dashboard/leads", label: "Leads", icon: UsersIcon },
   { href: "/dashboard/conversations", label: "Conversations", icon: MessageSquareIcon },
@@ -31,7 +35,11 @@ function isActive(pathname: string, href: string, exact?: boolean) {
   return exact ? pathname === href : pathname === href || pathname.startsWith(href + "/");
 }
 
-export function DashboardNav() {
+// Platform admins also run the /admin area (tenants, WhatsApp numbers, usage),
+// which isn't otherwise linked from anywhere.
+const ADMIN_ITEM: NavItem = { href: "/admin", label: "Admin", icon: ShieldIcon };
+
+export function DashboardNav({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
   const pathname = usePathname();
 
   return (
@@ -46,7 +54,7 @@ export function DashboardNav() {
       <div className="hidden px-2 pb-4 text-sm font-semibold tracking-tight md:block">
         ChatAlot
       </div>
-      {NAV_ITEMS.map((item) => {
+      {(isPlatformAdmin ? [...NAV_ITEMS, ADMIN_ITEM] : NAV_ITEMS).map((item) => {
         const active = isActive(pathname, item.href, item.exact);
         const Icon = item.icon;
         return (

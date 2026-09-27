@@ -18,9 +18,17 @@ export default async function DashboardLayout({
   const tenantId = await getCurrentTenantId();
   if (!tenantId) redirect("/");
 
+  // RLS on platform_admins only returns the caller's own row, so this is the
+  // same check the /admin layout makes.
+  const { data: adminRow } = await supabase
+    .from("platform_admins")
+    .select("user_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
   return (
     <div className="flex min-h-screen flex-col bg-zinc-50 md:flex-row dark:bg-black">
-      <DashboardNav />
+      <DashboardNav isPlatformAdmin={!!adminRow} />
       <PageTransition>{children}</PageTransition>
     </div>
   );

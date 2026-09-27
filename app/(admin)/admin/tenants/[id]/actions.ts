@@ -8,7 +8,12 @@ import { encrypt } from "@/lib/security/crypto";
 
 const connectSchema = z.object({
   tenantId: z.string().uuid(),
-  phoneNumberId: z.string().min(1, "Phone number ID is required"),
+  // Meta's numeric ID for the number, not the phone number itself — the
+  // webhook matches incoming messages on this exact value.
+  phoneNumberId: z
+    .string()
+    .trim()
+    .regex(/^\d{10,20}$/,"Use the Phone Number ID from Meta (digits only), not the phone number itself."),
   accessToken: z.string().min(1, "Access token is required"),
 });
 
