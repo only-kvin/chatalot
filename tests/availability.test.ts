@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeOpenSlots, localToUtcDate } from "../lib/agent/availability";
+import { computeOpenSlots, localToUtcDate, startOfLocalDay } from "../lib/agent/availability";
 
 const DATE = "2026-09-24";
 const FAR_PAST = new Date("2000-01-01T00:00:00Z");
@@ -82,5 +82,18 @@ describe("computeOpenSlots", () => {
       now: localToUtcDate(DATE, "09:20"),
     });
     expect(slots).toEqual(["09:30", "09:45"]);
+  });
+});
+
+describe("startOfLocalDay", () => {
+  it("is SA midnight (22:00 UTC the day before)", () => {
+    expect(startOfLocalDay(new Date("2026-09-27T12:00:00Z")).toISOString()).toBe("2026-09-26T22:00:00.000Z");
+  });
+
+  it("rolls over at SA midnight, not UTC midnight", () => {
+    // 23:30 UTC is already 01:30 the next day in SA.
+    expect(startOfLocalDay(new Date("2026-09-27T23:30:00Z")).toISOString()).toBe("2026-09-27T22:00:00.000Z");
+    // 21:59 UTC is still 23:59 the same SA day.
+    expect(startOfLocalDay(new Date("2026-09-27T21:59:00Z")).toISOString()).toBe("2026-09-26T22:00:00.000Z");
   });
 });

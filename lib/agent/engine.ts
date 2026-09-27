@@ -26,6 +26,9 @@ export type AgentOutcome = {
   // request_human ran this turn, so the conversation is now `human` by the
   // AI's own doing (vs. the owner taking over mid-turn).
   handedOff: boolean;
+  // The caller's keepReply said the reply won't be delivered, so it wasn't
+  // saved to the transcript.
+  discarded: boolean;
 };
 
 type AdminClient = ReturnType<typeof createAdminClient>;
@@ -172,10 +175,16 @@ async function executeTool(
 // Streams the assistant's reply text as it's generated, persisting the user
 // message up front and the full assistant reply once streaming finishes.
 // The generator's return value reports how the turn went (see AgentOutcome).
+//
+// keepReply lets a caller that sends the reply later (WhatsApp) veto it after
+// generation, e.g. because a newer customer message made it stale. A vetoed
+// reply is left out of the transcript so later turns don't believe the
+// customer saw it.
 export async function* runAgent(params: {
   tenantId: string;
   conversationId: string;
   userMessage: string;
+  keepReply?: (outcome: Omit<AgentOutcome, "discarded">) => Promise<boolean>;
 }): AsyncGenerator<string, AgentOutcome> {
   const admin = createAdminClient();
 
@@ -187,7 +196,7 @@ export async function* runAgent(params: {
 
   if (configError || !agentConfig) {
     yield "Sorry, something went wrong on our end. Please try again shortly.";
-    return { failed: true, handedOff: false };
+    return { failed: true, handedOff: false, discarded: false };
   }
 
   const { data: history } = await admin
@@ -205,12 +214,16 @@ export async function* runAgent(params: {
     );
   messages.push({ role: "user", content: params.userMessage });
 
-  await admin.from("messages").insert({
-    conversation_id: params.conversationId,
-    tenant_id: params.tenantId,
-    role: "user",
-    content: params.userMessage,
-  });
+  const { data: userRow } = await admin
+    .from("messages")
+    .insert({
+      conversation_id: params.conversationId,
+      tenant_id: params.tenantId,
+      role: "user",
+      content: params.userMessage,
+    })
+    .select("id")
+    .single();
 
   let knowledgeText = "";
   try {
@@ -260,7 +273,26 @@ export async function* runAgent(params: {
     fullText += fallback;
   }
 
-  if (fullText.trim()) {
+  let discarded = false;
+  if (params.keepReply) {
+    try {
+      discarded = !(await params.keepReply({ failed, handedOff }));
+    } catch (err) {
+      console.error("keepReply check failed; keeping the reply:", err);
+    }
+  }
+
+  if (discarded) {
+    // The tokens were still spent — book them on the user message so
+    // usage_daily (which sums every message row) stays accurate.
+    if (userRow) {
+      await admin
+        .from("messages")
+        .update({ tokens_in: tokensIn, tokens_out: tokensOut })
+        .eq("id", userRow.id)
+        .eq("tenant_id", params.tenantId);
+    }
+  } else if (fullText.trim()) {
     await admin.from("messages").insert({
       conversation_id: params.conversationId,
       tenant_id: params.tenantId,
@@ -271,5 +303,5 @@ export async function* runAgent(params: {
     });
   }
 
-  return { failed, handedOff };
+  return { failed, handedOff, discarded };
 }

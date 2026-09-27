@@ -18,6 +18,10 @@ function corsHeaders(origin: string | null) {
   };
 }
 
+// Preflight carries no body, so the widget key (and so the tenant's allowed
+// domains) is unknown here. Echoing the origin is harmless: the real POST
+// response only carries CORS headers once the origin has been checked, so a
+// disallowed site still can't read anything.
 export async function OPTIONS(request: Request) {
   return new Response(null, { headers: corsHeaders(request.headers.get("origin")) });
 }
@@ -31,13 +35,15 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return Response.json(
       { error: "Invalid request" },
-      { status: 400, headers: corsHeaders(origin) },
+      { status: 400 },
     );
   }
   const { key, sessionId, message } = parsed.data;
 
   const admin = createAdminClient();
 
+  // Error responses before the origin check deliberately carry no CORS
+  // headers, so other sites can't read them.
   const { data: tenant } = await admin
     .from("tenants")
     .select("id, status, allowed_domains")
@@ -45,13 +51,13 @@ export async function POST(request: Request) {
     .single();
 
   if (!tenant || tenant.status !== "active") {
-    return Response.json({ error: "Not found" }, { status: 404, headers: corsHeaders(origin) });
+    return Response.json({ error: "Not found" }, { status: 404 });
   }
 
   if (!isOriginAllowed(origin, tenant.allowed_domains)) {
     return Response.json(
       { error: "Origin not allowed" },
-      { status: 403, headers: corsHeaders(origin) },
+      { status: 403 },
     );
   }
 

@@ -1,6 +1,8 @@
 import { createAdminClient } from "@/lib/db/supabase-admin";
 import { decrypt } from "@/lib/security/crypto";
+import { redis } from "@/lib/redis";
 import { isWithinServiceWindow, sendWhatsAppText } from "./whatsapp";
+import { customerTurns, redisTurnStore } from "./customer-lock";
 import { runAgent } from "@/lib/agent/engine";
 import { notifyOwnerHumanRequested } from "@/lib/email/notify-human-requested";
 
@@ -11,19 +13,42 @@ type WhatsAppMessage = {
   text?: { body: string };
 };
 
+type WhatsAppStatus = {
+  id: string;
+  status: string;
+  errors?: { code: number; title: string }[];
+};
+
 type WebhookValue = {
   metadata: { phone_number_id: string };
   messages?: WhatsAppMessage[];
+  statuses?: WhatsAppStatus[];
 };
 
 type WebhookPayload = {
   entry?: { changes?: { field: string; value: WebhookValue }[] }[];
 };
 
-async function isAlreadyProcessed(
-  admin: ReturnType<typeof createAdminClient>,
-  providerMessageId: string,
-): Promise<boolean> {
+type AdminClient = ReturnType<typeof createAdminClient>;
+
+// Message types we can't read but should acknowledge, so the customer isn't
+// left waiting (voice notes are very common in SA). Anything else — e.g.
+// reactions or system notices — is ignored without a reply.
+const NON_TEXT_LABELS: Record<string, string> = {
+  audio: "a voice note",
+  image: "a photo",
+  video: "a video",
+  document: "a document",
+  sticker: "a sticker",
+  location: "a location",
+  contacts: "a contact card",
+  unsupported: "an unsupported message",
+};
+const NON_TEXT_REPLY = "Sorry, I can only read text messages for now — please type your question.";
+
+const turnStore = redisTurnStore(redis);
+
+async function isAlreadyProcessed(admin: AdminClient, providerMessageId: string): Promise<boolean> {
   const { error } = await admin
     .from("processed_events")
     .insert({ provider_message_id: providerMessageId });
@@ -31,21 +56,34 @@ async function isAlreadyProcessed(
   return error?.code === "23505";
 }
 
+async function saveMessage(
+  admin: AdminClient,
+  tenantId: string,
+  conversationId: string,
+  role: "user" | "assistant",
+  content: string,
+) {
+  await admin
+    .from("messages")
+    .insert({ tenant_id: tenantId, conversation_id: conversationId, role, content });
+}
+
 async function handleMessage(
-  admin: ReturnType<typeof createAdminClient>,
+  admin: AdminClient,
   tenantId: string,
   phoneNumberId: string,
   accessToken: string,
   message: WhatsAppMessage,
 ) {
+  const isText = message.type === "text" && !!message.text;
+  const nonTextLabel = NON_TEXT_LABELS[message.type];
+  if (!isText && !nonTextLabel) return;
   if (await isAlreadyProcessed(admin, message.id)) return;
-  if (message.type !== "text" || !message.text) return;
 
   const customerPhone = message.from;
-  const text = message.text.body;
-  const normalized = text.trim().toLowerCase();
   const receivedAt = new Date().toISOString();
 
+  // Any inbound message, text or not, opens Meta's 24h window.
   const { data: conversation } = await admin
     .from("conversations")
     .upsert(
@@ -61,6 +99,19 @@ async function handleMessage(
     .select("id, status, last_inbound_at")
     .single();
   if (!conversation) return;
+
+  if (!isText) {
+    if (conversation.status === "human") return;
+    // Saved so the owner sees it in the transcript and the AI knows about it
+    // on the customer's next text message.
+    await saveMessage(admin, tenantId, conversation.id, "user", `[Customer sent ${nonTextLabel}]`);
+    await saveMessage(admin, tenantId, conversation.id, "assistant", NON_TEXT_REPLY);
+    await sendWhatsAppText(phoneNumberId, accessToken, customerPhone, NON_TEXT_REPLY);
+    return;
+  }
+
+  const text = message.text!.body;
+  const normalized = text.trim().toLowerCase();
 
   if (normalized === "stop") {
     await setHuman(admin, tenantId, conversation.id);
@@ -88,10 +139,83 @@ async function handleMessage(
 
   if (conversation.status === "human") return;
 
+  const turns = customerTurns(turnStore, tenantId, customerPhone);
+  // Marked before waiting on the lock, so a turn already in progress can see
+  // that its reply is about to be stale.
+  await turns.markLatest(message.id);
+
+  await turns.withLock(async () => {
+    // Waiting for the previous turn can take a while; the owner may have
+    // taken over, or more messages may have arrived, in the meantime.
+    const { data: current } = await admin
+      .from("conversations")
+      .select("status")
+      .eq("id", conversation.id)
+      .eq("tenant_id", tenantId)
+      .single();
+    if (current?.status === "human") return;
+
+    if (await turns.isSuperseded(message.id)) {
+      // Kept in the history so the newer message's turn answers this too.
+      await saveMessage(admin, tenantId, conversation.id, "user", text);
+      return;
+    }
+
+    await replyWithAgent(admin, {
+      tenantId,
+      phoneNumberId,
+      accessToken,
+      customerPhone,
+      businessName,
+      conversationId: conversation.id,
+      lastInboundAt: conversation.last_inbound_at,
+      messageId: message.id,
+      text,
+      turns,
+    });
+  });
+}
+
+async function replyWithAgent(
+  admin: AdminClient,
+  p: {
+    tenantId: string;
+    phoneNumberId: string;
+    accessToken: string;
+    customerPhone: string;
+    businessName: string;
+    conversationId: string;
+    lastInboundAt: string | null;
+    messageId: string;
+    text: string;
+    turns: ReturnType<typeof customerTurns>;
+  },
+) {
   // Avoids a second owner email if the fallback send also fails below.
   let ownerNotified = false;
   try {
-    const agent = runAgent({ tenantId, conversationId: conversation.id, userMessage: text });
+    const agent = runAgent({
+      tenantId: p.tenantId,
+      conversationId: p.conversationId,
+      userMessage: p.text,
+      keepReply: async ({ failed, handedOff }) => {
+        // A failure's fallback text (with handoff_contact) always goes out.
+        // So does the AI's own "someone will be in touch" after request_human.
+        if (failed || handedOff) return true;
+
+        // The owner may have hit "Take over" while the reply was generating —
+        // if so, it's theirs now and the AI stays quiet.
+        const { data: current } = await admin
+          .from("conversations")
+          .select("status")
+          .eq("id", p.conversationId)
+          .eq("tenant_id", p.tenantId)
+          .single();
+        if (current?.status === "human") return false;
+
+        return !(await p.turns.isSuperseded(p.messageId));
+      },
+    });
     let fullText = "";
     let step = await agent.next();
     while (!step.done) {
@@ -99,49 +223,33 @@ async function handleMessage(
       step = await agent.next();
     }
     const outcome = step.value;
+    if (outcome.discarded) return;
 
     if (outcome.failed) {
-      // The engine's fallback text (with handoff_contact) still goes out below;
-      // this makes sure a person actually follows up rather than the customer
-      // being left with just an apology.
-      await handOffAfterFailure(admin, tenantId, businessName, conversation.id, "the AI model failed or timed out");
+      // The fallback still goes out below; this makes sure a person actually
+      // follows up rather than the customer being left with just an apology.
+      await handOffAfterFailure(admin, p.tenantId, p.businessName, p.conversationId, "the AI model failed or timed out");
       ownerNotified = true;
-    } else if (!outcome.handedOff) {
-      // The owner may have hit "Take over" while the reply was generating — if
-      // so, it's theirs now and the AI stays quiet. (When the AI itself
-      // called request_human this turn, its "someone will be in touch" reply
-      // must still go out.)
-      const { data: current } = await admin
-        .from("conversations")
-        .select("status")
-        .eq("id", conversation.id)
-        .eq("tenant_id", tenantId)
-        .single();
-      if (current?.status === "human") return;
     }
 
     if (!fullText.trim()) return;
-    if (!isWithinServiceWindow(conversation.last_inbound_at)) {
+    if (!isWithinServiceWindow(p.lastInboundAt)) {
       // Can't happen for an immediate reply today; guards against slow
       // processing and keeps the rule enforced in one place if that changes.
-      console.error(`WhatsApp reply for conversation ${conversation.id} is outside the 24h window; not sent.`);
+      console.error(`WhatsApp reply for conversation ${p.conversationId} is outside the 24h window; not sent.`);
       return;
     }
-    await sendWhatsAppText(phoneNumberId, accessToken, customerPhone, fullText);
+    await sendWhatsAppText(p.phoneNumberId, p.accessToken, p.customerPhone, fullText);
   } catch (err) {
     // Meta already has its 200, so it won't redeliver — without this the
     // customer would silently never get a reply.
-    console.error(`WhatsApp reply for message ${message.id} failed:`, err);
+    console.error(`WhatsApp reply for message ${p.messageId} failed:`, err);
     if (ownerNotified) return;
-    await handOffAfterFailure(admin, tenantId, businessName, conversation.id, "the AI's reply could not be generated or sent");
+    await handOffAfterFailure(admin, p.tenantId, p.businessName, p.conversationId, "the AI's reply could not be generated or sent");
   }
 }
 
-async function setHuman(
-  admin: ReturnType<typeof createAdminClient>,
-  tenantId: string,
-  conversationId: string,
-) {
+async function setHuman(admin: AdminClient, tenantId: string, conversationId: string) {
   await admin
     .from("conversations")
     .update({ status: "human" })
@@ -151,7 +259,7 @@ async function setHuman(
 
 // Best-effort: runs from error paths, so its own failures are logged, not thrown.
 async function handOffAfterFailure(
-  admin: ReturnType<typeof createAdminClient>,
+  admin: AdminClient,
   tenantId: string,
   businessName: string,
   conversationId: string,
@@ -170,13 +278,25 @@ async function handOffAfterFailure(
   }
 }
 
+// Meta reports delivery outcomes asynchronously. Only failures matter here —
+// e.g. 131047 means the reply was sent outside the 24h window — and they'd
+// otherwise be invisible, since the send itself already returned 200.
+function logFailedStatuses(statuses: WhatsAppStatus[]) {
+  for (const s of statuses) {
+    if (s.status !== "failed") continue;
+    const errors = (s.errors ?? []).map((e) => `${e.code} ${e.title}`).join("; ");
+    console.error(`WhatsApp message ${s.id} failed to deliver: ${errors || "no error details"}`);
+  }
+}
+
 export async function processWhatsAppWebhook(payload: WebhookPayload): Promise<void> {
   const admin = createAdminClient();
 
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
       if (change.field !== "messages") continue;
-      const { metadata, messages } = change.value;
+      const { metadata, messages, statuses } = change.value;
+      if (statuses?.length) logFailedStatuses(statuses);
       if (!messages?.length) continue;
 
       const { data: channel } = await admin

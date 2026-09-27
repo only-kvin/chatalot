@@ -51,6 +51,11 @@ export function localToUtcDate(dateISO: string, hhmm: string): Date {
   return new Date(`${dateISO}T${hhmm}:00${TENANT_TZ_OFFSET}`);
 }
 
+// Local (SA) midnight at the start of the day that `date` falls on, as a UTC instant.
+export function startOfLocalDay(date: Date): Date {
+  return localToUtcDate(localDateISO(date), "00:00");
+}
+
 export function todayLocalISO(): string {
   return localDateISO(new Date());
 }

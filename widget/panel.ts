@@ -68,7 +68,10 @@ export function createWidget(
 
   const header = document.createElement("div");
   header.className = "header";
-  header.innerHTML = `<span>${config.businessName}</span>`;
+  // textContent, not innerHTML: businessName is tenant-controlled text.
+  const title = document.createElement("span");
+  title.textContent = config.businessName;
+  header.appendChild(title);
   const closeBtn = document.createElement("button");
   closeBtn.className = "close-btn";
   closeBtn.setAttribute("aria-label", "Close chat");

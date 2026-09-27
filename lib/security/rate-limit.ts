@@ -1,13 +1,7 @@
-import { Redis } from "@upstash/redis";
 import { Ratelimit } from "@upstash/ratelimit";
 import type { SupabaseClient } from "@supabase/supabase-js";
-
-// Explicit url/token rather than Redis.fromEnv() — the Vercel Marketplace
-// provisions Upstash under KV_REST_API_* names, not UPSTASH_REDIS_REST_*.
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL!,
-  token: process.env.KV_REST_API_TOKEN!,
-});
+import { redis } from "@/lib/redis";
+import { startOfLocalDay } from "@/lib/agent/availability";
 
 const sessionLimiter = new Ratelimit({
   redis,
@@ -43,8 +37,8 @@ export async function checkDailyTenantCap(
 
   const cap = config?.daily_message_cap ?? 200;
 
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
+  // SA midnight, not the server's (UTC on Vercel, which would reset the cap at 02:00 SA time).
+  const startOfDay = startOfLocalDay(new Date());
 
   const { count } = await supabase
     .from("messages")
