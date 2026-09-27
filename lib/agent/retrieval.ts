@@ -35,31 +35,45 @@ export async function getRelevantKnowledge(
   userMessage: string,
   k = 6,
 ): Promise<string> {
-  const [{ data: infoItems }, [queryEmbedding]] = await Promise.all([
+  const [{ data: infoItems }, matches] = await Promise.all([
     supabase
       .from("knowledge_items")
       .select("title, content")
       .eq("tenant_id", tenantId)
       .eq("type", "info"),
-    embed([userMessage], "query"),
+    // Similarity search is best-effort: if embedding fails (e.g. Voyage rate
+    // limits), the always-included info items below still reach the prompt.
+    searchChunks(supabase, tenantId, userMessage, k).catch((err) => {
+      console.error("Knowledge search failed; using info items only:", err);
+      return [];
+    }),
   ]);
-
-  const { data: matches, error } = await supabase.rpc("match_chunks", {
-    p_tenant_id: tenantId,
-    p_query_embedding: queryEmbedding,
-    p_k: k,
-  });
-  if (error) throw new Error(`match_chunks failed: ${error.message}`);
 
   const sections: string[] = [];
   for (const item of infoItems ?? []) {
     sections.push(`${item.title}: ${item.content}`);
   }
-  for (const match of matches ?? []) {
+  for (const match of matches) {
     sections.push(match.content);
   }
 
   return sections.join("\n\n");
+}
+
+async function searchChunks(
+  supabase: SupabaseClient,
+  tenantId: string,
+  userMessage: string,
+  k: number,
+): Promise<{ content: string }[]> {
+  const [queryEmbedding] = await embed([userMessage], "query");
+  const { data, error } = await supabase.rpc("match_chunks", {
+    p_tenant_id: tenantId,
+    p_query_embedding: queryEmbedding,
+    p_k: k,
+  });
+  if (error) throw new Error(`match_chunks failed: ${error.message}`);
+  return data ?? [];
 }
 
 // Re-embeds one knowledge item into knowledge_chunks. Called after create/update
@@ -71,9 +85,11 @@ export async function reembedKnowledgeItem(
   itemId: string,
   content: string,
 ): Promise<void> {
-  await supabase.from("knowledge_chunks").delete().eq("item_id", itemId);
-
+  // Embed first: if Voyage fails, the item keeps its previous embedding
+  // instead of being left with none.
   const [embedding] = await embed([content], "document");
+
+  await supabase.from("knowledge_chunks").delete().eq("item_id", itemId).eq("tenant_id", tenantId);
   const { error } = await supabase.from("knowledge_chunks").insert({
     tenant_id: tenantId,
     item_id: itemId,

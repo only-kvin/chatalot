@@ -34,6 +34,7 @@ export function KnowledgeEditor({ initialItems }: { initialItems: KnowledgeItem[
   const [editing, setEditing] = useState<KnowledgeItem | null>(null);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
 
   const isEditing = editing !== null;
   const formValues = editing ?? { type: "faq" as const, title: "", content: "" };
@@ -45,41 +46,37 @@ export function KnowledgeEditor({ initialItems }: { initialItems: KnowledgeItem[
 
   function handleSubmit(formData: FormData) {
     setError(null);
+    setWarning(null);
     startTransition(async () => {
-      try {
-        if (isEditing) {
-          formData.set("id", editing!.id);
-          await updateKnowledgeItemAction(formData);
-          setItems((prev) =>
-            prev.map((it) =>
-              it.id === editing!.id
-                ? {
-                    ...it,
-                    type: formData.get("type") as KnowledgeItem["type"],
-                    title: formData.get("title") as string,
-                    content: formData.get("content") as string,
-                  }
-                : it,
-            ),
-          );
-        } else {
-          await createKnowledgeItemAction(formData);
-          // Re-fetch isn't wired here for simplicity — revalidatePath refreshes
-          // server data on next navigation; reload to see the new item immediately.
-          window.location.reload();
-        }
-        resetForm();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Something went wrong");
+      if (isEditing) formData.set("id", editing.id);
+      const result = isEditing
+        ? await updateKnowledgeItemAction(formData)
+        : await createKnowledgeItemAction(formData);
+
+      if (result.error || !result.item) {
+        setError(result.error ?? "Something went wrong.");
+        return;
       }
+      const saved = result.item;
+      setItems((prev) =>
+        isEditing ? prev.map((it) => (it.id === saved.id ? saved : it)) : [saved, ...prev],
+      );
+      resetForm();
+      setWarning(result.warning);
     });
   }
 
   function handleDelete(id: string) {
+    setError(null);
+    setWarning(null);
     startTransition(async () => {
       const formData = new FormData();
       formData.set("id", id);
-      await deleteKnowledgeItemAction(formData);
+      const result = await deleteKnowledgeItemAction(formData);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
       setItems((prev) => prev.filter((it) => it.id !== id));
     });
   }
@@ -131,6 +128,7 @@ export function KnowledgeEditor({ initialItems }: { initialItems: KnowledgeItem[
               />
             </div>
             {error && <p className="feedback-enter text-sm text-red-600">{error}</p>}
+            {warning && <p className="feedback-enter text-sm text-amber-600">{warning}</p>}
             <div className="flex gap-2">
               <Button type="submit" disabled={pending}>
                 {pending ? "Saving…" : isEditing ? "Update item" : "Add item"}
