@@ -4,6 +4,8 @@ import { getCurrentTenantId } from "@/lib/db/current-tenant";
 import { toggleTakeOverAction } from "../actions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { isWithinServiceWindow } from "@/lib/channels/whatsapp";
+import { ReplyBox } from "./reply-box";
 
 export default async function ConversationPage({
   params,
@@ -17,7 +19,7 @@ export default async function ConversationPage({
   const supabase = await createClient();
   const { data: conversation } = await supabase
     .from("conversations")
-    .select("id, channel, status, external_id")
+    .select("id, channel, status, external_id, last_inbound_at")
     .eq("id", id)
     .eq("tenant_id", tenantId)
     .single();
@@ -27,6 +29,7 @@ export default async function ConversationPage({
     .from("messages")
     .select("id, role, content, created_at")
     .eq("conversation_id", id)
+    .eq("tenant_id", tenantId)
     .order("created_at", { ascending: true });
 
   const nextStatus = conversation.status === "human" ? "ai" : "human";
@@ -65,6 +68,20 @@ export default async function ConversationPage({
         ))}
         {!messages?.length && (
           <p className="text-center text-zinc-500">No messages yet.</p>
+        )}
+      </div>
+
+      <div className="mt-6 border-t pt-6">
+        {conversation.channel === "whatsapp" ? (
+          <ReplyBox
+            conversationId={conversation.id}
+            isHuman={conversation.status === "human"}
+            windowOpen={isWithinServiceWindow(conversation.last_inbound_at)}
+          />
+        ) : (
+          <p className="text-sm text-zinc-500">
+            Replying from the dashboard isn&apos;t available for website chats yet.
+          </p>
         )}
       </div>
     </div>

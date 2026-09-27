@@ -101,10 +101,11 @@ async function handleMessage(
   if (!conversation) return;
 
   if (!isText) {
-    if (conversation.status === "human") return;
     // Saved so the owner sees it in the transcript and the AI knows about it
     // on the customer's next text message.
     await saveMessage(admin, tenantId, conversation.id, "user", `[Customer sent ${nonTextLabel}]`);
+    // In human mode the owner replies from the dashboard; no auto-reply.
+    if (conversation.status === "human") return;
     await saveMessage(admin, tenantId, conversation.id, "assistant", NON_TEXT_REPLY);
     await sendWhatsAppText(phoneNumberId, accessToken, customerPhone, NON_TEXT_REPLY);
     return;
@@ -113,7 +114,10 @@ async function handleMessage(
   const text = message.text!.body;
   const normalized = text.trim().toLowerCase();
 
+  // Every text message goes in the transcript except the ones that start an
+  // AI turn — runAgent saves those itself, once it knows the turn will run.
   if (normalized === "stop") {
+    await saveMessage(admin, tenantId, conversation.id, "user", text);
     await setHuman(admin, tenantId, conversation.id);
     return;
   }
@@ -126,18 +130,20 @@ async function handleMessage(
   const businessName = agentConfig?.business_name ?? "";
 
   if (normalized === "human" || normalized === "agent") {
+    const confirmation = "A team member will get back to you shortly.";
+    await saveMessage(admin, tenantId, conversation.id, "user", text);
     await setHuman(admin, tenantId, conversation.id);
     await notifyOwnerHumanRequested(admin, tenantId, businessName, "Visitor asked for a person on WhatsApp");
-    await sendWhatsAppText(
-      phoneNumberId,
-      accessToken,
-      customerPhone,
-      "A team member will get back to you shortly.",
-    );
+    await sendWhatsAppText(phoneNumberId, accessToken, customerPhone, confirmation);
+    await saveMessage(admin, tenantId, conversation.id, "assistant", confirmation);
     return;
   }
 
-  if (conversation.status === "human") return;
+  if (conversation.status === "human") {
+    // The owner is handling this one from the dashboard.
+    await saveMessage(admin, tenantId, conversation.id, "user", text);
+    return;
+  }
 
   const turns = customerTurns(turnStore, tenantId, customerPhone);
   // Marked before waiting on the lock, so a turn already in progress can see
@@ -153,10 +159,9 @@ async function handleMessage(
       .eq("id", conversation.id)
       .eq("tenant_id", tenantId)
       .single();
-    if (current?.status === "human") return;
-
-    if (await turns.isSuperseded(message.id)) {
-      // Kept in the history so the newer message's turn answers this too.
+    // Either way the message is kept: for the owner, or so the newer
+    // message's turn answers this one too.
+    if (current?.status === "human" || (await turns.isSuperseded(message.id))) {
       await saveMessage(admin, tenantId, conversation.id, "user", text);
       return;
     }
