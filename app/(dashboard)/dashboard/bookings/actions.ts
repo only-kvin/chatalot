@@ -8,6 +8,7 @@ import { formatLocalDateTime, getOpenSlots } from "@/lib/agent/availability";
 import { cancelBooking, logBookingEvent, rescheduleBooking } from "@/lib/bookings/manage";
 import { sendTeamWhatsApp } from "@/lib/channels/team-whatsapp";
 import { formatPhone, canonicalPhone } from "@/lib/contacts/phone";
+import { isOptedOut } from "@/lib/contacts/consent";
 
 // Team actions on a booking. They use the signed-in user's client, so RLS
 // scopes everything to their tenant, and every change is logged under their
@@ -35,7 +36,7 @@ type Session = NonNullable<Awaited<ReturnType<typeof session>>>;
 async function loadBooking(s: Session, bookingId: string) {
   const { data } = await s.supabase
     .from("bookings")
-    .select("id, name, phone, starts_at, status, service_id, conversation_id, services(name)")
+    .select("id, name, phone, starts_at, status, service_id, conversation_id, contact_id, services(name)")
     .eq("id", bookingId)
     .eq("tenant_id", s.tenantId)
     .maybeSingle();
@@ -52,12 +53,15 @@ function revalidate(bookingId: string) {
 // 24-hour window allows it, otherwise a reminder to contact them directly.
 async function tellCustomer(
   s: Session,
-  booking: { name: string; phone: string; conversation_id: string | null },
+  booking: { name: string; phone: string; conversation_id: string | null; contact_id: string | null },
   text: string,
   notify: boolean,
 ): Promise<string> {
   const contactHint = `Let ${booking.name} know on ${formatPhone(canonicalPhone(booking.phone)) || booking.phone}.`;
   if (!notify) return contactHint;
+  if (await isOptedOut(s.supabase, s.tenantId, booking.contact_id)) {
+    return `${booking.name} replied STOP to our messages, so they weren't told on WhatsApp. ${contactHint}`;
+  }
   if (!booking.conversation_id) return `There's no WhatsApp chat with this customer. ${contactHint}`;
 
   const sent = await sendTeamWhatsApp(s.supabase, {

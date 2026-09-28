@@ -15,7 +15,8 @@ export type BookingEventType =
   | "attended"
   | "no_show"
   | "reopened"
-  | "reminder_sent";
+  | "reminder_sent"
+  | "reminder_not_sent";
 
 export type BookingSummary = {
   id: string;

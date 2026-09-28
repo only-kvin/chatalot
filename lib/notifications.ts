@@ -5,7 +5,8 @@ export type NotificationType =
   | "new_lead"
   | "new_booking"
   | "booking_cancelled"
-  | "booking_rescheduled";
+  | "booking_rescheduled"
+  | "reminder_not_sent";
 
 // Where an alert takes the owner — shared by the dashboard bell and the emails.
 export function notificationPath(type: NotificationType, conversationId?: string | null): string {

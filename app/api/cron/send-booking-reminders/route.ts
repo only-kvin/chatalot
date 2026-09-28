@@ -1,20 +1,14 @@
-import { logBookingEvent } from "@/lib/bookings/manage";
 import { createAdminClient } from "@/lib/db/supabase-admin";
 import { decrypt } from "@/lib/security/crypto";
-import { sendWhatsAppTemplate } from "@/lib/channels/whatsapp";
-
-// Must exist and be approved in Meta Business Manager before sends actually go
-// out — see docs/SETUP.md. Until then this route runs end-to-end and just logs
-// the Graph API rejection for each attempted send.
-const REMINDER_TEMPLATE_NAME = "booking_reminder";
-const REMINDER_TEMPLATE_LANGUAGE = "en";
+import { sendBookingReminder, type ReminderChannel } from "@/lib/bookings/reminders";
 
 // Runs once daily (see vercel.json — Vercel's Hobby plan only allows daily
 // cron schedules). Rather than a narrow "~24h out" window a once-a-day run
 // could easily straddle, this looks ahead a full 2 days: any booking that
 // far out or closer gets a reminder attempt every run until it's sent, so a
 // failed send (or a missed/delayed cron trigger) still gets retried the next
-// day instead of silently never firing.
+// day instead of silently never firing. How each reminder is sent, and what
+// happens when it can't be, lives in lib/bookings/reminders.ts.
 const LOOKAHEAD_HOURS = 48;
 
 export async function GET(request: Request) {
@@ -28,7 +22,7 @@ export async function GET(request: Request) {
 
   const { data: bookings, error } = await admin
     .from("bookings")
-    .select("id, tenant_id, name, phone, starts_at, services(name)")
+    .select("id, tenant_id, name, phone, starts_at, contact_id, conversation_id, services(name)")
     .eq("status", "confirmed")
     .is("reminder_sent_at", null)
     .gte("starts_at", windowStart)
@@ -39,56 +33,60 @@ export async function GET(request: Request) {
     return new Response("Error", { status: 500 });
   }
 
+  // One WhatsApp number and business name per tenant; looked up once each.
+  const channels = new Map<string, ReminderChannel | null>();
+  async function channelFor(tenantId: string): Promise<ReminderChannel | null> {
+    if (!channels.has(tenantId)) {
+      const [{ data: channel }, { data: config }] = await Promise.all([
+        admin
+          .from("channels")
+          .select("wa_phone_number_id, wa_access_token_encrypted")
+          .eq("tenant_id", tenantId)
+          .eq("type", "whatsapp")
+          .eq("status", "active")
+          .limit(1)
+          .maybeSingle(),
+        admin.from("agent_configs").select("business_name").eq("tenant_id", tenantId).maybeSingle(),
+      ]);
+      channels.set(
+        tenantId,
+        channel?.wa_phone_number_id && channel.wa_access_token_encrypted
+          ? {
+              phoneNumberId: channel.wa_phone_number_id,
+              accessToken: decrypt(channel.wa_access_token_encrypted),
+              businessName: config?.business_name ?? "",
+            }
+          : null,
+      );
+    }
+    return channels.get(tenantId) ?? null;
+  }
+
   let sent = 0;
+  let notSent = 0;
   for (const booking of bookings ?? []) {
     try {
-      const { data: channel } = await admin
-        .from("channels")
-        .select("wa_phone_number_id, wa_access_token_encrypted")
-        .eq("tenant_id", booking.tenant_id)
-        .eq("type", "whatsapp")
-        .eq("status", "active")
-        .maybeSingle();
-      if (!channel?.wa_access_token_encrypted || !channel.wa_phone_number_id) continue;
+      // Tenants without WhatsApp don't have reminders at all.
+      const channel = await channelFor(booking.tenant_id);
+      if (!channel) continue;
 
-      // A many-to-one embed comes back as an object, not an array.
-      const serviceName =
-        (booking.services as unknown as { name: string } | null)?.name ?? "your appointment";
-      const timeLabel = new Date(booking.starts_at).toLocaleString("en-ZA", {
-        dateStyle: "medium",
-        timeStyle: "short",
-        timeZone: "Africa/Johannesburg",
-      });
-
-      await sendWhatsAppTemplate(
-        channel.wa_phone_number_id,
-        decrypt(channel.wa_access_token_encrypted),
-        booking.phone,
-        REMINDER_TEMPLATE_NAME,
-        REMINDER_TEMPLATE_LANGUAGE,
-        [booking.name, serviceName, timeLabel],
+      const result = await sendBookingReminder(
+        admin,
+        {
+          ...booking,
+          // A many-to-one embed comes back as an object, not an array.
+          serviceName: (booking.services as unknown as { name: string } | null)?.name ?? "appointment",
+        },
+        channel,
       );
-
-      await admin
-        .from("bookings")
-        .update({ reminder_sent_at: new Date().toISOString() })
-        .eq("id", booking.id)
-        .eq("tenant_id", booking.tenant_id);
-      await logBookingEvent(admin, {
-        tenantId: booking.tenant_id,
-        bookingId: booking.id,
-        type: "reminder_sent",
-        actor: "system",
-        channel: "whatsapp",
-      });
-      sent++;
+      if (result === "sent") sent++;
+      else notSent++;
     } catch (err) {
-      // Doesn't stop the rest of the batch — reminder_sent_at stays null so
-      // this booking is retried on tomorrow's run, until it's sent or it
-      // falls out of the lookahead window entirely.
+      // Doesn't stop the rest of the batch; reminder_sent_at stays null, so
+      // it's retried on tomorrow's run.
       console.error(`Reminder failed for booking ${booking.id}:`, err);
     }
   }
 
-  return Response.json({ checked: bookings?.length ?? 0, sent });
+  return Response.json({ checked: bookings?.length ?? 0, sent, notSent });
 }

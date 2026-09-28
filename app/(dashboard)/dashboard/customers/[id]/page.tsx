@@ -26,7 +26,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   const supabase = await createClient();
   const { data: customer } = await supabase
     .from("contacts")
-    .select("id, name, name_source, phone_e164, email, notes, first_channel, first_seen_at, last_seen_at, consent_at")
+    .select("id, name, name_source, phone_e164, email, notes, first_channel, first_seen_at, last_seen_at, consent_at, opted_out_at")
     .eq("id", id)
     .eq("tenant_id", tenantId)
     .maybeSingle();
@@ -79,6 +79,12 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
         <CardContent className="flex flex-col gap-3">
           {customer.name && customer.name_source && (
             <p className="text-xs text-zinc-500">Name {NAME_SOURCE_LABEL[customer.name_source]}.</p>
+          )}
+          {customer.opted_out_at && (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+              Replied STOP on {when(customer.opted_out_at)}: they won&apos;t get reminders or booking notices from us
+              until they reply START. You can still answer when they message you.
+            </p>
           )}
           <p className="text-xs text-zinc-500">
             {customer.consent_at

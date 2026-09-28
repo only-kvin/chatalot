@@ -6,6 +6,7 @@ import { customerTurns, redisTurnStore } from "./customer-lock";
 import { runAgent } from "@/lib/agent/engine";
 import { wantsHuman } from "@/lib/agent/handoff-intent";
 import { linkConversation, upsertContact } from "@/lib/contacts/upsert";
+import { consentKeyword, setOptedOut, START_CONFIRMATION, STOP_CONFIRMATION } from "@/lib/contacts/consent";
 import { checkDailyTenantCap } from "@/lib/security/rate-limit";
 import { notifyOwnerHumanRequested } from "@/lib/email/notify-human-requested";
 
@@ -134,13 +135,24 @@ async function handleMessage(
   }
 
   const text = message.text!.body;
-  const normalized = text.trim().toLowerCase();
 
   // Every text message goes in the transcript except the ones that start an
   // AI turn — runAgent saves those itself, once it knows the turn will run.
-  if (normalized === "stop") {
+  // STOP pauses the AI and opts them out of every message we'd start
+  // (reminders, notices); START undoes both. Both are confirmed — they just
+  // messaged us, so the 24h window is open.
+  const keyword = consentKeyword(text);
+  if (keyword) {
     await saveMessage(admin, tenantId, conversation.id, "user", text);
-    await setHuman(admin, tenantId, conversation.id);
+    if (contactId) await setOptedOut(admin, tenantId, contactId, keyword === "stop");
+    await admin
+      .from("conversations")
+      .update({ status: keyword === "stop" ? "human" : "ai" })
+      .eq("id", conversation.id)
+      .eq("tenant_id", tenantId);
+    const confirmation = keyword === "stop" ? STOP_CONFIRMATION : START_CONFIRMATION;
+    await sendWhatsAppText(phoneNumberId, accessToken, customerPhone, confirmation);
+    await saveMessage(admin, tenantId, conversation.id, "assistant", confirmation);
     return;
   }
 

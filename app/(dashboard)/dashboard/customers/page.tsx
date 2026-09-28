@@ -32,7 +32,7 @@ export default async function CustomersPage({
   let query = supabase
     .from("contacts")
     .select(
-      "id, name, phone_e164, email, first_channel, last_seen_at, conversations(count), leads(count), bookings(count)",
+      "id, name, phone_e164, email, first_channel, last_seen_at, opted_out_at, conversations(count), leads(count), bookings(count)",
     )
     .eq("tenant_id", tenantId)
     .order("last_seen_at", { ascending: false })
@@ -84,6 +84,11 @@ export default async function CustomersPage({
                 <Link href={`/dashboard/customers/${c.id}`} className="font-medium hover:underline">
                   {c.name || c.email || "Unnamed customer"}
                 </Link>
+                {c.opted_out_at && (
+                  <Badge variant="outline" className="ml-2" title="Replied STOP: no reminders or notices">
+                    Opted out
+                  </Badge>
+                )}
               </TableCell>
               <TableCell className="whitespace-nowrap">{formatPhone(c.phone_e164)}</TableCell>
               <TableCell>

@@ -1,4 +1,5 @@
 import { formatLocalDateTime } from "@/lib/agent/availability";
+import { NOT_SENT_REASON, type NotSentReason } from "./reminders";
 
 // Human wording for the booking history and status badges. Pure, so both
 // server pages and tests use it.
@@ -61,7 +62,11 @@ export function describeEvent(e: BookingEvent, currentUserId: string | null = nu
     case "reopened":
       return `Set back to confirmed by ${who(e, currentUserId)}`;
     case "reminder_sent":
-      return "Reminder sent on WhatsApp";
+      return d.via === "template" ? "Reminder sent on WhatsApp (template)" : "Reminder sent on WhatsApp";
+    case "reminder_not_sent": {
+      const reason = typeof d.reason === "string" && d.reason in NOT_SENT_REASON ? NOT_SENT_REASON[d.reason as NotSentReason] : "";
+      return `Reminder not sent${reason ? `: ${reason}` : ""}`;
+    }
     default:
       return e.type;
   }
