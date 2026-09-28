@@ -91,6 +91,39 @@ export const AGENT_TOOLS: ToolDef[] = [
       required: ["service", "date", "time", "name", "phone"],
     },
   },
+  {
+    name: "my_bookings",
+    description:
+      "List this visitor's upcoming bookings, each with a reference. Call it before cancelling or rescheduling, and whenever they ask about their appointments.",
+    parameters: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "cancel_booking",
+    description:
+      "Cancel one of the visitor's upcoming bookings. Only after they've clearly confirmed which booking (by the reference from my_bookings) and that they want it cancelled. Then tell them exactly what the result says.",
+    parameters: {
+      type: "object",
+      properties: {
+        booking_ref: { type: "string", description: "The booking reference from my_bookings" },
+        reason: { type: ["string", "null"], description: "Their reason, if they gave one, otherwise null" },
+      },
+      required: ["booking_ref"],
+    },
+  },
+  {
+    name: "reschedule_booking",
+    description:
+      "Move one of the visitor's upcoming bookings to a new date and time — the same booking, not a new one. Check availability for the service on the new date first, and only use a time it returned. Then tell them exactly what the result says.",
+    parameters: {
+      type: "object",
+      properties: {
+        booking_ref: { type: "string", description: "The booking reference from my_bookings" },
+        date: { type: "string", description: "New date, as YYYY-MM-DD" },
+        time: { type: "string", description: "New start time, as 24-hour HH:MM" },
+      },
+      required: ["booking_ref", "date", "time"],
+    },
+  },
 ];
 
 // `input` is whatever the model produced — untrusted until parseToolInput accepts it.
@@ -128,6 +161,9 @@ export const TOOL_INPUT_SCHEMAS = {
     phone: requiredText,
     email: optionalText,
   }),
+  my_bookings: z.object({}).passthrough(),
+  cancel_booking: z.object({ booking_ref: requiredText, reason: optionalText }),
+  reschedule_booking: z.object({ booking_ref: requiredText, date: dateText, time: timeText }),
 };
 
 export type ToolName = keyof typeof TOOL_INPUT_SCHEMAS;

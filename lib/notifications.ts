@@ -1,11 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type NotificationType = "human_requested" | "new_lead" | "new_booking";
+export type NotificationType =
+  | "human_requested"
+  | "new_lead"
+  | "new_booking"
+  | "booking_cancelled"
+  | "booking_rescheduled";
 
 // Where an alert takes the owner — shared by the dashboard bell and the emails.
 export function notificationPath(type: NotificationType, conversationId?: string | null): string {
   if (conversationId) return `/dashboard/conversations/${conversationId}`;
-  return type === "new_booking" ? "/dashboard/bookings" : "/dashboard/leads";
+  return type === "new_lead" || type === "human_requested" ? "/dashboard/leads" : "/dashboard/bookings";
 }
 
 // Records an in-app alert for the tenant's dashboard bell. Written by the

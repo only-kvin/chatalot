@@ -51,6 +51,31 @@ export function localToUtcDate(dateISO: string, hhmm: string): Date {
   return new Date(`${dateISO}T${hhmm}:00${TENANT_TZ_OFFSET}`);
 }
 
+const LOCAL_DAY = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Africa/Johannesburg",
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+});
+const LOCAL_TIME = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Africa/Johannesburg",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
+// "Friday 2 October at 10:00" in SA time. Tool results use this wording so
+// the model repeats it verbatim instead of reinterpreting "2026-10-02".
+export function formatLocalDateTime(instant: string | Date): string {
+  const d = new Date(instant);
+  return `${LOCAL_DAY.format(d)} at ${LOCAL_TIME.format(d)}`;
+}
+
+// "Friday 2 October" for a YYYY-MM-DD local date (noon avoids any DST edge).
+export function formatLocalDate(dateISO: string): string {
+  return LOCAL_DAY.format(localToUtcDate(dateISO, "12:00"));
+}
+
 // Local (SA) midnight at the start of the day that `date` falls on, as a UTC instant.
 export function startOfLocalDay(date: Date): Date {
   return localToUtcDate(localDateISO(date), "00:00");
@@ -139,6 +164,9 @@ export async function getOpenSlots(
   tenantId: string,
   serviceId: string,
   dateISO: string,
+  // When rescheduling: ignore the booking being moved, so its own current
+  // time doesn't block the slots around it.
+  excludeBookingId?: string,
 ): Promise<{ durationMinutes: number; slots: string[] } | null> {
   const { data: service } = await supabase
     .from("services")
@@ -168,9 +196,10 @@ export async function getOpenSlots(
     // Bookings that start on this local day. A booking starting just before
     // local midnight and running past it wouldn't be caught here — acceptable
     // for service-length appointments, not worth the added complexity.
-    supabase
-      .from("bookings")
-      .select("starts_at, ends_at")
+    (excludeBookingId
+      ? supabase.from("bookings").select("starts_at, ends_at").neq("id", excludeBookingId)
+      : supabase.from("bookings").select("starts_at, ends_at")
+    )
       .eq("tenant_id", tenantId)
       .neq("status", "cancelled")
       .gte("starts_at", dayStart)

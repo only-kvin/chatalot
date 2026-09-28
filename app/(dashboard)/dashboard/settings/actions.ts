@@ -12,6 +12,7 @@ const settingsSchema = z.object({
   greeting: z.string().min(1, "Greeting is required"),
   system_prompt_extra: z.string(),
   handoff_contact: z.string(),
+  booking_change_cutoff_minutes: z.coerce.number().int().min(0).max(10080),
   allowed_domains: z.string(),
 });
 
@@ -27,9 +28,11 @@ function parseDomains(raw: string): string[] {
   return [...new Set(domains)];
 }
 
-export async function updateSettingsAction(formData: FormData) {
+// Returns errors rather than throwing: Next.js hides thrown server action
+// messages in production, and these are meant for the owner to read.
+export async function updateSettingsAction(formData: FormData): Promise<{ error: string | null }> {
   const tenantId = await getCurrentTenantId();
-  if (!tenantId) throw new Error("Not authorized");
+  if (!tenantId) return { error: "Not authorized." };
 
   const parsed = settingsSchema.safeParse({
     business_name: formData.get("business_name"),
@@ -37,9 +40,10 @@ export async function updateSettingsAction(formData: FormData) {
     greeting: formData.get("greeting"),
     system_prompt_extra: formData.get("system_prompt_extra") ?? "",
     handoff_contact: formData.get("handoff_contact") ?? "",
+    booking_change_cutoff_minutes: formData.get("booking_change_cutoff_minutes") ?? 120,
     allowed_domains: formData.get("allowed_domains") ?? "",
   });
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
 
   const supabase = await createClient();
 
@@ -51,10 +55,14 @@ export async function updateSettingsAction(formData: FormData) {
       greeting: parsed.data.greeting,
       system_prompt_extra: parsed.data.system_prompt_extra,
       handoff_contact: parsed.data.handoff_contact,
+      booking_change_cutoff_minutes: parsed.data.booking_change_cutoff_minutes,
       updated_at: new Date().toISOString(),
     })
     .eq("tenant_id", tenantId);
-  if (configError) throw new Error(configError.message);
+  if (configError) {
+    console.error(`Saving settings for ${tenantId} failed:`, configError);
+    return { error: "Couldn't save your settings. Please try again." };
+  }
 
   // `tenants` RLS restricts writes to platform admins (see
   // 20260921084004_rls_policies.sql) so a tenant owner editing their own
@@ -66,7 +74,11 @@ export async function updateSettingsAction(formData: FormData) {
     .from("tenants")
     .update({ allowed_domains: parseDomains(parsed.data.allowed_domains) })
     .eq("id", tenantId);
-  if (tenantError) throw new Error(tenantError.message);
+  if (tenantError) {
+    console.error(`Saving allowed domains for ${tenantId} failed:`, tenantError);
+    return { error: "Couldn't save your allowed domains. Please try again." };
+  }
 
   revalidatePath("/dashboard/settings");
+  return { error: null };
 }

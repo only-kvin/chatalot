@@ -1,0 +1,187 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { formatLocalDateTime, getOpenSlots, localToUtcDate } from "@/lib/agent/availability";
+
+// Booking changes shared by the AI tools (service-role client, actor "ai") and
+// dashboard actions (the signed-in user's client, actor "team" — RLS then
+// scopes every read and write to their tenant). Every change is logged to
+// booking_events so the owner can see who changed what, and when.
+
+export type BookingActor = "ai" | "team" | "system";
+export type BookingEventChannel = "web" | "whatsapp" | "dashboard";
+export type BookingEventType =
+  | "created"
+  | "rescheduled"
+  | "cancelled"
+  | "attended"
+  | "no_show"
+  | "reopened"
+  | "reminder_sent";
+
+export type BookingSummary = {
+  id: string;
+  // Short reference the AI shows and hands back; resolved against the
+  // customer's own bookings only, so a guessed ref can't reach anyone else's.
+  ref: string;
+  serviceName: string;
+  serviceId: string;
+  startsAt: string;
+  status: string;
+  customerName: string;
+};
+
+type Actor = { actor: BookingActor; channel: BookingEventChannel; createdBy?: string | null };
+
+export function bookingRef(id: string): string {
+  return id.slice(0, 8).toUpperCase();
+}
+
+export async function logBookingEvent(
+  client: SupabaseClient,
+  e: Actor & {
+    tenantId: string;
+    bookingId: string;
+    type: BookingEventType;
+    details?: Record<string, unknown>;
+  },
+): Promise<void> {
+  const { error } = await client.from("booking_events").insert({
+    tenant_id: e.tenantId,
+    booking_id: e.bookingId,
+    type: e.type,
+    actor: e.actor,
+    channel: e.channel,
+    details: e.details ?? {},
+    created_by: e.createdBy ?? null,
+  });
+  if (error) console.error(`Logging ${e.type} for booking ${e.bookingId} failed:`, error);
+}
+
+// Which bookings a visitor may manage in chat. WhatsApp proves their phone
+// number, so it's everything booked by that customer; on the website anyone
+// can type a number, so only bookings made in this very chat.
+export async function listManageableBookings(
+  admin: SupabaseClient,
+  s: { tenantId: string; conversationId: string; channel: "web" | "whatsapp" },
+): Promise<BookingSummary[]> {
+  let contactId: string | null = null;
+  if (s.channel === "whatsapp") {
+    const { data } = await admin
+      .from("conversations")
+      .select("contact_id")
+      .eq("id", s.conversationId)
+      .eq("tenant_id", s.tenantId)
+      .maybeSingle();
+    contactId = data?.contact_id ?? null;
+  }
+
+  let query = admin
+    .from("bookings")
+    .select("id, service_id, starts_at, status, name, services(name)")
+    .eq("tenant_id", s.tenantId)
+    .eq("status", "confirmed")
+    .gt("starts_at", new Date().toISOString())
+    .order("starts_at");
+  query = contactId
+    ? query.or(`conversation_id.eq.${s.conversationId},contact_id.eq.${contactId}`)
+    : query.eq("conversation_id", s.conversationId);
+
+  const { data } = await query;
+  return (data ?? []).map((b) => ({
+    id: b.id,
+    ref: bookingRef(b.id),
+    serviceId: b.service_id,
+    serviceName: (b.services as unknown as { name: string } | null)?.name ?? "Booking",
+    startsAt: b.starts_at,
+    status: b.status,
+    customerName: b.name,
+  }));
+}
+
+export function describeBooking(b: { serviceName: string; startsAt: string }): string {
+  return `${b.serviceName} on ${formatLocalDateTime(b.startsAt)}`;
+}
+
+// True when the booking starts within the tenant's minimum notice, so the
+// customer can't change it themselves in chat.
+export function insideCutoff(startsAt: string, cutoffMinutes: number, now = new Date()): boolean {
+  return new Date(startsAt).getTime() - now.getTime() < cutoffMinutes * 60_000;
+}
+
+export async function cancelBooking(
+  client: SupabaseClient,
+  c: Actor & { tenantId: string; bookingId: string; reason?: string | null },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { data, error } = await client
+    .from("bookings")
+    .update({ status: "cancelled", updated_at: new Date().toISOString() })
+    .eq("id", c.bookingId)
+    .eq("tenant_id", c.tenantId)
+    .eq("status", "confirmed")
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error(`Cancelling booking ${c.bookingId} failed:`, error);
+    return { ok: false, error: "The booking couldn't be cancelled due to a technical problem." };
+  }
+  if (!data) return { ok: false, error: "That booking isn't active any more." };
+
+  await logBookingEvent(client, {
+    ...c,
+    type: "cancelled",
+    details: c.reason ? { reason: c.reason } : {},
+  });
+  return { ok: true };
+}
+
+export async function rescheduleBooking(
+  client: SupabaseClient,
+  r: Actor & { tenantId: string; bookingId: string; date: string; time: string },
+): Promise<{ ok: true; from: string; to: string } | { ok: false; error: string }> {
+  const { data: booking } = await client
+    .from("bookings")
+    .select("id, service_id, starts_at, status, services(duration_minutes)")
+    .eq("id", r.bookingId)
+    .eq("tenant_id", r.tenantId)
+    .maybeSingle();
+  if (!booking || booking.status !== "confirmed") {
+    return { ok: false, error: "That booking isn't active any more." };
+  }
+
+  // Recomputed here even if availability was just checked — defends against
+  // a stale or made-up time, and excludes this booking's own current slot.
+  const open = await getOpenSlots(client, r.tenantId, booking.service_id, r.date, booking.id);
+  if (!open || !open.slots.includes(r.time)) {
+    return {
+      ok: false,
+      error: `That time isn't available. Check availability for ${r.date} and pick one of the returned times.`,
+    };
+  }
+
+  const startsAt = localToUtcDate(r.date, r.time);
+  const endsAt = new Date(startsAt.getTime() + open.durationMinutes * 60_000);
+  const { error } = await client
+    .from("bookings")
+    .update({
+      starts_at: startsAt.toISOString(),
+      ends_at: endsAt.toISOString(),
+      // A new time needs a new reminder.
+      reminder_sent_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", booking.id)
+    .eq("tenant_id", r.tenantId)
+    .eq("status", "confirmed");
+  if (error) {
+    // Exclusion violation: someone took the slot between the check and now.
+    if (error.code === "23P01") return { ok: false, error: "That slot was just taken — please pick another time." };
+    console.error(`Rescheduling booking ${booking.id} failed:`, error);
+    return { ok: false, error: "The booking couldn't be moved due to a technical problem." };
+  }
+
+  await logBookingEvent(client, {
+    ...r,
+    type: "rescheduled",
+    details: { from: booking.starts_at, to: startsAt.toISOString() },
+  });
+  return { ok: true, from: booking.starts_at, to: startsAt.toISOString() };
+}

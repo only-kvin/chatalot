@@ -1,3 +1,4 @@
+import { logBookingEvent } from "@/lib/bookings/manage";
 import { createAdminClient } from "@/lib/db/supabase-admin";
 import { decrypt } from "@/lib/security/crypto";
 import { sendWhatsAppTemplate } from "@/lib/channels/whatsapp";
@@ -70,7 +71,15 @@ export async function GET(request: Request) {
       await admin
         .from("bookings")
         .update({ reminder_sent_at: new Date().toISOString() })
-        .eq("id", booking.id);
+        .eq("id", booking.id)
+        .eq("tenant_id", booking.tenant_id);
+      await logBookingEvent(admin, {
+        tenantId: booking.tenant_id,
+        bookingId: booking.id,
+        type: "reminder_sent",
+        actor: "system",
+        channel: "whatsapp",
+      });
       sent++;
     } catch (err) {
       // Doesn't stop the rest of the batch — reminder_sent_at stays null so

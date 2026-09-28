@@ -9,11 +9,23 @@ import {
   listActiveServiceNames,
   listActiveServices,
   localToUtcDate,
+  formatLocalDate,
+  formatLocalDateTime,
 } from "./availability";
 import { notifyOwnerOfLead } from "@/lib/email/notify-lead";
 import { notifyOwnerHumanRequested } from "@/lib/email/notify-human-requested";
 import { notifyOwnerOfBooking } from "@/lib/email/notify-booking";
 import { linkConversation, upsertContact } from "@/lib/contacts/upsert";
+import {
+  bookingRef,
+  cancelBooking,
+  describeBooking,
+  insideCutoff,
+  listManageableBookings,
+  logBookingEvent,
+  rescheduleBooking,
+} from "@/lib/bookings/manage";
+import { notifyOwnerOfBookingChange } from "@/lib/email/notify-booking-change";
 
 const MAX_TOKENS = 400;
 const MAX_HISTORY = 10;
@@ -72,6 +84,8 @@ type ToolContext = {
   channel: Channel;
   // Web only: the tenant has a WhatsApp link the widget can offer on handoff.
   whatsappAvailable: boolean;
+  // Minimum notice for customers to cancel or reschedule in chat.
+  cutoffMinutes: number;
 };
 
 // Tool result for request_human on the website, where the owner can't reply
@@ -161,10 +175,65 @@ async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall: ToolCa
     if (typeof resolved === "string") return resolved;
 
     const result = await getOpenSlots(admin, tenantId, resolved.id, date);
+    const day = formatLocalDate(date);
     if (!result || result.slots.length === 0) {
-      return `No availability on ${date} for ${resolved.name}.`;
+      return `No availability on ${day} (${date}) for ${resolved.name}.`;
     }
-    return `Available times on ${date} for ${resolved.name}: ${result.slots.join(", ")}.`;
+    return `Available times on ${day} (${date}) for ${resolved.name}: ${result.slots.join(", ")}.`;
+  }
+
+  if (call.name === "my_bookings") {
+    const bookings = await listManageableBookings(admin, ctx);
+    if (!bookings.length) {
+      return ctx.channel === "web"
+        ? "No upcoming bookings were made in this chat. On the website, only bookings made in this same chat can be changed; for others, the visitor should message us on WhatsApp or call."
+        : "This customer has no upcoming bookings.";
+    }
+    return `Upcoming bookings: ${bookings.map((b) => `[${b.ref}] ${describeBooking(b)}`).join("; ")}.`;
+  }
+
+  if (call.name === "cancel_booking" || call.name === "reschedule_booking") {
+    // Only bookings this visitor may manage are resolvable by reference.
+    const bookings = await listManageableBookings(admin, ctx);
+    const ref = call.input.booking_ref.replace(/[^a-z0-9]/gi, "").toUpperCase();
+    const booking = bookings.find((b) => b.ref === ref);
+    if (!booking) {
+      return "No matching upcoming booking for this visitor. Call my_bookings and use one of its references.";
+    }
+    if (insideCutoff(booking.startsAt, ctx.cutoffMinutes)) {
+      return `${describeBooking(booking)} is too soon to change in chat (the business needs at least ${formatNotice(ctx.cutoffMinutes)} notice). Nothing was changed. Apologise and call request_human so the team can help.`;
+    }
+    const actor = { actor: "ai" as const, channel: ctx.channel, tenantId, bookingId: booking.id };
+
+    if (call.name === "cancel_booking") {
+      const result = await cancelBooking(admin, { ...actor, reason: call.input.reason });
+      if (!result.ok) return result.error;
+      await notifyOwnerOfBookingChange(
+        admin,
+        tenantId,
+        businessName,
+        { kind: "cancelled", customer: booking.customerName, booking: describeBooking(booking), reason: call.input.reason },
+        conversationId,
+      );
+      return `Cancelled: ${describeBooking(booking)}. Tell the visitor exactly this.`;
+    }
+
+    const moved = await rescheduleBooking(admin, { ...actor, date: call.input.date, time: call.input.time });
+    if (!moved.ok) return moved.error;
+    await notifyOwnerOfBookingChange(
+      admin,
+      tenantId,
+      businessName,
+      {
+        kind: "rescheduled",
+        customer: booking.customerName,
+        serviceName: booking.serviceName,
+        from: formatLocalDateTime(moved.from),
+        to: formatLocalDateTime(moved.to),
+      },
+      conversationId,
+    );
+    return `Moved: ${booking.serviceName} from ${formatLocalDateTime(moved.from)} to ${formatLocalDateTime(moved.to)} (same booking, nothing else changed). Tell the visitor exactly this.`;
   }
 
   // create_booking
@@ -201,18 +270,23 @@ async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall: ToolCa
     .single();
   if (leadError) return toolFailed(call.name, leadError);
 
-  const { error: bookingError } = await admin.from("bookings").insert({
-    tenant_id: tenantId,
-    service_id: resolved.id,
-    conversation_id: conversationId,
-    contact_id: contactId,
-    lead_id: lead.id,
-    name,
-    phone,
-    email,
-    starts_at: startsAt.toISOString(),
-    ends_at: endsAt.toISOString(),
-  });
+  const { data: booking, error: bookingError } = await admin
+    .from("bookings")
+    .insert({
+      tenant_id: tenantId,
+      service_id: resolved.id,
+      conversation_id: conversationId,
+      contact_id: contactId,
+      lead_id: lead.id,
+      name,
+      phone,
+      email,
+      starts_at: startsAt.toISOString(),
+      ends_at: endsAt.toISOString(),
+      source: ctx.channel,
+    })
+    .select("id")
+    .single();
   if (bookingError) {
     // Exclusion-violation: another booking took this slot between our
     // availability check above and this insert.
@@ -222,15 +296,30 @@ async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall: ToolCa
     return toolFailed(call.name, bookingError);
   }
 
-  await notifyOwnerOfBooking(admin, tenantId, businessName, {
-    name,
-    phone,
-    email,
-    serviceName: resolved.name,
-    startsAtLabel: `${date} at ${time}`,
-  }, conversationId);
+  await logBookingEvent(admin, {
+    tenantId,
+    bookingId: booking.id,
+    type: "created",
+    actor: "ai",
+    channel: ctx.channel,
+  });
 
-  return `Booking confirmed: ${resolved.name} on ${date} at ${time}.`;
+  const when = formatLocalDateTime(startsAt);
+  await notifyOwnerOfBooking(
+    admin,
+    tenantId,
+    businessName,
+    { name, phone, email, serviceName: resolved.name, startsAtLabel: when },
+    conversationId,
+  );
+
+  return `Booking confirmed: ${resolved.name} on ${when} (reference ${bookingRef(booking.id)}). Tell the visitor exactly this date and time.`;
+}
+
+function formatNotice(minutes: number): string {
+  if (minutes % 1440 === 0) return `${minutes / 1440} day${minutes === 1440 ? "" : "s"}'`;
+  if (minutes % 60 === 0) return `${minutes / 60} hour${minutes === 60 ? "" : "s"}'`;
+  return `${minutes} minutes'`;
 }
 
 // Streams the assistant's reply text as it's generated, persisting the user
@@ -254,7 +343,7 @@ export async function* runAgent(params: {
 
   const { data: agentConfig, error: configError } = await admin
     .from("agent_configs")
-    .select("business_name, tone, greeting, system_prompt_extra, handoff_contact")
+    .select("business_name, tone, greeting, system_prompt_extra, handoff_contact, booking_change_cutoff_minutes")
     .eq("tenant_id", params.tenantId)
     .single();
 
@@ -322,6 +411,7 @@ export async function* runAgent(params: {
             conversationId: params.conversationId,
             channel: params.channel,
             whatsappAvailable: params.whatsappAvailable ?? false,
+            cutoffMinutes: agentConfig.booking_change_cutoff_minutes ?? 120,
           },
           call,
         ),

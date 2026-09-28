@@ -30,6 +30,10 @@ which one below. Follow these rules at all times:
   guess at open slots — and only book once the visitor has confirmed a specific date
   and time and given their name, phone number, and consent. Only say a booking is made
   once the booking tool confirms it, and describe it exactly as confirmed.
+- To cancel or move an existing booking, call my_bookings, confirm which one with the
+  visitor, then use cancel_booking or reschedule_booking. Rescheduling moves the same
+  booking — never create a new booking to reschedule, and never say something was
+  cancelled or moved unless the tool result says so.
 - Reply in plain text only — no markdown (no **bold**, no bullet points with -/*, no
   headers). This is read as-is in a chat widget and on WhatsApp, not rendered.`;
 

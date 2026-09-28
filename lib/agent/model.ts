@@ -17,7 +17,18 @@ export type AgentTurnEvent =
   | { type: "usage"; promptTokens: number; completionTokens: number };
 
 const GROQ_MODEL = "openai/gpt-oss-120b";
-const MAX_TOOL_ITERATIONS = 3;
+// A cut + colour booking alone takes 4 tool calls (check availability and book,
+// twice); a reschedule adds a lookup. 3 was too few: the forced text-only
+// round then made the model call a tool anyway, which Groq rejects with 400.
+const MAX_TOOL_ITERATIONS = 6;
+
+// Told to the model on the forced text-only round, so it wraps up in words
+// rather than attempting another tool call (which the provider would reject).
+const FINAL_ROUND_NOTE =
+  "You can't use any more tools in this reply. Reply to the visitor now in plain text: confirm only what the tool results above show was actually done, and say clearly what still needs doing.";
+
+// Invisible characters the model sometimes emits (seen in a degenerate reply).
+const INVISIBLE_CHARS = /[​-‍⁠﻿]/g;
 
 function toOpenAiTools(tools: ToolDef[]) {
   return tools.map((t) => ({
@@ -58,6 +69,12 @@ async function streamOnce(
     messages,
     max_tokens: maxTokens,
     stream: true,
+    // gpt-oss reasons before answering, and those tokens count against
+    // max_tokens: at the default effort a long turn could run out mid-thought
+    // and leak half-formed reasoning into the reply. Low effort keeps it
+    // short; include_reasoning:false keeps it out of the response entirely.
+    reasoning_effort: "low",
+    include_reasoning: false,
   };
   // Omit tools/tool_choice entirely (rather than an empty array) when this
   // call is forced text-only — some providers reject tool_choice with no tools.
@@ -114,7 +131,10 @@ async function streamOnce(
       const delta = chunk.choices?.[0]?.delta;
       if (!delta) continue;
 
-      if (delta.content) onText(delta.content);
+      if (delta.content) {
+        const text = delta.content.replace(INVISIBLE_CHARS, "");
+        if (text) onText(text);
+      }
 
       if (delta.tool_calls) {
         for (const tc of delta.tool_calls) {
@@ -165,10 +185,11 @@ export async function* runAgentTurn(params: {
   ];
 
   for (let iteration = 0; iteration <= MAX_TOOL_ITERATIONS; iteration++) {
-    const tools = iteration < MAX_TOOL_ITERATIONS ? params.tools : [];
+    const finalRound = iteration === MAX_TOOL_ITERATIONS;
+    const tools = finalRound ? [] : params.tools;
     let iterationText = "";
     const { calls: pendingCalls, usage } = await streamOnce(
-      openAiMessages,
+      finalRound ? [...openAiMessages, { role: "system", content: FINAL_ROUND_NOTE }] : openAiMessages,
       tools,
       params.maxTokens,
       params.signal,
