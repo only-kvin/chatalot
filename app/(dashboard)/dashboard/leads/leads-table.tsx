@@ -18,6 +18,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatShortLocal } from "@/lib/time";
+import { localDateISO } from "@/lib/agent/availability";
 
 type Lead = {
   id: string;
@@ -53,7 +55,7 @@ function downloadCsv(leads: Lead[]) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `leads-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `leads-${localDateISO(new Date())}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -114,7 +116,7 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
                   </SelectContent>
                 </Select>
               </TableCell>
-              <TableCell>{new Date(lead.created_at).toLocaleDateString()}</TableCell>
+              <TableCell>{formatShortLocal(lead.created_at)}</TableCell>
             </TableRow>
           ))}
           {leads.length === 0 && (

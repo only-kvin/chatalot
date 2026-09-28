@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatShortLocal } from "@/lib/time";
 
 export default async function ConversationsPage() {
   const tenantId = await getCurrentTenantId();
@@ -52,7 +53,7 @@ export default async function ConversationsPage() {
                   {c.status}
                 </Badge>
               </TableCell>
-              <TableCell>{new Date(c.last_message_at).toLocaleString()}</TableCell>
+              <TableCell>{formatShortLocal(c.last_message_at)}</TableCell>
             </TableRow>
           ))}
           {!conversations?.length && (

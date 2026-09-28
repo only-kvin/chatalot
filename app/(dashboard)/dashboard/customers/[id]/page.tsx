@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CustomerForm } from "./customer-form";
 import { DeleteCustomer } from "./delete-customer";
+import { formatShortLocal } from "@/lib/time";
 
 const NAME_SOURCE_LABEL: Record<string, string> = {
   whatsapp_profile: "from their WhatsApp profile",
@@ -15,9 +16,7 @@ const NAME_SOURCE_LABEL: Record<string, string> = {
   owner: "edited by your team",
 };
 
-function when(iso: string) {
-  return new Date(iso).toLocaleString();
-}
+const when = formatShortLocal;
 
 export default async function CustomerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

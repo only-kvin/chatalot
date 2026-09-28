@@ -15,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatShortLocal } from "@/lib/time";
 
 type Count = { count: number }[];
 
@@ -88,7 +89,7 @@ export default async function CustomersPage({
               <TableCell>
                 {c.first_channel && <Badge variant="secondary">{c.first_channel}</Badge>}
               </TableCell>
-              <TableCell className="whitespace-nowrap">{new Date(c.last_seen_at).toLocaleString()}</TableCell>
+              <TableCell className="whitespace-nowrap">{formatShortLocal(c.last_seen_at)}</TableCell>
               <TableCell className="text-right">{(c.conversations as Count)[0]?.count ?? 0}</TableCell>
               <TableCell className="text-right">{(c.leads as Count)[0]?.count ?? 0}</TableCell>
               <TableCell className="text-right">{(c.bookings as Count)[0]?.count ?? 0}</TableCell>

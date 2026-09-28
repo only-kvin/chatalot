@@ -24,20 +24,7 @@ export const SOURCE_LABEL: Record<string, string> = {
   team: "Your team",
 };
 
-const SHORT = new Intl.DateTimeFormat("en-GB", {
-  timeZone: "Africa/Johannesburg",
-  day: "numeric",
-  month: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-});
-
-// "28 Sep, 00:19" in SA time. Dashboard pages render on the server (UTC on
-// Vercel), so plain toLocaleString() would show times two hours off.
-export function formatShortLocal(instant: string | Date): string {
-  return SHORT.format(new Date(instant));
-}
+export { formatShortLocal } from "@/lib/time";
 
 export type BookingEvent = {
   type: string;

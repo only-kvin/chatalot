@@ -51,8 +51,9 @@ export async function GET(request: Request) {
         .maybeSingle();
       if (!channel?.wa_access_token_encrypted || !channel.wa_phone_number_id) continue;
 
+      // A many-to-one embed comes back as an object, not an array.
       const serviceName =
-        (booking.services as { name: string }[] | null)?.[0]?.name ?? "your appointment";
+        (booking.services as unknown as { name: string } | null)?.name ?? "your appointment";
       const timeLabel = new Date(booking.starts_at).toLocaleString("en-ZA", {
         dateStyle: "medium",
         timeStyle: "short",
