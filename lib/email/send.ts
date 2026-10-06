@@ -33,6 +33,10 @@ export type OwnerEmail = {
   intro: string;
   // Label/value lines; null values are skipped.
   details: [label: string, value: string | null][];
+  // Headed lists, for digests like the daily summary. Empty ones are skipped.
+  sections?: { heading: string; lines: string[] }[];
+  // Small print under the button.
+  footer?: string;
   // Dashboard path the button opens, e.g. /dashboard/conversations/<id>.
   // A signed-out owner goes through login and lands back on it.
   path: string;
@@ -44,13 +48,23 @@ export function renderOwnerEmail(email: OwnerEmail): string {
     .filter(([, value]) => value)
     .map(([label, value]) => `<strong>${escapeHtml(label)}:</strong> ${escapeHtml(value!)}`)
     .join("<br />");
+  const sections = (email.sections ?? [])
+    .filter((section) => section.lines.length > 0)
+    .map(
+      (section) =>
+        `<p style="margin-bottom:4px"><strong>${escapeHtml(section.heading)}</strong></p>` +
+        `<ul style="margin-top:0;padding-left:20px">${section.lines.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>`,
+    )
+    .join("");
   return `
     <p>${escapeHtml(email.intro)}</p>
     ${details ? `<p>${details}</p>` : ""}
+    ${sections}
     <p>
       <a href="${escapeHtml(url)}" style="display:inline-block;padding:10px 18px;border-radius:6px;background:#4f46e5;color:#ffffff;text-decoration:none;font-weight:600">Open in ChatAlot</a>
     </p>
     <p style="font-size:12px;color:#71717a">Or paste this link into your browser: ${escapeHtml(url)}</p>
+    ${email.footer ? `<p style="font-size:12px;color:#71717a">${escapeHtml(email.footer)}</p>` : ""}
   `;
 }
 

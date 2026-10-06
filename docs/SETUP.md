@@ -124,7 +124,9 @@ Manual steps the platform owner needs to do. Kept up to date as new phases add n
 
    How it works (`lib/bookings/review-requests.ts`): each morning, bookings marked **Attended** in the last 3 days are asked once — skipped after STOP, a normal message inside the 24h window, else the template. It's never retried; if it can't go out, the booking history says "Review request not sent: <why>". A reply that is just a score ("5", "4/5", "⭐⭐⭐") within 7 days is saved on the booking (star rating on the Bookings pages) and thanked; 3 or below also alerts the owner (bell + email). **The Google link goes to every customer whatever their score** — Google forbids review gating, so never change the code to show it only to happy customers.
 
-5. Once services and weekly availability are set up per-tenant (`/dashboard/services`, `/dashboard/availability`), the agent can offer real booking slots — test via `public/widget-demo.html` or a WhatsApp conversation by asking to book something.
+5. **Owner daily summary**: nothing to set up. The same daily cron then emails each business's owners at 08:00 SA with today's bookings (flagging any whose reminder couldn't go out), what needs them (chats waiting for a person, new leads, past bookings not yet marked Attended / No-show), and yesterday's numbers including ratings. Mornings with nothing to report are skipped, and it's sent at most once a day per business (`agent_configs.daily_summary_sent_on`). Owners turn it off in Dashboard → Settings → Daily summary. Like the other owner emails it goes through Resend, so until a sending domain is verified it only reaches your own Resend account's email (see Phase 2).
+
+6. Once services and weekly availability are set up per-tenant (`/dashboard/services`, `/dashboard/availability`), the agent can offer real booking slots — test via `public/widget-demo.html` or a WhatsApp conversation by asking to book something.
 
 ## Reliability & safety hardening (2026-09-27)
 

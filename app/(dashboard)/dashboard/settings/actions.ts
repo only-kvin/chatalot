@@ -18,6 +18,7 @@ const settingsSchema = z.object({
     .string()
     .trim()
     .refine((v) => v === "" || /^https:\/\/\S+$/.test(v), "The Google review link must start with https://"),
+  daily_summary_enabled: z.boolean(),
   allowed_domains: z.string(),
 });
 
@@ -47,6 +48,8 @@ export async function updateSettingsAction(formData: FormData): Promise<{ error:
     handoff_contact: formData.get("handoff_contact") ?? "",
     booking_change_cutoff_minutes: formData.get("booking_change_cutoff_minutes") ?? 120,
     google_review_url: formData.get("google_review_url") ?? "",
+    // An unticked checkbox isn't submitted at all.
+    daily_summary_enabled: formData.get("daily_summary_enabled") === "on",
     allowed_domains: formData.get("allowed_domains") ?? "",
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
@@ -63,6 +66,7 @@ export async function updateSettingsAction(formData: FormData): Promise<{ error:
       handoff_contact: parsed.data.handoff_contact,
       booking_change_cutoff_minutes: parsed.data.booking_change_cutoff_minutes,
       google_review_url: parsed.data.google_review_url || null,
+      daily_summary_enabled: parsed.data.daily_summary_enabled,
       updated_at: new Date().toISOString(),
     })
     .eq("tenant_id", tenantId);

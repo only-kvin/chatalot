@@ -2,11 +2,13 @@ import { createAdminClient } from "@/lib/db/supabase-admin";
 import { sendBookingReminder } from "@/lib/bookings/reminders";
 import { REVIEW_LOOKBACK_DAYS, sendReviewRequest } from "@/lib/bookings/review-requests";
 import { tenantWhatsAppLookup, type TenantWhatsApp } from "@/lib/bookings/whatsapp-channel";
+import { sendDailySummary } from "@/lib/email/send-daily-summary";
 
-// The daily WhatsApp jobs: booking reminders, then review requests. Runs once
-// a day at 06:00 UTC = 08:00 SA (see vercel.json — Vercel's Hobby plan only
-// allows daily cron schedules). How each message is sent, and what happens
-// when it can't be, lives in lib/bookings/reminders.ts and review-requests.ts.
+// The daily jobs: booking reminders and review requests on WhatsApp, then the
+// owners' summary email. Runs once a day at 06:00 UTC = 08:00 SA (see
+// vercel.json — Vercel's Hobby plan only allows daily cron schedules). How
+// each message is sent, and what happens when it can't be, lives in
+// lib/bookings/reminders.ts, review-requests.ts and lib/summary/.
 
 // Rather than a narrow "~24h out" window a once-a-day run could easily
 // straddle, reminders look ahead a full 2 days: any booking that far out or
@@ -88,6 +90,28 @@ async function sendReviewRequests(admin: Admin, channelFor: ChannelFor) {
   return { checked: bookings?.length ?? 0, sent, notSent };
 }
 
+async function sendSummaries(admin: Admin) {
+  const { data: configs, error } = await admin
+    .from("agent_configs")
+    .select("tenant_id, business_name, tenants!inner(status)")
+    .eq("daily_summary_enabled", true)
+    .eq("tenants.status", "active");
+  if (error) throw error;
+
+  const counts = { sent: 0, quiet: 0, alreadySent: 0 };
+  for (const config of configs ?? []) {
+    try {
+      const result = await sendDailySummary(admin, { tenantId: config.tenant_id, businessName: config.business_name ?? "" });
+      if (result === "sent") counts.sent++;
+      else if (result === "quiet") counts.quiet++;
+      else counts.alreadySent++;
+    } catch (err) {
+      console.error(`Daily summary failed for tenant ${config.tenant_id}:`, err);
+    }
+  }
+  return counts;
+}
+
 export async function GET(request: Request) {
   if (request.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
     return new Response("Unauthorized", { status: 401 });
@@ -105,12 +129,16 @@ export async function GET(request: Request) {
   for (const [job, result] of [["reminders", reminders], ["review requests", reviews]] as const) {
     if (result.status === "rejected") console.error(`Daily ${job} failed:`, result.reason);
   }
-  const ok = reminders.status === "fulfilled" && reviews.status === "fulfilled";
+  // After the WhatsApp jobs, so today's "reminder not sent" is already known.
+  const [summaries] = await Promise.allSettled([sendSummaries(admin)]);
+  if (summaries.status === "rejected") console.error("Daily summaries failed:", summaries.reason);
+  const ok = [reminders, reviews, summaries].every((r) => r.status === "fulfilled");
 
   return Response.json(
     {
       reminders: reminders.status === "fulfilled" ? reminders.value : "failed",
       reviews: reviews.status === "fulfilled" ? reviews.value : "failed",
+      summaries: summaries.status === "fulfilled" ? summaries.value : "failed",
     },
     { status: ok ? 200 : 500 },
   );

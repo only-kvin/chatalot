@@ -16,6 +16,7 @@ type Settings = {
   handoff_contact: string;
   booking_change_cutoff_minutes: number;
   google_review_url: string;
+  daily_summary_enabled: boolean;
   allowed_domains: string[];
 };
 
@@ -160,6 +161,27 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
             Find it in your Google Business Profile under &ldquo;Ask for reviews&rdquo;. Leave empty to turn review
             requests off. Every customer gets the link, whatever their score, as Google requires.
           </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Daily summary</CardTitle>
+          <CardDescription>
+            An email at 08:00 with today&rsquo;s bookings, anything waiting for you, and how yesterday went. Mornings
+            with nothing to report are skipped.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="daily_summary_enabled"
+              defaultChecked={initialSettings.daily_summary_enabled}
+              className="size-4"
+            />
+            Email me a daily summary
+          </label>
         </CardContent>
       </Card>
 
