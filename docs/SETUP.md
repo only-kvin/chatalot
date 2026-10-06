@@ -104,13 +104,27 @@ Manual steps the platform owner needs to do. Kept up to date as new phases add n
    pnpm exec supabase db push --db-url "$POSTGRES_URL_NON_POOLING"
    ```
 
-2. **`CRON_SECRET`**: generate one (see `.env.example`) and set it in Vercel's Environment Variables. Vercel Cron automatically sends it as `Authorization: Bearer <CRON_SECRET>` to routes listed in `vercel.json` — no extra wiring needed once the env var is set and the project is deployed. The reminder cron (`/api/cron/send-booking-reminders`) runs once daily there (06:00 UTC) — **Vercel's Hobby plan only allows daily cron schedules**, an hourly one fails the whole deploy outright. The route compensates by checking a 48h lookahead window instead of a narrow "~24h out" one, so a booking still gets a reminder attempt on each of the 1-2 daily runs before it happens, even with only one run a day. Upgrading to Pro would unlock finer-grained schedules if that's ever wanted.
+2. **`CRON_SECRET`**: generate one (see `.env.example`) and set it in Vercel's Environment Variables. Vercel Cron automatically sends it as `Authorization: Bearer <CRON_SECRET>` to routes listed in `vercel.json` — no extra wiring needed once the env var is set and the project is deployed. The daily cron (`/api/cron/daily` — booking reminders, then review requests) runs once a day there (06:00 UTC = 08:00 SA) — **Vercel's Hobby plan only allows daily cron schedules**, an hourly one fails the whole deploy outright. The route compensates by checking a 48h lookahead window instead of a narrow "~24h out" one, so a booking still gets a reminder attempt on each of the 1-2 daily runs before it happens, even with only one run a day. Upgrading to Pro would unlock finer-grained schedules if that's ever wanted.
 
 3. **WhatsApp reminder template**: create and get approval for a **Utility** template named `booking_reminder` (English) in WhatsApp Manager → Message Templates, with three body variables in this order: customer name, service, date and time (e.g. "Hi {{1}}, a reminder of your {{2}} on {{3}}. Reply here if you need to change it."). How reminders go out (see `lib/bookings/reminders.ts`): a customer who replied STOP is skipped; one who messaged in the last 24 hours gets a normal WhatsApp message (works before the template is approved); otherwise the template is used. When none of that works, the booking history shows "Reminder not sent: <why>" and the owner gets one bell alert to call the customer. The daily run retries unsent reminders until the appointment is within the window.
 
    **STOP / START**: a customer replying STOP (or UNSUBSCRIBE / OPT OUT) is opted out of every message ChatAlot starts — reminders, booking notices from the dashboard, and later review requests and win-back — and the AI is paused for that chat. START (or SUBSCRIBE) undoes both. Both are confirmed to the customer. Opted-out customers are marked on the Customers page.
 
-4. Once services and weekly availability are set up per-tenant (`/dashboard/services`, `/dashboard/availability`), the agent can offer real booking slots — test via `public/widget-demo.html` or a WhatsApp conversation by asking to book something.
+4. **WhatsApp review request template**: create a template named `review_request` (English) in WhatsApp Manager → Message Templates. Meta will most likely put it in the **Marketing** category (asking for a review isn't a transaction update); accept that. Four body variables in this order: customer name, business name, service, Google review link. The body must read exactly:
+
+   ```
+   Hi {{1}}, thanks for visiting {{2}}! How was your {{3}}? Reply with a number from 1 (poor) to 5 (great).
+
+   If you have a moment, a Google review helps us a lot: {{4}}
+
+   Thank you!
+   ```
+
+   (It must match `reviewRequestText()` in `lib/bookings/rating.ts`, which is also what's sent inside the 24h window.) Then, per business, paste their **Google review link** in Dashboard → Settings → Reviews (Google Business Profile → "Ask for reviews" → copy link). Review requests are off until that link is set.
+
+   How it works (`lib/bookings/review-requests.ts`): each morning, bookings marked **Attended** in the last 3 days are asked once — skipped after STOP, a normal message inside the 24h window, else the template. It's never retried; if it can't go out, the booking history says "Review request not sent: <why>". A reply that is just a score ("5", "4/5", "⭐⭐⭐") within 7 days is saved on the booking (star rating on the Bookings pages) and thanked; 3 or below also alerts the owner (bell + email). **The Google link goes to every customer whatever their score** — Google forbids review gating, so never change the code to show it only to happy customers.
+
+5. Once services and weekly availability are set up per-tenant (`/dashboard/services`, `/dashboard/availability`), the agent can offer real booking slots — test via `public/widget-demo.html` or a WhatsApp conversation by asking to book something.
 
 ## Reliability & safety hardening (2026-09-27)
 

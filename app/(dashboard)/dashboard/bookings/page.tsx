@@ -13,6 +13,7 @@ import {
   type BookingStatus,
 } from "@/lib/bookings/labels";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { Rating } from "@/components/dashboard/rating";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "cn";
 import {
@@ -45,7 +46,7 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
 
   let query = supabase
     .from("bookings")
-    .select("id, name, starts_at, status, source, created_at, contact_id, services(name)")
+    .select("id, name, starts_at, status, source, created_at, contact_id, review_rating, services(name)")
     .eq("tenant_id", tenantId)
     .limit(200);
   if (tab === "upcoming") query = query.neq("status", "cancelled").gte("starts_at", now).order("starts_at");
@@ -134,6 +135,7 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
                   ) : (
                     <Badge variant={statusVariant(b.status)}>{STATUS_LABEL[b.status as BookingStatus] ?? b.status}</Badge>
                   )}
+                  {b.review_rating && <Rating value={b.review_rating} className="ml-2" />}
                 </TableCell>
                 <TableCell className="whitespace-nowrap text-zinc-600 dark:text-zinc-400">
                   {SOURCE_LABEL[b.source] ?? b.source}

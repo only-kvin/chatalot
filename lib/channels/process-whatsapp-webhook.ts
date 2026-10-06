@@ -9,6 +9,7 @@ import { linkConversation, upsertContact } from "@/lib/contacts/upsert";
 import { consentKeyword, setOptedOut, START_CONFIRMATION, STOP_CONFIRMATION } from "@/lib/contacts/consent";
 import { checkDailyTenantCap } from "@/lib/security/rate-limit";
 import { notifyOwnerHumanRequested } from "@/lib/email/notify-human-requested";
+import { handleRatingReply } from "@/lib/bookings/review-requests";
 
 type WhatsAppMessage = {
   from: string;
@@ -158,11 +159,28 @@ async function handleMessage(
 
   const { data: agentConfig } = await admin
     .from("agent_configs")
-    .select("business_name, handoff_contact")
+    .select("business_name, handoff_contact, google_review_url")
     .eq("tenant_id", tenantId)
     .single();
   const businessName = agentConfig?.business_name ?? "";
   const handoffContact = agentConfig?.handoff_contact ?? "";
+
+  // A bare "5" answering our review request: recorded and thanked here, even
+  // if the team has taken over the chat, rather than left to the AI.
+  const ratingReply = await handleRatingReply(admin, {
+    tenantId,
+    contactId: contactId ?? conversation.contact_id,
+    conversationId: conversation.id,
+    text,
+    businessName,
+    reviewUrl: agentConfig?.google_review_url ?? null,
+  });
+  if (ratingReply) {
+    await saveMessage(admin, tenantId, conversation.id, "user", text);
+    await sendWhatsAppText(phoneNumberId, accessToken, customerPhone, ratingReply);
+    await saveMessage(admin, tenantId, conversation.id, "assistant", ratingReply);
+    return;
+  }
 
   if (wantsHuman(text)) {
     const confirmation = "A team member will get back to you shortly.";

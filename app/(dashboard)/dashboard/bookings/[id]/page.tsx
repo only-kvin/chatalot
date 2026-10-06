@@ -14,6 +14,7 @@ import {
   type BookingStatus,
 } from "@/lib/bookings/labels";
 import { Badge } from "@/components/ui/badge";
+import { Rating } from "@/components/dashboard/rating";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BookingActions } from "./booking-actions";
 
@@ -30,7 +31,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
   const { data: booking } = await supabase
     .from("bookings")
     .select(
-      "id, name, phone, email, starts_at, ends_at, status, source, created_at, contact_id, conversation_id, services(name), conversations(channel)",
+      "id, name, phone, email, starts_at, ends_at, status, source, created_at, contact_id, conversation_id, review_rating, services(name), conversations(channel)",
     )
     .eq("id", id)
     .eq("tenant_id", tenantId)
@@ -62,6 +63,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
           <Badge variant={statusVariant(booking.status)}>
             {STATUS_LABEL[booking.status as BookingStatus] ?? booking.status}
           </Badge>
+          {booking.review_rating && <Rating value={booking.review_rating} />}
         </div>
         <p className="mt-1 text-sm text-zinc-500">
           {formatLocalDateTime(booking.starts_at)} – {formatLocalDateTime(booking.ends_at).split(" at ")[1]}

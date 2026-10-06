@@ -27,6 +27,12 @@ export const SOURCE_LABEL: Record<string, string> = {
 
 export { formatShortLocal } from "@/lib/time";
 
+const REVIEW_NOT_SENT_REASON: Record<NotSentReason, string> = {
+  opted_out: "they replied STOP",
+  no_template: "there's no approved review template yet, and they haven't messaged in the last 24 hours",
+  send_failed: "WhatsApp didn't accept the message",
+};
+
 export type BookingEvent = {
   type: string;
   actor: string;
@@ -67,6 +73,15 @@ export function describeEvent(e: BookingEvent, currentUserId: string | null = nu
       const reason = typeof d.reason === "string" && d.reason in NOT_SENT_REASON ? NOT_SENT_REASON[d.reason as NotSentReason] : "";
       return `Reminder not sent${reason ? `: ${reason}` : ""}`;
     }
+    case "review_requested":
+      return d.via === "template" ? "Review request sent on WhatsApp (template)" : "Review request sent on WhatsApp";
+    case "review_not_sent": {
+      const reason =
+        typeof d.reason === "string" && d.reason in REVIEW_NOT_SENT_REASON ? REVIEW_NOT_SENT_REASON[d.reason as NotSentReason] : "";
+      return `Review request not sent${reason ? `: ${reason}` : ""}`;
+    }
+    case "review_rated":
+      return `Customer rated the visit ${typeof d.rating === "number" ? d.rating : "?"}/5`;
     default:
       return e.type;
   }

@@ -13,6 +13,11 @@ const settingsSchema = z.object({
   system_prompt_extra: z.string(),
   handoff_contact: z.string(),
   booking_change_cutoff_minutes: z.coerce.number().int().min(0).max(10080),
+  // Empty turns review requests off.
+  google_review_url: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || /^https:\/\/\S+$/.test(v), "The Google review link must start with https://"),
   allowed_domains: z.string(),
 });
 
@@ -41,6 +46,7 @@ export async function updateSettingsAction(formData: FormData): Promise<{ error:
     system_prompt_extra: formData.get("system_prompt_extra") ?? "",
     handoff_contact: formData.get("handoff_contact") ?? "",
     booking_change_cutoff_minutes: formData.get("booking_change_cutoff_minutes") ?? 120,
+    google_review_url: formData.get("google_review_url") ?? "",
     allowed_domains: formData.get("allowed_domains") ?? "",
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
@@ -56,6 +62,7 @@ export async function updateSettingsAction(formData: FormData): Promise<{ error:
       system_prompt_extra: parsed.data.system_prompt_extra,
       handoff_contact: parsed.data.handoff_contact,
       booking_change_cutoff_minutes: parsed.data.booking_change_cutoff_minutes,
+      google_review_url: parsed.data.google_review_url || null,
       updated_at: new Date().toISOString(),
     })
     .eq("tenant_id", tenantId);

@@ -5,6 +5,7 @@ import { canonicalPhone, formatPhone } from "@/lib/contacts/phone";
 import { isOptedOut } from "@/lib/contacts/consent";
 import { recordNotification } from "@/lib/notifications";
 import { logBookingEvent } from "./manage";
+import type { TenantWhatsApp } from "./whatsapp-channel";
 
 // Booking reminders. Order of preference:
 //   1. customer replied STOP → don't send;
@@ -55,12 +56,15 @@ export type ReminderBooking = {
   serviceName: string;
 };
 
-export type ReminderChannel = { phoneNumberId: string; accessToken: string; businessName: string };
+export type ReminderChannel = Pick<TenantWhatsApp, "phoneNumberId" | "accessToken" | "businessName">;
 
 // The WhatsApp conversation to remind them in: the one the booking was made
 // in, else this customer's latest WhatsApp chat (e.g. they booked on the
 // website but have also messaged us on WhatsApp).
-async function findWhatsAppConversation(admin: SupabaseClient, b: ReminderBooking) {
+export async function findWhatsAppConversation(
+  admin: SupabaseClient,
+  b: Pick<ReminderBooking, "tenant_id" | "contact_id" | "conversation_id">,
+) {
   const select = "id, channel, external_id, last_inbound_at";
   if (b.conversation_id) {
     const { data } = await admin

@@ -16,7 +16,10 @@ export type BookingEventType =
   | "no_show"
   | "reopened"
   | "reminder_sent"
-  | "reminder_not_sent";
+  | "reminder_not_sent"
+  | "review_requested"
+  | "review_not_sent"
+  | "review_rated";
 
 export type BookingSummary = {
   id: string;

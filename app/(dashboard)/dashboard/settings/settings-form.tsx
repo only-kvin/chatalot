@@ -15,6 +15,7 @@ type Settings = {
   system_prompt_extra: string;
   handoff_contact: string;
   booking_change_cutoff_minutes: number;
+  google_review_url: string;
   allowed_domains: string[];
 };
 
@@ -135,6 +136,30 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
               </option>
             )}
           </select>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Reviews</CardTitle>
+          <CardDescription>
+            The morning after you mark a booking Attended, we ask the customer on WhatsApp to rate their visit
+            from 1 to 5 and share your Google review link. Low scores (3 or below) alert you so you can follow up.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2">
+          <Label htmlFor="google_review_url">Google review link</Label>
+          <Input
+            id="google_review_url"
+            name="google_review_url"
+            type="url"
+            defaultValue={initialSettings.google_review_url}
+            placeholder="https://g.page/r/…/review"
+          />
+          <p className="text-xs text-zinc-500">
+            Find it in your Google Business Profile under &ldquo;Ask for reviews&rdquo;. Leave empty to turn review
+            requests off. Every customer gets the link, whatever their score, as Google requires.
+          </p>
         </CardContent>
       </Card>
 
