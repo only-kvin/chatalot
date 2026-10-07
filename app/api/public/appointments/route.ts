@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/db/supabase-admin";
 import { checkWidgetBookingLimit } from "@/lib/security/rate-limit";
-import { loadBookingWidget } from "@/lib/widgets/config";
+import { loadWidget } from "@/lib/widgets/config";
 import { splitAnswers, submissionSchema } from "@/lib/widgets/fields";
 import { bookFromWidget } from "@/lib/widgets/book";
 import { looksLikeBot } from "@/lib/widgets/spam";
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
   const [widget, { data: service }] = await Promise.all([
-    loadBookingWidget(admin, tenantId, body.widget),
+    loadWidget(admin, tenantId, body.widget),
     admin
       .from("services")
       .select("id")

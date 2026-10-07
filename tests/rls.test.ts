@@ -29,6 +29,7 @@ describe("RLS tenant isolation", () => {
   let clientA: SupabaseClient;
   let contactBId: string;
   let serviceBId: string;
+  let messageAId: string;
 
   beforeAll(async () => {
     tenantA = await createTenant(admin, {
@@ -99,6 +100,20 @@ describe("RLS tenant isolation", () => {
     serviceBId = serviceB.id;
     const { error: staffError } = await admin.from("staff").insert({ tenant_id: tenantB.id, name: "TENANT_B_STAFF" });
     if (staffError) throw staffError;
+
+    const { data: messages, error: messageError } = await admin
+      .from("contact_messages")
+      .insert([
+        { tenant_id: tenantA.id, name: "A", email: "a@example.com", message: "TENANT_A_MESSAGE" },
+        { tenant_id: tenantB.id, name: "B", email: "b@example.com", message: "TENANT_B_MESSAGE" },
+      ])
+      .select("id, tenant_id");
+    if (messageError) throw messageError;
+    messageAId = messages.find((m) => m.tenant_id === tenantA.id)!.id;
+    const { error: consentError } = await admin
+      .from("consents")
+      .insert({ tenant_id: tenantB.id, contact_id: contactBId, kind: "marketing", granted: true, source: "test" });
+    if (consentError) throw consentError;
 
     clientA = scopedClient();
     const { error: signInError } = await clientA.auth.signInWithPassword({
@@ -196,6 +211,25 @@ describe("RLS tenant isolation", () => {
 
   it("doesn't let the public key call the booking functions", async () => {
     const { error } = await scopedClient().rpc("create_booking", bookingArgs());
+    expect(error).not.toBeNull();
+  });
+
+  it("shows only the tenant's own contact messages, and only their status can be changed", async () => {
+    const { data } = await clientA.from("contact_messages").select("message");
+    expect(data!.map((m) => m.message)).toEqual(["TENANT_A_MESSAGE"]);
+
+    const { error: statusError } = await clientA.from("contact_messages").update({ status: "read" }).eq("id", messageAId);
+    expect(statusError).toBeNull();
+    const { error: textError } = await clientA.from("contact_messages").update({ message: "rewritten" }).eq("id", messageAId);
+    expect(textError).not.toBeNull();
+  });
+
+  it("keeps consent history read-only and per tenant", async () => {
+    const { data } = await clientA.from("consents").select("id");
+    expect(data).toEqual([]);
+    const { error } = await clientA
+      .from("consents")
+      .insert({ tenant_id: tenantA.id, contact_id: contactBId, kind: "marketing", granted: true, source: "forged" });
     expect(error).not.toBeNull();
   });
 });

@@ -208,3 +208,14 @@ Manual steps the platform owner needs to do. Kept up to date as new phases add n
 - **Staff photos**: upload on the staff page (JPEG/PNG/WebP up to 2 MB, checked by the file's contents, not its name). Stored in the public `staff-photos` bucket under the business's own folder; replaced and deleted photos are removed. Server actions now accept bodies up to 3 MB (`next.config.ts`).
 - `public/widget-demo.html?key=<public widget key>` loads any business's widgets locally.
 - The widget preview page moved out of the dashboard layout (`app/(widget-preview)/`), so previews show just the widget.
+
+## Widget suite, Phase E1: consent history and the contact widget (2026-10-07)
+
+**Manual step:** none. The `contact_widget` migration is already applied to the dev project.
+
+**What's new:**
+
+- **Consent history** (`consents` table, `lib/contacts/consents.ts`): every yes or no a customer gives (booking notifications, marketing, newsletter), with where and when, appended and never edited, which is what a business needs to show under POPIA. `contacts.marketing_opt_in_at` mirrors the latest marketing answer for quick checks. Dashboard users can read it but not change it.
+- **Contact widget** (`<div data-chatalot="contact">`, Dashboard → Widgets → Contact): the business's own fields (name and message always; an email or phone required so they can be answered; an optional subject list), optional and unticked "newsletter" and "events and promotions" boxes, the same spam checks and limits as bookings, and a thank-you with the expected response time. Each message becomes a contact message and a `contact_widget` lead, with a bell alert and owner email. The sender becomes a customer record only if they tick a consent box.
+- **Messages** (new in the dashboard nav): an inbox of contact-form messages, New / All. Opening one marks it read; "Reply by email" (from the owner's own email, so it works without a verified sending domain) marks it replied. The daily summary counts unread ones.
+- Form rules per widget live in `lib/widgets/fields.ts` (`FormKind`: booking, contact, registration); the dashboard's form builder adapts to each.

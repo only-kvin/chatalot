@@ -8,7 +8,7 @@ import { getCurrentTenantId } from "@/lib/db/current-tenant";
 // live saved settings exactly.
 export default async function WidgetPreviewPage({ searchParams }: { searchParams: Promise<{ widget?: string }> }) {
   const requested = (await searchParams).widget;
-  const inline = requested === "schedule" || requested === "appointment" ? requested : null;
+  const inline = requested === "schedule" || requested === "appointment" || requested === "contact" ? requested : null;
   const tenantId = await getCurrentTenantId();
   if (!tenantId) redirect("/");
 

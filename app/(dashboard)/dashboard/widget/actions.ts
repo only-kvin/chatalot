@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
 import { whatsappContinueUrl } from "@/lib/channels/web-handoff";
-import { WIDGET_SCHEMAS, type BookingWidgetType } from "@/lib/widgets/config";
+import { FORM_KIND, WIDGET_SCHEMAS, type WidgetType } from "@/lib/widgets/config";
 import { fieldsInputSchema, normalizeFields } from "@/lib/widgets/fields";
 
 const widgetSchema = z.object({
@@ -106,9 +106,9 @@ export async function updateWidgetThemeAction(formData: FormData): Promise<{ err
   return { error: null };
 }
 
-const widgetTypeSchema = z.enum(["schedule", "appointment"]);
+const widgetTypeSchema = z.enum(["schedule", "appointment", "contact"]);
 
-function inputSchema(type: BookingWidgetType) {
+function inputSchema(type: WidgetType) {
   return z.object({
     active: z.boolean(),
     copy: WIDGET_SCHEMAS[type].copy,
@@ -117,7 +117,7 @@ function inputSchema(type: BookingWidgetType) {
   });
 }
 
-export async function saveBookingWidgetAction(type: BookingWidgetType, input: unknown): Promise<{ error: string | null }> {
+export async function saveBookingWidgetAction(type: WidgetType, input: unknown): Promise<{ error: string | null }> {
   const tenantId = await getCurrentTenantId();
   if (!tenantId) return { error: "Not authorized." };
   if (!widgetTypeSchema.safeParse(type).success) return { error: "Invalid widget." };
@@ -135,8 +135,8 @@ export async function saveBookingWidgetAction(type: BookingWidgetType, input: un
       active: parsed.data.active,
       copy: parsed.data.copy,
       settings: parsed.data.settings,
-      // Normalised: name and phone always present and required.
-      fields: normalizeFields(parsed.data.fields),
+      // Normalised for that widget's form (e.g. name always asked).
+      fields: normalizeFields(parsed.data.fields, FORM_KIND[type]),
       updated_at: new Date().toISOString(),
     },
     { onConflict: "tenant_id,type" },

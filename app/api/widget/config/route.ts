@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/db/supabase-admin";
-import { loadBookingWidget, loadWidgetTheme } from "@/lib/widgets/config";
+import { loadWidget, loadWidgetTheme } from "@/lib/widgets/config";
 import { preflight, resolvePublicTenant } from "@/lib/widgets/public-request";
 
 export const OPTIONS = preflight;
 
 // Public widget settings by key. Without `widget` it's the chat widget's
-// config (what widget.js has always fetched); `widget=schedule` or
-// `widget=appointment` returns the shared look plus that widget's wording,
-// settings and form fields.
+// config (what widget.js has always fetched); `widget=schedule`,
+// `appointment` or `contact` returns the shared look plus that widget's
+// wording, settings and form fields.
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const resolved = await resolvePublicTenant(request, url.searchParams.get("key"));
@@ -17,10 +17,10 @@ export async function GET(request: Request) {
   const admin = createAdminClient();
   const widget = url.searchParams.get("widget");
 
-  if (widget === "schedule" || widget === "appointment") {
+  if (widget === "schedule" || widget === "appointment" || widget === "contact") {
     const [theme, instance, { data: agentConfig }] = await Promise.all([
       loadWidgetTheme(admin, tenantId),
-      loadBookingWidget(admin, tenantId, widget),
+      loadWidget(admin, tenantId, widget),
       admin.from("agent_configs").select("business_name, handoff_contact").eq("tenant_id", tenantId).single(),
     ]);
     if (!instance.active) return NextResponse.json({ error: "Not found" }, { status: 404, headers });

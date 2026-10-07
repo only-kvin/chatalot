@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
+  addableBuiltins,
   customKey,
+  defaultFields,
+  splitContactAnswers,
   DEFAULT_FIELDS,
   fieldsInputSchema,
   normalizeFields,
@@ -15,10 +18,11 @@ describe("normalizeFields", () => {
   it("falls back to the defaults for nothing or junk", () => {
     expect(normalizeFields([])).toEqual(DEFAULT_FIELDS);
     expect(normalizeFields("nonsense")).toEqual(DEFAULT_FIELDS);
+    // Missing must-haves go back in: name first, the rest at the end.
     expect(normalizeFields([{ key: "custom_car", label: "Car", type: "text", required: false }]).map((f) => f.key)).toEqual([
       "full_name",
-      "phone",
       "custom_car",
+      "phone",
     ]);
   });
 
@@ -112,5 +116,50 @@ describe("customKey", () => {
   it("makes a unique custom key from a label", () => {
     expect(customKey("Vehicle registration", [])).toBe("custom_vehicle_registration");
     expect(customKey("Vehicle registration", ["custom_vehicle_registration"])).toBe("custom_vehicle_registration_2");
+  });
+});
+
+describe("contact form", () => {
+  it("always asks name and message, and drops another form's built-ins", () => {
+    const fields = normalizeFields(
+      [
+        { key: "email", label: "Email", type: "email", required: false },
+        { key: "notes", label: "Notes", type: "textarea", required: false },
+      ],
+      "contact",
+    );
+    expect(fields.map((f) => f.key)).toEqual(["full_name", "email", "message"]);
+    expect(fields.find((f) => f.key === "message")?.required).toBe(true);
+  });
+
+  it("needs an email or a phone to reply on", () => {
+    const schema = submissionSchema(defaultFields("contact"), "contact");
+    expect(schema.safeParse({ full_name: "Thandi", message: "Hi" }).error?.issues[0]?.message).toMatch(/email address or a phone/);
+    expect(schema.safeParse({ full_name: "Thandi", message: "Hi", phone: "082 123 4567" }).success).toBe(true);
+    expect(schema.safeParse({ full_name: "Thandi", message: "Hi", email: "t@example.com" }).success).toBe(true);
+  });
+
+  it("splits a message into its columns", () => {
+    const fields = normalizeFields([...defaultFields("contact"), ...addableBuiltins("contact", defaultFields("contact"))], "contact");
+    const values = submissionSchema(fields, "contact").parse({
+      full_name: "Thandi",
+      email: "",
+      phone: "082 123 4567",
+      subject: "Prices",
+      message: "How much is a cut?",
+    });
+    expect(splitContactAnswers(values)).toEqual({
+      name: "Thandi",
+      email: null,
+      phone: "082 123 4567",
+      subject: "Prices",
+      message: "How much is a cut?",
+      details: {},
+    });
+  });
+
+  it("offers the subject list as an optional built-in", () => {
+    expect(addableBuiltins("contact", defaultFields("contact")).map((f) => f.key)).toEqual(["subject"]);
+    expect(addableBuiltins("booking", DEFAULT_FIELDS)).toEqual([]);
   });
 });

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { filterServices, groupServices, needsStaffStep, previousStep, stepsFor } from "../widget/appointment/flow";
 import { imageKind, storedPhotoPath } from "../lib/staff/photo";
-import { bookingWidgetFrom } from "../lib/widgets/config";
+import { widgetFrom } from "../lib/widgets/config";
 import { renderCustomerBookingEmail } from "../lib/email/customer-booking";
 
 describe("appointment steps", () => {
@@ -46,10 +46,10 @@ describe("service list", () => {
 
 describe("appointment widget settings", () => {
   it("fills in defaults and keeps valid stored values", () => {
-    const fresh = bookingWidgetFrom("appointment", null);
+    const fresh = widgetFrom("appointment", null);
     expect(fresh.copy.title).toBe("Book a service");
     expect(fresh.settings).toEqual({ allowAnyStaff: true, groupByCategory: true });
-    const stored = bookingWidgetFrom("appointment", {
+    const stored = widgetFrom("appointment", {
       copy: { title: "Book with us", nextSteps: "Arrive 5 minutes early", bogus: 1 },
       settings: { allowAnyStaff: false, groupByCategory: "yes" },
     });

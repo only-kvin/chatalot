@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowDownIcon, ArrowUpIcon, XIcon } from "lucide-react";
-import { customKey, DEFAULT_FIELDS, FIELD_TYPES, type Field, type FieldType } from "@/lib/widgets/fields";
+import { addableBuiltins, alwaysRequired, customKey, FIELD_TYPES, type Field, type FieldType, type FormKind } from "@/lib/widgets/fields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -22,10 +22,10 @@ const TYPE_LABEL: Record<FieldType, string> = {
 };
 // Custom fields can't be email or phone: those are the built-ins.
 const CUSTOM_TYPES = FIELD_TYPES.filter((t) => t !== "email" && t !== "tel");
-const LOCKED = ["full_name", "phone"];
 
 function FieldRow({
   field,
+  locked,
   first,
   last,
   onChange,
@@ -33,6 +33,7 @@ function FieldRow({
   onRemove,
 }: {
   field: Field;
+  locked: boolean;
   first: boolean;
   last: boolean;
   onChange: (f: Field) => void;
@@ -40,7 +41,6 @@ function FieldRow({
   onRemove: () => void;
 }) {
   const custom = field.key.startsWith("custom_");
-  const locked = LOCKED.includes(field.key);
   return (
     <li className="flex flex-col gap-2 rounded-lg border p-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -98,13 +98,24 @@ function FieldRow({
           }
         />
       )}
-      {locked && <p className="text-xs text-zinc-500">Always asked: needed for the booking and reminders.</p>}
+      {locked && <p className="text-xs text-zinc-500">Always asked.</p>}
     </li>
   );
 }
 
-export function FormFieldsEditor({ fields, onChange }: { fields: Field[]; onChange: (fields: Field[]) => void }) {
-  const missingBuiltins = DEFAULT_FIELDS.filter((d) => !fields.some((f) => f.key === d.key));
+export function FormFieldsEditor({
+  kind,
+  fields,
+  onChange,
+  consentNote = true,
+}: {
+  kind: FormKind;
+  fields: Field[];
+  onChange: (fields: Field[]) => void;
+  consentNote?: boolean;
+}) {
+  const locked = alwaysRequired(kind);
+  const missingBuiltins = addableBuiltins(kind, fields);
   const move = (i: number, dir: -1 | 1) => {
     const next = [...fields];
     [next[i], next[i + dir]] = [next[i + dir], next[i]];
@@ -118,6 +129,7 @@ export function FormFieldsEditor({ fields, onChange }: { fields: Field[]; onChan
           <FieldRow
             key={f.key}
             field={f}
+            locked={locked.includes(f.key)}
             first={i === 0}
             last={i === fields.length - 1}
             onChange={(next) => onChange(fields.map((x, j) => (j === i ? next : x)))}
@@ -147,9 +159,11 @@ export function FormFieldsEditor({ fields, onChange }: { fields: Field[]; onChan
           </Button>
         ))}
       </div>
-      <p className="text-xs text-zinc-500">
-        Customers also tick a box agreeing to you saving their details for the booking (POPIA).
-      </p>
+      {consentNote && (
+        <p className="text-xs text-zinc-500">
+          Customers also tick a box agreeing to you saving their details for the booking (POPIA).
+        </p>
+      )}
     </fieldset>
   );
 }

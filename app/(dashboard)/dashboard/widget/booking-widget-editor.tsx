@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveBookingWidgetAction, updateWidgetThemeAction } from "./actions";
 import { CopySnippetButton } from "./widget-editor";
-import type { BookingWidgetType, WidgetTheme } from "@/lib/widgets/config";
+import { FORM_KIND, type WidgetTheme, type WidgetType } from "@/lib/widgets/config";
 import type { Field } from "@/lib/widgets/fields";
 import { FormFieldsEditor } from "@/components/dashboard/form-fields-editor";
 import { Button } from "@/components/ui/button";
@@ -95,7 +95,7 @@ export function ThemeForm({ theme, onSaved }: { theme: WidgetTheme; onSaved?: ()
 
 // What each widget type lets owners word and switch, for the shared form.
 const WIDGET_UI: Record<
-  BookingWidgetType,
+  WidgetType,
   {
     name: string;
     description: string;
@@ -136,6 +136,22 @@ const WIDGET_UI: Record<
     ],
     place: "the service list",
   },
+  contact: {
+    name: "Contact widget",
+    description: "A message form. Each message lands in Messages and Leads, and you get an alert.",
+    copy: [
+      ["title", "Title"],
+      ["submitButton", "Send button"],
+      ["successTitle", "Sent: heading"],
+      ["successMessage", "Sent: message"],
+      ["responseTime", "Expected response time (e.g. \"We usually reply within one working day.\")"],
+    ],
+    toggles: [
+      ["offerNewsletter", "Offer a newsletter sign-up box (unticked)"],
+      ["offerPromotions", "Offer an events and promotions box (unticked)"],
+    ],
+    place: "the form",
+  },
 };
 
 type WidgetValues = {
@@ -150,7 +166,7 @@ export function BookingWidgetForm({
   initial,
   onSaved,
 }: {
-  type: BookingWidgetType;
+  type: WidgetType;
   initial: WidgetValues;
   onSaved?: () => void;
 }) {
@@ -165,7 +181,7 @@ export function BookingWidgetForm({
     <form action={() => save(() => saveBookingWidgetAction(type, { active, copy, settings, fields }), onSaved)} className="flex flex-col gap-6">
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" className="size-4" checked={active} onChange={(e) => setActive(e.target.checked)} />
-        {ui.name} is on (customers can book through it)
+        {ui.name} is on
       </label>
 
       <fieldset className="flex flex-col gap-3">
@@ -190,7 +206,7 @@ export function BookingWidgetForm({
         </label>
       ))}
 
-      <FormFieldsEditor fields={fields} onChange={setFields} />
+      <FormFieldsEditor kind={FORM_KIND[type]} fields={fields} onChange={setFields} consentNote={FORM_KIND[type] === "booking"} />
 
       <Feedback error={error} saved={saved} />
       <div>
@@ -202,7 +218,7 @@ export function BookingWidgetForm({
   );
 }
 
-export function WidgetSnippet({ type, snippet }: { type: BookingWidgetType; snippet: string }) {
+export function WidgetSnippet({ type, snippet }: { type: WidgetType; snippet: string }) {
   return (
     <Card>
       <CardHeader>
@@ -229,7 +245,7 @@ export function BookingWidgetTab({
   theme,
   initial,
 }: {
-  type: BookingWidgetType;
+  type: WidgetType;
   theme: WidgetTheme;
   initial: WidgetValues;
 }) {

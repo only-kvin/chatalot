@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { normalizeFields, type Field } from "./fields";
+import { normalizeFields, type Field, type FormKind } from "./fields";
 
 // What the website widgets read: the shared look (widget_settings) and each
 // widget's own wording, behaviour and form (widget_instances). Anything a
@@ -16,6 +16,11 @@ export type WidgetTheme = {
 };
 
 export type BookingWidgetType = "schedule" | "appointment";
+// Every widget configured in widget_instances.
+export type WidgetType = BookingWidgetType | "contact";
+
+// Which form each widget shows (lib/widgets/fields.ts).
+export const FORM_KIND: Record<WidgetType, FormKind> = { schedule: "booking", appointment: "booking", contact: "contact" };
 
 // Wording both booking widgets have.
 const baseCopy = {
@@ -59,11 +64,34 @@ export const WIDGET_SCHEMAS = {
     defaultCopy: { title: "Book a service", nextSteps: "", ...BASE_COPY_DEFAULTS },
     defaultSettings: { allowAnyStaff: true, groupByCategory: true },
   },
+  contact: {
+    copy: z.object({
+      title: z.string().trim().min(1).max(60),
+      submitButton: z.string().trim().min(1).max(40),
+      successTitle: z.string().trim().min(1).max(60),
+      successMessage: z.string().trim().max(300),
+      // "We usually reply within a day."
+      responseTime: z.string().trim().max(120),
+    }),
+    settings: z.object({
+      // Optional, unticked boxes under the message.
+      offerNewsletter: z.boolean(),
+      offerPromotions: z.boolean(),
+    }),
+    defaultCopy: {
+      title: "Get in touch",
+      submitButton: "Send message",
+      successTitle: "Thanks for your message",
+      successMessage: "We'll get back to you soon.",
+      responseTime: "We usually reply within one working day.",
+    },
+    defaultSettings: { offerNewsletter: false, offerPromotions: false },
+  },
 } as const;
 
 type Schemas = typeof WIDGET_SCHEMAS;
-export type WidgetCopy<T extends BookingWidgetType> = z.infer<Schemas[T]["copy"]>;
-export type WidgetSettings<T extends BookingWidgetType> = z.infer<Schemas[T]["settings"]>;
+export type WidgetCopy<T extends WidgetType> = z.infer<Schemas[T]["copy"]>;
+export type WidgetSettings<T extends WidgetType> = z.infer<Schemas[T]["settings"]>;
 export type ScheduleCopy = WidgetCopy<"schedule">;
 export type ScheduleSettings = WidgetSettings<"schedule">;
 export type AppointmentCopy = WidgetCopy<"appointment">;
@@ -77,31 +105,31 @@ function merge<T extends Record<string, unknown>>(schema: z.ZodObject, defaults:
   return { ...defaults, ...clean };
 }
 
-export type BookingWidgetConfig<T extends BookingWidgetType> = {
+export type WidgetConfig<T extends WidgetType> = {
   copy: WidgetCopy<T>;
   settings: WidgetSettings<T>;
   fields: Field[];
   active: boolean;
 };
 
-export function bookingWidgetFrom<T extends BookingWidgetType>(
+export function widgetFrom<T extends WidgetType>(
   type: T,
   row: { copy?: unknown; settings?: unknown; fields?: unknown; active?: boolean } | null,
-): BookingWidgetConfig<T> {
+): WidgetConfig<T> {
   const schemas = WIDGET_SCHEMAS[type];
   return {
     copy: merge(schemas.copy, { ...schemas.defaultCopy } as WidgetCopy<T>, row?.copy),
     settings: merge(schemas.settings, { ...schemas.defaultSettings } as WidgetSettings<T>, row?.settings),
-    fields: normalizeFields(row?.fields ?? []),
+    fields: normalizeFields(row?.fields ?? [], FORM_KIND[type]),
     active: row?.active ?? true,
   };
 }
 
-export async function loadBookingWidget<T extends BookingWidgetType>(
+export async function loadWidget<T extends WidgetType>(
   client: SupabaseClient,
   tenantId: string,
   type: T,
-): Promise<BookingWidgetConfig<T>> {
+): Promise<WidgetConfig<T>> {
   const { data, error } = await client
     .from("widget_instances")
     .select("copy, settings, fields, active")
@@ -109,7 +137,7 @@ export async function loadBookingWidget<T extends BookingWidgetType>(
     .eq("type", type)
     .maybeSingle();
   if (error) throw error;
-  return bookingWidgetFrom(type, data);
+  return widgetFrom(type, data);
 }
 
 export async function loadWidgetTheme(client: SupabaseClient, tenantId: string): Promise<WidgetTheme> {
