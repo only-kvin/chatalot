@@ -8,7 +8,7 @@ import {
   nearestAvailable,
   weekDays,
   weekStart,
-} from "../widget/schedule/calendar";
+} from "../widget/booking/calendar";
 import { onColor } from "../widget/shared/theme";
 
 describe("week and month grids", () => {

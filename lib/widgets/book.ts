@@ -21,7 +21,7 @@ export async function bookFromWidget(
     time: string;
     answers: Answers;
     idempotencyKey: string;
-    widget: "schedule";
+    widget: "schedule" | "appointment";
   },
 ): Promise<CreatedBooking | BookingFailure> {
   const { answers } = b;

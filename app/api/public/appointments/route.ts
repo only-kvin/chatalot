@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/db/supabase-admin";
 import { checkWidgetBookingLimit } from "@/lib/security/rate-limit";
-import { loadScheduleWidget } from "@/lib/widgets/config";
+import { loadBookingWidget } from "@/lib/widgets/config";
 import { splitAnswers, submissionSchema } from "@/lib/widgets/fields";
 import { bookFromWidget } from "@/lib/widgets/book";
 import { looksLikeBot } from "@/lib/widgets/spam";
@@ -10,9 +10,13 @@ import { clientIp, preflight, resolvePublicTenant } from "@/lib/widgets/public-r
 
 export const OPTIONS = preflight;
 
+function staffChoiceAllowed(settings: Record<string, unknown>, staffId: string | null): string | null {
+  return settings.allowStaffChoice === false ? null : staffId;
+}
+
 const bodySchema = z.object({
   key: z.string().min(1).max(100),
-  widget: z.literal("schedule"),
+  widget: z.enum(["schedule", "appointment"]),
   serviceId: z.string().uuid(),
   staffId: z.string().uuid().nullable().optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -60,7 +64,7 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
   const [widget, { data: service }] = await Promise.all([
-    loadScheduleWidget(admin, tenantId),
+    loadBookingWidget(admin, tenantId, body.widget),
     admin
       .from("services")
       .select("id")
@@ -80,12 +84,14 @@ export async function POST(request: Request) {
   const booked = await bookFromWidget(admin, {
     tenantId,
     serviceId: body.serviceId,
-    staffId: widget.settings.allowStaffChoice ? (body.staffId ?? null) : null,
+    // The schedule widget can hide the staff choice; the appointment widget
+    // always offers it (with "any" when allowed).
+    staffId: staffChoiceAllowed(widget.settings, body.staffId ?? null),
     date: body.date,
     time: body.time,
     answers: splitAnswers(answers.data),
     idempotencyKey: body.idempotencyKey,
-    widget: "schedule",
+    widget: body.widget,
   });
   if (!booked.ok) {
     if (booked.reason === "slot_taken" || booked.reason === "unavailable") {
@@ -97,8 +103,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "We couldn't make the booking. Please try again." }, { status: 500, headers });
   }
 
+  // Who it's with, so "Any available" can say who it turned out to be.
+  const { data: person } = booked.staffId
+    ? await admin.from("staff").select("name").eq("tenant_id", tenantId).eq("id", booked.staffId).maybeSingle()
+    : { data: null };
   return NextResponse.json(
-    { ok: true, status: booked.status, ref: booked.ref, startsAt: booked.startsAt, endsAt: booked.endsAt },
+    { ok: true, status: booked.status, ref: booked.ref, startsAt: booked.startsAt, endsAt: booked.endsAt, staffName: person?.name ?? null },
     { headers },
   );
 }

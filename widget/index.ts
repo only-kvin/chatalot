@@ -14,7 +14,7 @@ declare global {
   }
 }
 
-const WIDGETS = ["schedule"];
+const WIDGETS = ["schedule", "appointment", "reschedule"];
 
 function getScriptTag(): HTMLScriptElement | null {
   const current = document.currentScript as HTMLScriptElement | null;

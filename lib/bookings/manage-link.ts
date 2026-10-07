@@ -11,20 +11,29 @@ export async function loadBookingFromToken(token: string) {
   const admin = createAdminClient();
   const { data: booking } = await admin
     .from("bookings")
-    .select("id, tenant_id, name, starts_at, ends_at, status, services(name), staff(name)")
+    .select("id, tenant_id, service_id, staff_id, name, starts_at, ends_at, status, services(name), staff(name)")
     .eq("id", bookingId)
     .maybeSingle();
   if (!booking) return null;
-  const { data: config } = await admin
-    .from("agent_configs")
-    .select("business_name, handoff_contact, booking_change_cutoff_minutes")
-    .eq("tenant_id", booking.tenant_id)
-    .maybeSingle();
+  const [{ data: config }, { data: tenant }] = await Promise.all([
+    admin
+      .from("agent_configs")
+      .select("business_name, handoff_contact, booking_change_cutoff_minutes")
+      .eq("tenant_id", booking.tenant_id)
+      .maybeSingle(),
+    admin.from("tenants").select("public_widget_key, status").eq("id", booking.tenant_id).maybeSingle(),
+  ]);
 
   const active = ACTIVE_STATUSES.includes(booking.status) && new Date(booking.starts_at) > new Date();
   return {
     id: booking.id,
     tenantId: booking.tenant_id,
+    // Public anyway (it's in every widget snippet); the reschedule picker
+    // on the manage page uses it to read availability.
+    publicKey: tenant?.status === "active" ? (tenant.public_widget_key as string) : null,
+    serviceId: booking.service_id,
+    staffId: booking.staff_id as string | null,
+    endsAt: booking.ends_at,
     name: booking.name,
     startsAt: booking.starts_at,
     status: booking.status,

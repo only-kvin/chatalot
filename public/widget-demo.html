@@ -41,6 +41,19 @@
     </p>
     <div data-chatalot="schedule"></div>
 
-    <script src="/widget.js" data-key="REPLACE_WITH_PUBLIC_WIDGET_KEY" async></script>
+    <h2>Appointment widget</h2>
+    <p>Services first, then who, then when: <code>&lt;div data-chatalot="appointment"&gt;</code>.</p>
+    <div data-chatalot="appointment"></div>
+
+    <!-- For local testing, any business's key can be passed as ?key=... -->
+    <script>
+      (function () {
+        var s = document.createElement("script");
+        s.src = "/widget.js";
+        s.async = true;
+        s.dataset.key = new URLSearchParams(location.search).get("key") || "REPLACE_WITH_PUBLIC_WIDGET_KEY";
+        document.body.appendChild(s);
+      })();
+    </script>
   </body>
 </html>

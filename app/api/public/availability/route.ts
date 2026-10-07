@@ -4,9 +4,25 @@ import { createAdminClient } from "@/lib/db/supabase-admin";
 import { getAvailability, MAX_RANGE_DAYS } from "@/lib/bookings/availability";
 import { checkWidgetReadLimit } from "@/lib/security/rate-limit";
 import { addDays } from "@/lib/time";
+import { readBookingToken } from "@/lib/security/signed-token";
 import { clientIp, preflight, resolvePublicTenant } from "@/lib/widgets/public-request";
 
 export const OPTIONS = preflight;
+
+// The booking a valid manage-link token points at, if it belongs to this
+// business and is for this service.
+async function bookingFromToken(tenantId: string, token: string, serviceId: string): Promise<string | null> {
+  const bookingId = readBookingToken(token);
+  if (!bookingId) return null;
+  const { data } = await createAdminClient()
+    .from("bookings")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("id", bookingId)
+    .eq("service_id", serviceId)
+    .maybeSingle();
+  return data?.id ?? null;
+}
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const querySchema = z
@@ -15,6 +31,8 @@ const querySchema = z
     staff: z.string().uuid().optional(),
     from: date,
     to: date,
+    // A customer's manage-link token, when they're moving that booking.
+    token: z.string().max(200).optional(),
   })
   .refine((q) => q.from <= q.to && q.to < addDays(q.from, MAX_RANGE_DAYS), "Invalid range");
 
@@ -35,21 +53,27 @@ export async function GET(request: Request) {
     staff: params.get("staff") || undefined,
     from: params.get("from"),
     to: params.get("to"),
+    token: params.get("token") || undefined,
   });
   if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400, headers });
   const q = parsed.data;
 
   const admin = createAdminClient();
-  // Only services the business shows on its website.
-  const { data: service } = await admin
-    .from("services")
-    .select("id")
-    .eq("tenant_id", tenantId)
-    .eq("id", q.service)
-    .eq("active", true)
-    .eq("online_bookable", true)
-    .maybeSingle();
-  if (!service) return NextResponse.json({ error: "Not found" }, { status: 404, headers });
+  // Moving a booking: its own time doesn't block itself, and its service
+  // may be one the business doesn't show on its website (booked in chat).
+  const moving = q.token ? await bookingFromToken(tenantId, q.token, q.service) : null;
+  if (!moving) {
+    // Only services the business shows on its website.
+    const { data: service } = await admin
+      .from("services")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("id", q.service)
+      .eq("active", true)
+      .eq("online_bookable", true)
+      .maybeSingle();
+    if (!service) return NextResponse.json({ error: "Not found" }, { status: 404, headers });
+  }
 
   try {
     const availability = await getAvailability(admin, tenantId, {
@@ -57,6 +81,7 @@ export async function GET(request: Request) {
       staffId: q.staff,
       fromDate: q.from,
       toDate: q.to,
+      excludeBookingId: moving ?? undefined,
     });
     if (!availability) return NextResponse.json({ error: "Not found" }, { status: 404, headers });
     return NextResponse.json(

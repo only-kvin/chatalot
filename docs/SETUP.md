@@ -195,3 +195,16 @@ Manual steps the platform owner needs to do. Kept up to date as new phases add n
 - The widget (`widget/schedule/`) reuses the server's own pure code where it can (SA dates from `lib/time.ts`, phone checks, the `.ics` builder), takes all colours/roundness/font from the business's look via `--ca-*` CSS variables, and emits `chatalot:event` (`view`, `step`, `submitted`) as a DOM event and a window message for analytics.
 - The dashboard's preview pages call the widget API from ChatAlot's own domain; `isOwnAppRequest()` (`lib/security/origin-check.ts`) lets those through without the business adding `chatalot.vercel.app` to its allowed domains.
 - A booking's owner alert and customer email are sent after the response (`waitUntil`), so customers see their confirmation in about a second instead of six.
+
+## Widget suite, Phase D: appointment widget, rescheduling, staff photos (2026-10-07)
+
+**Manual step:** none. The `staff_photos` migration (a public Storage bucket) is already applied to the dev project.
+
+**What's new:**
+
+- **Appointment widget** (`<div data-chatalot="appointment">`, Dashboard → Widgets → Appointment): services first (grouped by category, with search from 9 services), then who (only people offering that service, with photos; "Any available" if the business allows it; skipped when there's no choice), then the same date-and-time picker as the schedule widget, then the customer's details. A step indicator and back arrow throughout; going back keeps what was chosen and typed. The confirmation names who the booking went to, and can add a "what happens next" line.
+- **Shared booking pieces** (`widget/booking/`): the shell, the date-and-time picker, the details and confirmation steps are used by both widgets and the reschedule picker, so they can't drift apart.
+- **Rescheduling from the email link**: the manage page (`/b/<token>`) has **Change time**, which loads the same picker (`/widgets/reschedule.js`) and moves the booking through `POST /api/public/reschedule`: an active booking, outside the change cutoff, to a genuinely free time (keeping the same person if they're free). The owner gets "Booking moved (using the link in their booking email)"; the customer gets a "Booking moved" email with the new calendar file.
+- **Staff photos**: upload on the staff page (JPEG/PNG/WebP up to 2 MB, checked by the file's contents, not its name). Stored in the public `staff-photos` bucket under the business's own folder; replaced and deleted photos are removed. Server actions now accept bodies up to 3 MB (`next.config.ts`).
+- `public/widget-demo.html?key=<public widget key>` loads any business's widgets locally.
+- The widget preview page moved out of the dashboard layout (`app/(widget-preview)/`), so previews show just the widget.

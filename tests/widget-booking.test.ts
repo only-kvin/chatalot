@@ -28,6 +28,9 @@ import { createTenant } from "../lib/db/create-tenant";
 import { bookFromWidget } from "../lib/widgets/book";
 import { decidePendingBooking } from "../lib/bookings/manage";
 import { POST as bookRoute } from "../app/api/public/appointments/route";
+import { POST as rescheduleRoute } from "../app/api/public/reschedule/route";
+import { GET as availabilityRoute } from "../app/api/public/availability/route";
+import { createBookingToken } from "../lib/security/signed-token";
 import { addDays, localDateISO } from "../lib/time";
 
 // Each test makes many real database round trips.
@@ -184,6 +187,111 @@ describe("widget booking", { timeout: 30_000 }, () => {
       const { data } = await admin.from("bookings").select("id").eq("tenant_id", tenantId).eq("idempotency_key", `b-${suffix}`);
       expect(data).toEqual([]);
       expect((await bookRoute(request(body({ key: crypto.randomUUID() })))).status).toBe(404);
+    });
+  });
+
+  describe("the appointment widget and rescheduling by link", () => {
+    let staffA: string;
+    const post = (url: string, body: Record<string, unknown>) =>
+      new Request(`http://localhost${url}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    const tokenFor = (id: string) => createBookingToken(id, new Date(Date.now() + 30 * 86_400_000));
+    const at = async (id: string) =>
+      (await admin.from("bookings").select("starts_at, staff_id, status").eq("id", id).single()).data!;
+    const localIso = (time: string) => new Date(`${DATE}T${time}:00+02:00`).toISOString();
+
+    beforeAll(async () => {
+      const { data } = await admin
+        .from("staff")
+        .insert([
+          { tenant_id: tenantId, name: "Staff A" },
+          { tenant_id: tenantId, name: "Staff B" },
+        ])
+        .select("id, name");
+      staffA = data!.find((p) => p.name === "Staff A")!.id;
+    });
+
+    it("books with the person the customer chose", async () => {
+      const res = await bookRoute(
+        post("/api/public/appointments", {
+          key: publicKey,
+          widget: "appointment",
+          serviceId,
+          staffId: staffA,
+          date: DATE,
+          time: "11:30",
+          answers: { full_name: "Appointment Customer", phone: "083 000 0098" },
+          consent: true,
+          idempotencyKey: `appt-${suffix}`,
+          elapsedMs: 9_000,
+        }),
+      );
+      expect(res.status).toBe(200);
+      const { ref } = await res.json();
+      const { data } = await admin.from("bookings").select("staff_id, leads(source)").eq("tenant_id", tenantId).eq("idempotency_key", `appt-${suffix}`).single();
+      expect(ref).toBeTruthy();
+      expect(data).toMatchObject({ staff_id: staffA, leads: { source: "appointment_widget" } });
+    });
+
+    it("moves a booking from the email link, as the customer", async () => {
+      const made = await book("12:00", 20, `move-${suffix}`);
+      if (!made.ok) throw new Error(made.reason);
+      const res = await rescheduleRoute(post("/api/public/reschedule", { token: tokenFor(made.bookingId), date: DATE, time: "13:00" }));
+      expect(res.status).toBe(200);
+      expect((await at(made.bookingId)).starts_at).toBe(localIso("13:00").replace(".000Z", "+00:00"));
+      const { data: events } = await admin.from("booking_events").select("type, actor").eq("booking_id", made.bookingId).order("created_at");
+      expect(events?.at(-1)).toEqual({ type: "rescheduled", actor: "customer" });
+    });
+
+    it("counts the booking's own time as free only for its own link", async () => {
+      // Both people busy at 13:00: the moved booking, plus another.
+      const other = await book("13:00", 21, `other-${suffix}`);
+      if (!other.ok) throw new Error(other.reason);
+      const { data: moved } = await admin.from("bookings").select("id").eq("idempotency_key", `move-${suffix}`).single();
+      const slotAt = async (token?: string) => {
+        const url = new URL("http://localhost/api/public/availability");
+        Object.entries({ key: publicKey, service: serviceId, from: DATE, to: DATE, ...(token ? { token } : {}) }).forEach(([k, v]) => url.searchParams.set(k, v));
+        const json = await (await availabilityRoute(new Request(url))).json();
+        return json.days[0].slots.find((s: { time: string }) => s.time === "13:00");
+      };
+      expect(await slotAt()).toEqual({ time: "13:00", available: false });
+      expect(await slotAt(tokenFor(moved!.id))).toEqual({ time: "13:00", available: true });
+    });
+
+    it("refuses altered links, taken times, cancelled bookings and changes inside the cutoff", async () => {
+      // 14:00 went to an earlier test; 17:00 is free.
+      const made = await book("17:00", 22, `refuse-${suffix}`);
+      if (!made.ok) throw new Error(made.reason);
+      const good = tokenFor(made.bookingId);
+
+      const tampered = `${good.slice(0, -2)}xx`;
+      expect((await rescheduleRoute(post("/api/public/reschedule", { token: tampered, date: DATE, time: "15:30" }))).status).toBe(404);
+
+      // 13:00 is taken by both people now.
+      const taken = await rescheduleRoute(post("/api/public/reschedule", { token: good, date: DATE, time: "13:00" }));
+      expect(taken.status).toBe(409);
+      expect((await taken.json()).reason).toBe("slot_taken");
+
+      // Inside the cutoff: a booking two days out, with a week's notice required.
+      const soon = await bookFromWidget(admin, {
+        tenantId,
+        serviceId,
+        staffId: null,
+        date: addDays(localDateISO(new Date()), 2),
+        time: "10:00",
+        answers: answers(23),
+        idempotencyKey: `soon-${suffix}`,
+        widget: "schedule",
+      });
+      if (!soon.ok) throw new Error(soon.reason);
+      await admin.from("agent_configs").update({ booking_change_cutoff_minutes: 10080 }).eq("tenant_id", tenantId);
+      const tooLate = await rescheduleRoute(post("/api/public/reschedule", { token: tokenFor(soon.bookingId), date: DATE, time: "15:30" }));
+      await admin.from("agent_configs").update({ booking_change_cutoff_minutes: 120 }).eq("tenant_id", tenantId);
+      expect(tooLate.status).toBe(409);
+      expect((await tooLate.json()).error).toMatch(/too close/);
+
+      await admin.from("bookings").update({ status: "cancelled" }).eq("id", made.bookingId);
+      expect((await rescheduleRoute(post("/api/public/reschedule", { token: good, date: DATE, time: "15:30" }))).status).toBe(409);
+      expect((await at(made.bookingId)).starts_at).toBe(localIso("17:00").replace(".000Z", "+00:00"));
     });
   });
 });

@@ -2,12 +2,14 @@ import { build } from "esbuild";
 import { readFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 
-// Two bundles: widget.js (the loader plus the chat, what every site loads)
-// and one file per inline widget, which the loader fetches only when the
+// widget.js (the loader plus the chat, what every site loads) and one
+// file per inline widget, which the loader fetches only when the
 // page has a <div data-chatalot="..."> for it.
 const bundles = [
   { entry: "widget/index.ts", out: "public/widget.js" },
   { entry: "widget/schedule/index.ts", out: "public/widgets/schedule.js" },
+  { entry: "widget/appointment/index.ts", out: "public/widgets/appointment.js" },
+  { entry: "widget/reschedule/index.ts", out: "public/widgets/reschedule.js" },
 ];
 
 // All widgets together must stay under this, gzipped (see CLAUDE.md).

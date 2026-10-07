@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { bookingRef } from "@/lib/bookings/manage";
 import { STATUS_LABEL, type BookingStatus } from "@/lib/bookings/labels";
 import { formatLocalDateTime } from "@/lib/time";
-import { loadBookingFromToken } from "./load";
+import { loadBookingFromToken } from "@/lib/bookings/manage-link";
 import { CancelBooking } from "./cancel-booking";
+import { ChangeTime } from "./change-time";
 
 // Personal links: keep them out of search engines and referrer headers.
 export const metadata: Metadata = {
@@ -18,7 +19,7 @@ export default async function ManageBookingPage({ params }: { params: Promise<{ 
 
   return (
     <main className="min-h-screen bg-zinc-50 px-4 py-12 dark:bg-black">
-      <div className="mx-auto flex max-w-md flex-col gap-4 rounded-2xl border bg-white p-6 text-sm dark:bg-zinc-950">
+      <div className="mx-auto flex max-w-lg flex-col gap-4 rounded-2xl border bg-white p-6 text-sm dark:bg-zinc-950">
         {!booking ? (
           <>
             <h1 className="text-xl font-semibold">Link not valid</h1>
@@ -48,16 +49,30 @@ export default async function ManageBookingPage({ params }: { params: Promise<{ 
               <dt className="text-zinc-500">Status</dt>
               <dd>{STATUS_LABEL[booking.status as BookingStatus] ?? booking.status}</dd>
             </dl>
-            {booking.active && !booking.tooLate && <CancelBooking token={token} />}
+            {booking.active && !booking.tooLate && (
+              <div className="flex flex-col gap-3">
+                {booking.publicKey && (
+                  <ChangeTime
+                    token={decodeURIComponent(token)}
+                    publicKey={booking.publicKey}
+                    serviceId={booking.serviceId}
+                    startsAt={booking.startsAt}
+                    serviceName={booking.serviceName}
+                    businessName={booking.businessName}
+                  />
+                )}
+                <CancelBooking token={token} />
+              </div>
+            )}
             {booking.tooLate && (
               <p className="text-zinc-600 dark:text-zinc-400">
-                It&apos;s too close to your appointment to cancel online.
+                It&apos;s too close to your appointment to change or cancel it online.
                 {booking.contact && ` Please contact ${booking.businessName} on ${booking.contact}.`}
               </p>
             )}
             {booking.active && booking.contact && !booking.tooLate && (
               <p className="text-xs text-zinc-500">
-                Need a different time? Contact {booking.businessName} on {booking.contact}.
+                Questions? Contact {booking.businessName} on {booking.contact}.
               </p>
             )}
           </>

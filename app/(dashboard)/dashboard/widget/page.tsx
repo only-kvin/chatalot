@@ -4,20 +4,22 @@ import { redirect } from "next/navigation";
 import { cn } from "cn";
 import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
-import { loadScheduleWidget, loadWidgetTheme } from "@/lib/widgets/config";
+import { loadBookingWidget, loadWidgetTheme } from "@/lib/widgets/config";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { WidgetEditor } from "./widget-editor";
-import { ScheduleSnippet, ScheduleTab } from "./schedule-editor";
+import { BookingWidgetTab, WidgetSnippet } from "./booking-widget-editor";
 
 const TABS = [
   { id: "chat", label: "Chat" },
   { id: "schedule", label: "Schedule" },
+  { id: "appointment", label: "Appointment" },
 ] as const;
 
 export default async function WidgetPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const tenantId = await getCurrentTenantId();
   if (!tenantId) redirect("/");
-  const tab = (await searchParams).tab === "schedule" ? "schedule" : "chat";
+  const requested = (await searchParams).tab;
+  const tab = requested === "schedule" || requested === "appointment" ? requested : "chat";
 
   const supabase = await createClient();
   const { data: tenant } = await supabase.from("tenants").select("public_widget_key").eq("id", tenantId).single();
@@ -41,15 +43,26 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
     </nav>
   );
 
-  if (tab === "schedule") {
-    const [theme, schedule] = await Promise.all([loadWidgetTheme(supabase, tenantId), loadScheduleWidget(supabase, tenantId)]);
+  if (tab !== "chat") {
+    const [theme, instance] = await Promise.all([loadWidgetTheme(supabase, tenantId), loadBookingWidget(supabase, tenantId, tab)]);
     return (
       <div className="mx-auto max-w-6xl p-8">
         <PageHeader title="Widgets" description="What customers see on your website." />
         {nav}
         <div className="flex flex-col gap-8">
-          <ScheduleSnippet snippet={`<div data-chatalot="schedule"></div>\n${script}`} />
-          <ScheduleTab theme={theme} schedule={schedule} />
+          <WidgetSnippet type={tab} snippet={`<div data-chatalot="${tab}"></div>
+${script}`} />
+          <BookingWidgetTab
+            key={tab}
+            type={tab}
+            theme={theme}
+            initial={{
+              active: instance.active,
+              copy: instance.copy as Record<string, string>,
+              settings: instance.settings as Record<string, boolean>,
+              fields: instance.fields,
+            }}
+          />
         </div>
       </div>
     );

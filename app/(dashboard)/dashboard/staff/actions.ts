@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
 import { timeOffRange } from "@/lib/bookings/hours";
+import { createAdminClient } from "@/lib/db/supabase-admin";
+import { imageKind, MAX_PHOTO_BYTES, PHOTO_BUCKET, storedPhotoPath } from "@/lib/staff/photo";
 
 // Staff, their services, hours and time off. The signed-in user's client is
 // used throughout, so RLS keeps every read and write inside their business;
@@ -141,8 +143,10 @@ export async function deleteStaffAction(staffId: string): Promise<Result> {
     .eq("staff_id", staffId);
   if (count) return { error: "They have bookings, so they can't be deleted. Untick Active instead." };
 
+  const { data: person } = await s.supabase.from("staff").select("avatar_url").eq("id", staffId).eq("tenant_id", s.tenantId).maybeSingle();
   const { error } = await s.supabase.from("staff").delete().eq("id", staffId).eq("tenant_id", s.tenantId);
   if (error) return failed("delete them", error);
+  await removeStoredPhoto(person?.avatar_url ?? null, s.tenantId);
   revalidate();
   return { error: null };
 }
@@ -268,4 +272,72 @@ export async function deleteTimeOffAction(timeOffId: string): Promise<Result> {
   if (error) return failed("remove that time off", error);
   revalidate(data?.[0]?.staff_id);
   return { error: null };
+}
+
+// Uploads a staff photo to Supabase Storage (<tenant>/<staff>-<random>) and
+// points the staff member at it, removing the photo it replaces. The
+// service-role client does the storage work, only after confirming through
+// the user's own RLS-scoped client that this staff member is theirs.
+export async function uploadStaffPhotoAction(staffId: string, formData: FormData): Promise<Result> {
+  const s = await session();
+  if (!s) return { error: "Not authorized." };
+  if (!uuid.safeParse(staffId).success) return { error: "Invalid request." };
+  const file = formData.get("photo");
+  if (!(file instanceof File) || file.size === 0) return { error: "Choose a photo first." };
+  if (file.size > MAX_PHOTO_BYTES) return { error: "That photo is over 2 MB. Please choose a smaller one." };
+
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const kind = imageKind(bytes);
+  if (!kind) return { error: "Use a JPEG, PNG or WebP photo." };
+
+  const { data: person } = await s.supabase
+    .from("staff")
+    .select("id, avatar_url")
+    .eq("tenant_id", s.tenantId)
+    .eq("id", staffId)
+    .maybeSingle();
+  if (!person) return { error: "Staff member not found." };
+
+  const admin = createAdminClient();
+  const path = `${s.tenantId}/${staffId}-${crypto.randomUUID()}.${kind.ext}`;
+  const { error: uploadError } = await admin.storage
+    .from(PHOTO_BUCKET)
+    .upload(path, bytes, { contentType: kind.contentType, cacheControl: "31536000", upsert: false });
+  if (uploadError) return failed("upload the photo", uploadError);
+
+  const url = admin.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl;
+  const { error } = await s.supabase.from("staff").update({ avatar_url: url }).eq("id", staffId).eq("tenant_id", s.tenantId);
+  if (error) {
+    await admin.storage.from(PHOTO_BUCKET).remove([path]);
+    return failed("save the photo", error);
+  }
+  await removeStoredPhoto(person.avatar_url, s.tenantId);
+  revalidate(staffId);
+  return { error: null };
+}
+
+export async function removeStaffPhotoAction(staffId: string): Promise<Result> {
+  const s = await session();
+  if (!s) return { error: "Not authorized." };
+  if (!uuid.safeParse(staffId).success) return { error: "Invalid request." };
+  const { data: person } = await s.supabase
+    .from("staff")
+    .select("avatar_url")
+    .eq("tenant_id", s.tenantId)
+    .eq("id", staffId)
+    .maybeSingle();
+  if (!person) return { error: "Staff member not found." };
+  const { error } = await s.supabase.from("staff").update({ avatar_url: null }).eq("id", staffId).eq("tenant_id", s.tenantId);
+  if (error) return failed("remove the photo", error);
+  await removeStoredPhoto(person.avatar_url, s.tenantId);
+  revalidate(staffId);
+  return { error: null };
+}
+
+// Deletes a photo we host, but only from this business's own folder.
+async function removeStoredPhoto(url: string | null, tenantId: string) {
+  const path = storedPhotoPath(url, process.env.NEXT_PUBLIC_SUPABASE_URL ?? "");
+  if (!path?.startsWith(`${tenantId}/`)) return;
+  const { error } = await createAdminClient().storage.from(PHOTO_BUCKET).remove([path]);
+  if (error) console.error(`Removing old staff photo ${path} failed:`, error);
 }

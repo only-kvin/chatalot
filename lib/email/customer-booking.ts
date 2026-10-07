@@ -10,7 +10,7 @@ import { escapeHtml, sendCustomerEmail } from "./send";
 // approval), approved, declined, cancelled. Only for bookings with an email
 // address — the widget asks for one; chat bookings usually don't have one.
 
-export type CustomerBookingEmailKind = "confirmed" | "requested" | "approved" | "declined" | "cancelled";
+export type CustomerBookingEmailKind = "confirmed" | "requested" | "approved" | "declined" | "cancelled" | "rescheduled";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 // Manage links keep working until a month after the appointment.
@@ -38,6 +38,7 @@ const SUBJECT: Record<CustomerBookingEmailKind, (b: BookingForEmail) => string> 
   approved: (b) => `Booking confirmed: ${b.serviceName} at ${b.businessName}`,
   declined: (b) => `Booking request declined: ${b.serviceName} at ${b.businessName}`,
   cancelled: (b) => `Booking cancelled: ${b.serviceName} at ${b.businessName}`,
+  rescheduled: (b) => `Booking moved: ${b.serviceName} at ${b.businessName}`,
 };
 
 const INTRO: Record<CustomerBookingEmailKind, string> = {
@@ -46,6 +47,7 @@ const INTRO: Record<CustomerBookingEmailKind, string> = {
   approved: "Good news: your booking is confirmed.",
   declined: "Sorry, we can't take this booking.",
   cancelled: "Your booking has been cancelled.",
+  rescheduled: "Your booking has been moved to a new time.",
 };
 
 // Pure: the email for one booking, so it can be tested without sending.
@@ -61,7 +63,7 @@ export function renderCustomerBookingEmail(
     ["With", b.staffName],
     ["Reference", bookingRef(b.id)],
   ];
-  const active = kind === "confirmed" || kind === "requested" || kind === "approved";
+  const active = kind === "confirmed" || kind === "requested" || kind === "approved" || kind === "rescheduled";
   const html = `
     <p>Hi ${escapeHtml(b.name)},</p>
     <p>${escapeHtml(INTRO[kind])}</p>
@@ -79,7 +81,7 @@ export function renderCustomerBookingEmail(
     <p style="font-size:12px;color:#71717a">${escapeHtml(b.businessName)}</p>
   `;
   const ics =
-    kind === "confirmed" || kind === "approved"
+    kind === "confirmed" || kind === "approved" || kind === "rescheduled"
       ? bookingIcs({
           uid: b.id,
           title: `${b.serviceName} at ${b.businessName}`,

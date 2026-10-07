@@ -7,7 +7,7 @@ import { StaffAvatar } from "@/components/dashboard/staff-avatar";
 import { WeeklyHours } from "@/components/dashboard/weekly-hours";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { DeleteStaff, HoursMode, StaffDetailsForm, StaffServices, TimeOff } from "./staff-editor";
+import { DeleteStaff, HoursMode, StaffDetailsForm, StaffPhoto, StaffServices, TimeOff } from "./staff-editor";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -82,10 +82,22 @@ export default async function StaffMemberPage({ params }: { params: Promise<{ id
 
       <Card>
         <CardHeader>
+          <CardTitle>Photo</CardTitle>
+          <CardDescription>Shown to customers choosing who to book with.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <StaffPhoto staffId={person.id} name={person.name} url={person.avatar_url} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Details</CardTitle>
         </CardHeader>
         <CardContent>
           <StaffDetailsForm
+            // A new photo changes the link field's starting value: start the form afresh.
+            key={person.avatar_url ?? "no-photo"}
             staff={person}
             upcomingBookings={upcoming ?? 0}
             bookingsHref={`/dashboard/bookings?staff=${person.id}`}

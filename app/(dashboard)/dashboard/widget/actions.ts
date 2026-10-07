@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
 import { whatsappContinueUrl } from "@/lib/channels/web-handoff";
-import { scheduleCopySchema, scheduleSettingsSchema } from "@/lib/widgets/config";
+import { WIDGET_SCHEMAS, type BookingWidgetType } from "@/lib/widgets/config";
 import { fieldsInputSchema, normalizeFields } from "@/lib/widgets/fields";
 
 const widgetSchema = z.object({
@@ -106,17 +106,22 @@ export async function updateWidgetThemeAction(formData: FormData): Promise<{ err
   return { error: null };
 }
 
-const scheduleInputSchema = z.object({
-  active: z.boolean(),
-  copy: scheduleCopySchema,
-  settings: scheduleSettingsSchema,
-  fields: fieldsInputSchema,
-});
+const widgetTypeSchema = z.enum(["schedule", "appointment"]);
 
-export async function saveScheduleWidgetAction(input: unknown): Promise<{ error: string | null }> {
+function inputSchema(type: BookingWidgetType) {
+  return z.object({
+    active: z.boolean(),
+    copy: WIDGET_SCHEMAS[type].copy,
+    settings: WIDGET_SCHEMAS[type].settings,
+    fields: fieldsInputSchema,
+  });
+}
+
+export async function saveBookingWidgetAction(type: BookingWidgetType, input: unknown): Promise<{ error: string | null }> {
   const tenantId = await getCurrentTenantId();
   if (!tenantId) return { error: "Not authorized." };
-  const parsed = scheduleInputSchema.safeParse(input);
+  if (!widgetTypeSchema.safeParse(type).success) return { error: "Invalid widget." };
+  const parsed = inputSchema(type).safeParse(input);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     return { error: issue?.path[0] === "copy" ? "Fill in every text, within its length." : (issue?.message ?? "Invalid input.") };
@@ -126,7 +131,7 @@ export async function saveScheduleWidgetAction(input: unknown): Promise<{ error:
   const { error } = await supabase.from("widget_instances").upsert(
     {
       tenant_id: tenantId,
-      type: "schedule",
+      type,
       active: parsed.data.active,
       copy: parsed.data.copy,
       settings: parsed.data.settings,
@@ -137,8 +142,8 @@ export async function saveScheduleWidgetAction(input: unknown): Promise<{ error:
     { onConflict: "tenant_id,type" },
   );
   if (error) {
-    console.error(`Saving the schedule widget for ${tenantId} failed:`, error);
-    return { error: "Couldn't save the schedule widget. Please try again." };
+    console.error(`Saving the ${type} widget for ${tenantId} failed:`, error);
+    return { error: "Couldn't save the widget. Please try again." };
   }
   revalidatePath("/dashboard/widget");
   return { error: null };

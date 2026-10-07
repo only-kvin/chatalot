@@ -7,12 +7,15 @@ import {
   addTimeOffAction,
   deleteStaffAction,
   deleteTimeOffAction,
+  removeStaffPhotoAction,
+  uploadStaffPhotoAction,
   setStaffServiceAction,
   switchToBusinessHoursAction,
   switchToOwnHoursAction,
   updateStaffAction,
 } from "../actions";
 import { describeTimeOff } from "@/lib/bookings/hours";
+import { StaffAvatar } from "@/components/dashboard/staff-avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -314,6 +317,36 @@ export function DeleteStaff({ staffId, name }: { staffId: string; name: string }
         </div>
       )}
       {error && <p className="feedback-enter text-sm text-red-600">{error}</p>}
+    </div>
+  );
+}
+
+export function StaffPhoto({ staffId, name, url }: { staffId: string; name: string; url: string | null }) {
+  const { pending, error, saved, run } = useAction();
+  const [formKey, setFormKey] = useState(0);
+  return (
+    <div className="flex flex-wrap items-center gap-4">
+      <StaffAvatar name={name} url={url} className="size-16" />
+      <form
+        key={formKey}
+        action={(formData) => run(() => uploadStaffPhotoAction(staffId, formData), () => setFormKey((k) => k + 1))}
+        className="flex flex-wrap items-center gap-2"
+      >
+        <Label htmlFor="photo" className="sr-only">
+          Photo
+        </Label>
+        <Input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" required className="max-w-64" />
+        <Button type="submit" size="sm" disabled={pending}>
+          {pending ? "Uploading…" : url ? "Replace photo" : "Upload photo"}
+        </Button>
+        {url && (
+          <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => run(() => removeStaffPhotoAction(staffId))}>
+            Remove
+          </Button>
+        )}
+      </form>
+      <p className="w-full text-xs text-zinc-500">JPEG, PNG or WebP, up to 2 MB. Square photos look best.</p>
+      <Feedback error={error} saved={saved} />
     </div>
   );
 }

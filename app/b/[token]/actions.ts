@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/db/supabase-admin";
 import { cancelBooking, describeBooking } from "@/lib/bookings/manage";
 import { emailCustomerAboutBooking } from "@/lib/email/customer-booking";
 import { notifyOwnerOfBookingChange } from "@/lib/email/notify-booking-change";
-import { loadBookingFromToken } from "./load";
+import { loadBookingFromToken } from "@/lib/bookings/manage-link";
 
 // The customer cancels from the link in their booking email. Same rules as
 // cancelling in chat: only an upcoming booking, and not inside the

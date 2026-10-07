@@ -1,6 +1,6 @@
 // Scoped to the widget's shadow root; colours, roundness and font come from
 // the --ca-* variables set by shared/theme.ts.
-export const SCHEDULE_CSS = `
+export const BOOKING_CSS = `
 :host { all: initial; display: block; container-type: inline-size; }
 * { box-sizing: border-box; }
 .card {
@@ -140,5 +140,44 @@ textarea { resize: vertical; }
 }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
+}
+`;
+
+// The appointment widget's extra pieces: a step indicator, service cards,
+// and the staff list.
+export const APPOINTMENT_CSS = `
+.stepper { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ca-muted); }
+.stepper ol { display: flex; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.stepper li { width: 8px; height: 8px; border-radius: 999px; background: var(--ca-line); }
+.stepper li[aria-current="step"] { background: var(--ca-primary); width: 20px; }
+.stepper li.done { background: color-mix(in srgb, var(--ca-primary) 45%, var(--ca-surface)); }
+.back { background: transparent; border: none; min-width: 44px; min-height: 44px; border-radius: 999px; font-size: 20px; margin-left: -10px; }
+.back:hover { background: var(--ca-soft); }
+.title-row { display: flex; align-items: center; gap: 4px; }
+.search { margin-bottom: 4px; }
+.group h3 { margin: 4px 0 8px; font-size: 13px; font-weight: 600; color: var(--ca-muted); text-transform: uppercase; letter-spacing: .04em; }
+.list { display: flex; flex-direction: column; gap: 10px; list-style: none; margin: 0; padding: 0; }
+.item {
+  display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--ca-line);
+  border-radius: calc(var(--ca-radius) / 1.5); background: var(--ca-surface);
+}
+.item:hover { border-color: color-mix(in srgb, var(--ca-primary) 50%, var(--ca-line)); }
+.item .body { flex: 1; min-width: 0; }
+.item .name { font-weight: 600; }
+.item .desc { font-size: 14px; color: var(--ca-muted); margin-top: 2px; }
+.item .meta { font-size: 13px; color: var(--ca-muted); margin-top: 4px; }
+.item .pick {
+  background: var(--ca-primary); color: var(--ca-on-primary); border: none; border-radius: 999px;
+  min-height: 44px; padding: 0 18px; font-weight: 600; flex: none;
+}
+.avatar {
+  width: 48px; height: 48px; border-radius: 999px; flex: none; object-fit: cover;
+  background: var(--ca-soft); color: var(--ca-text); display: flex; align-items: center; justify-content: center; font-weight: 600;
+}
+.empty { color: var(--ca-muted); font-size: 14px; }
+@container (max-width: 400px) {
+  .item { padding: 12px; gap: 10px; }
+  .item .pick { padding: 0 14px; }
+  .avatar { width: 40px; height: 40px; }
 }
 `;
