@@ -19,7 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatShortLocal } from "@/lib/time";
-import { localDateISO } from "@/lib/agent/availability";
+import { localDateISO } from "@/lib/time";
 
 type Lead = {
   id: string;

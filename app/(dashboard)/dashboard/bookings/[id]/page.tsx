@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { ArrowLeftIcon } from "lucide-react";
 import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
-import { formatLocalDateTime, localDateISO } from "@/lib/agent/availability";
+import { formatLocalDateTime, localDateISO } from "@/lib/time";
 import { canonicalPhone, formatPhone } from "@/lib/contacts/phone";
 import {
   describeEvent,

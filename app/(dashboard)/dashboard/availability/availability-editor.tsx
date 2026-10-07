@@ -7,7 +7,7 @@ import {
   createAvailabilityExceptionAction,
   deleteAvailabilityExceptionAction,
 } from "./actions";
-import { WEEKDAY_NAMES } from "@/lib/agent/availability";
+import { WEEKDAY_NAMES } from "@/lib/time";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

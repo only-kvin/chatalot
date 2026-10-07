@@ -144,3 +144,15 @@ Manual steps the platform owner needs to do. Kept up to date as new phases add n
 - **"Take over" mid-reply wins.** If the owner takes over while the AI is still generating a WhatsApp reply, that reply is discarded instead of sent.
 - **Agent turns have a hard 20s deadline** (all model calls in the tool loop combined); past it the visitor gets the fallback reply with `handoff_contact`.
 - **The widget restores the visitor's last 50 messages** on reload, via `GET /api/chat/history` (same origin check as the rest of the widget API).
+
+## Widget suite, Phase A: shared booking layer (2026-10-07)
+
+**Manual step:** none. The migrations (`booking_foundations`, `booking_block_defaults`, `private_schema_service_role`, `staff_services_staff_index`) are already applied to the dev project; for any other database, push them with `pnpm exec supabase db push` *before* deploying.
+
+**What changed:**
+
+- **One booking engine for everyone.** `lib/bookings/availability.ts` decides which times are bookable and `lib/bookings/create.ts` makes bookings; the AI tools, dashboard rescheduling and (from Phase C) the booking widgets all use them. Never put booking rules in widget code or prompt text.
+- **Bookings are made by database functions** `create_booking()` / `reschedule_booking()`, which lock the business's calendar and re-check capacity, then write the booking, its lead and its history entry in one transaction. Two people taking the same slot at once get one booking and one "that slot was just taken". `tests/booking-concurrency.test.ts` proves it against the real database.
+- **Staff (optional).** A business with no staff works as before: one calendar, one booking at a time. Once staff are added (`staff` table; dashboard screens come in Phase B), each person is their own calendar with their own hours (`availability_rules` rows with their `staff_id`, else the business's hours), time off (`time_off`) and capacity (`max_concurrent`: 1 for a chair, e.g. 12 for a class). Services can be limited to certain staff (`staff_services`; none linked = anyone). Bookings made before a business adds staff count against every staff member until reassigned, so nothing gets double-booked.
+- **Booking settings per business** (`agent_configs`, editable in Phase B): `booking_lead_time_minutes` (default **60**: customers can no longer book a slot starting within the hour), `booking_horizon_days` (default 60) and `slot_minutes` (15/30/60, default 15). The team can still book or move bookings at short notice from the dashboard.
+- **Service buffers** (`services.buffer_before_min` / `buffer_after_min`) keep time free around an appointment without lengthening it.

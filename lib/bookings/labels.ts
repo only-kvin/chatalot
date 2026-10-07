@@ -1,4 +1,4 @@
-import { formatLocalDateTime } from "@/lib/agent/availability";
+import { formatLocalDateTime } from "@/lib/time";
 import { NOT_SENT_REASON, type NotSentReason } from "./reminders";
 
 // Human wording for the booking history and status badges. Pure, so both

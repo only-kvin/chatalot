@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { localDateISO, startOfLocalDay } from "@/lib/agent/availability";
+import { formatLocalTime, localDateISO, startOfLocalDay } from "@/lib/time";
 import { canonicalPhone, formatPhone } from "@/lib/contacts/phone";
 import { LOW_RATING_MAX } from "@/lib/bookings/rating";
 import type { OwnerEmail } from "@/lib/email/send";
@@ -50,13 +50,6 @@ export function summaryDays(now: Date) {
   };
 }
 
-const LOCAL_TIME = new Intl.DateTimeFormat("en-GB", {
-  timeZone: "Africa/Johannesburg",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-});
-
 function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`;
 }
@@ -95,7 +88,7 @@ export function buildDailySummary(d: DailySummaryData): OwnerEmail | null {
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
     .map(
       (b) =>
-        `${LOCAL_TIME.format(new Date(b.startsAt))}  ${b.serviceName}, ${b.customer} (${b.phone})` +
+        `${formatLocalTime(b.startsAt)}  ${b.serviceName}, ${b.customer} (${b.phone})` +
         (b.reminderNotSent ? ". Reminder not sent: give them a call" : ""),
     );
 

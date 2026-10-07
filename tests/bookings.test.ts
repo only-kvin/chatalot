@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { formatLocalDate, formatLocalDateTime } from "../lib/agent/availability";
+import { formatLocalDate, formatLocalDateTime } from "../lib/time";
 import {
   bookingRef,
   cancelBooking,

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { formatLocalDateTime, getOpenSlots, localToUtcDate } from "@/lib/agent/availability";
+import { formatLocalDateTime, localToUtcDate } from "@/lib/time";
+import { getAvailability } from "./availability";
 
 // Booking changes shared by the AI tools (service-role client, actor "ai") and
 // dashboard actions (the signed-in user's client, actor "team" — RLS then
@@ -143,7 +144,7 @@ export async function rescheduleBooking(
 ): Promise<{ ok: true; from: string; to: string } | { ok: false; error: string }> {
   const { data: booking } = await client
     .from("bookings")
-    .select("id, service_id, starts_at, status, services(duration_minutes)")
+    .select("id, service_id, staff_id, status")
     .eq("id", r.bookingId)
     .eq("tenant_id", r.tenantId)
     .maybeSingle();
@@ -153,39 +154,41 @@ export async function rescheduleBooking(
 
   // Recomputed here even if availability was just checked — defends against
   // a stale or made-up time, and excludes this booking's own current slot.
-  const open = await getOpenSlots(client, r.tenantId, booking.service_id, r.date, booking.id);
-  if (!open || !open.slots.includes(r.time)) {
+  const availability = await getAvailability(client, r.tenantId, {
+    serviceId: booking.service_id,
+    fromDate: r.date,
+    toDate: r.date,
+    excludeBookingId: booking.id,
+    forTeam: r.actor === "team",
+  });
+  const slot = availability?.days[0]?.slots.find((s) => s.time === r.time);
+  if (!slot || slot.staffIds.length === 0) {
     return {
       ok: false,
       error: `That time isn't available. Check availability for ${r.date} and pick one of the returned times.`,
     };
   }
+  // Same person if they're free then, otherwise whoever is.
+  const staffId = slot.staffIds.includes(booking.staff_id) ? booking.staff_id : slot.staffIds[0];
 
-  const startsAt = localToUtcDate(r.date, r.time);
-  const endsAt = new Date(startsAt.getTime() + open.durationMinutes * 60_000);
-  const { error } = await client
-    .from("bookings")
-    .update({
-      starts_at: startsAt.toISOString(),
-      ends_at: endsAt.toISOString(),
-      // A new time needs a new reminder.
-      reminder_sent_at: null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", booking.id)
-    .eq("tenant_id", r.tenantId)
-    .eq("status", "confirmed");
+  const { data, error } = await client.rpc("reschedule_booking", {
+    p_tenant_id: r.tenantId,
+    p_booking_id: booking.id,
+    p_staff_id: staffId,
+    p_starts_at: localToUtcDate(r.date, r.time).toISOString(),
+    p_actor: r.actor,
+    p_channel: r.channel,
+    p_created_by: r.createdBy ?? null,
+  });
   if (error) {
-    // Exclusion violation: someone took the slot between the check and now.
-    if (error.code === "23P01") return { ok: false, error: "That slot was just taken — please pick another time." };
     console.error(`Rescheduling booking ${booking.id} failed:`, error);
     return { ok: false, error: "The booking couldn't be moved due to a technical problem." };
   }
-
-  await logBookingEvent(client, {
-    ...r,
-    type: "rescheduled",
-    details: { from: booking.starts_at, to: startsAt.toISOString() },
-  });
-  return { ok: true, from: booking.starts_at, to: startsAt.toISOString() };
+  const result = data as { ok: true; from: string; to: string } | { ok: false; reason: string };
+  if (!result.ok) {
+    if (result.reason === "slot_taken") return { ok: false, error: "That slot was just taken — please pick another time." };
+    return { ok: false, error: "That booking isn't active any more." };
+  }
+  // Postgres returns its own timestamp format; normalise to ISO.
+  return { ok: true, from: new Date(result.from).toISOString(), to: new Date(result.to).toISOString() };
 }

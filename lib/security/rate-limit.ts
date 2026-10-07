@@ -1,7 +1,7 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { redis } from "@/lib/redis";
-import { startOfLocalDay } from "@/lib/agent/availability";
+import { startOfLocalDay } from "@/lib/time";
 
 const sessionLimiter = new Ratelimit({
   redis,

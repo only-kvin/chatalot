@@ -28,6 +28,7 @@ describe("RLS tenant isolation", () => {
   let userBId: string;
   let clientA: SupabaseClient;
   let contactBId: string;
+  let serviceBId: string;
 
   beforeAll(async () => {
     tenantA = await createTenant(admin, {
@@ -89,6 +90,16 @@ describe("RLS tenant isolation", () => {
     if (contactError) throw contactError;
     contactBId = contactB.id;
 
+    const { data: serviceB, error: serviceError } = await admin
+      .from("services")
+      .insert({ tenant_id: tenantB.id, name: "TENANT_B_SERVICE", duration_minutes: 30 })
+      .select("id")
+      .single();
+    if (serviceError) throw serviceError;
+    serviceBId = serviceB.id;
+    const { error: staffError } = await admin.from("staff").insert({ tenant_id: tenantB.id, name: "TENANT_B_STAFF" });
+    if (staffError) throw staffError;
+
     clientA = scopedClient();
     const { error: signInError } = await clientA.auth.signInWithPassword({
       email: emailA,
@@ -141,6 +152,50 @@ describe("RLS tenant isolation", () => {
       title: "hijack",
       content: "should not be allowed",
     });
+    expect(error).not.toBeNull();
+  });
+
+  it("hides another tenant's staff and refuses staff written into it", async () => {
+    const { data, error } = await clientA.from("staff").select("name");
+    expect(error).toBeNull();
+    expect(data!.map((r) => r.name)).not.toContain("TENANT_B_STAFF");
+
+    const { error: insertError } = await clientA.from("staff").insert({ tenant_id: tenantB.id, name: "hijack" });
+    expect(insertError).not.toBeNull();
+  });
+
+  const bookingArgs = () => ({
+    p_tenant_id: tenantB.id,
+    p_service_id: serviceBId,
+    p_staff_id: null,
+    p_starts_at: "2031-01-06T08:00:00Z",
+    p_name: "hijack",
+    p_phone: "0820000000",
+    p_email: null,
+    p_contact_id: null,
+    p_conversation_id: null,
+    p_source: "team",
+    p_notes: "",
+    p_details: {},
+    p_idempotency_key: null,
+    p_lead_source: null,
+    p_lead_summary: null,
+    p_actor: "team",
+    p_channel: "dashboard",
+    p_created_by: userAId,
+  });
+
+  it("can't book into another tenant through create_booking", async () => {
+    const { data } = await clientA.rpc("create_booking", bookingArgs());
+    // RLS hides tenant B's service, so the function never gets as far as
+    // inserting (and the insert itself would be refused).
+    expect(data?.ok).not.toBe(true);
+    const { data: bookings } = await admin.from("bookings").select("id").eq("tenant_id", tenantB.id);
+    expect(bookings).toEqual([]);
+  });
+
+  it("doesn't let the public key call the booking functions", async () => {
+    const { error } = await scopedClient().rpc("create_booking", bookingArgs());
     expect(error).not.toBeNull();
   });
 });

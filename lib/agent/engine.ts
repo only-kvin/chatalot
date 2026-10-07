@@ -3,26 +3,19 @@ import { buildSystemPrompt, type AgentConfig } from "./prompt";
 import { runAgentTurn, type ChatMessage } from "./model";
 import { AGENT_TOOLS, parseToolInput, type ToolCall } from "./tools";
 import { getRelevantKnowledge } from "./retrieval";
-import {
-  findServiceByName,
-  getOpenSlots,
-  listActiveServiceNames,
-  listActiveServices,
-  localToUtcDate,
-  formatLocalDate,
-  formatLocalDateTime,
-} from "./availability";
+import { findServiceByName, listActiveServiceNames, listActiveServices } from "@/lib/bookings/catalog";
+import { getOpenSlots } from "@/lib/bookings/availability";
+import { createBooking } from "@/lib/bookings/create";
+import { formatLocalDate, formatLocalDateTime } from "@/lib/time";
 import { notifyOwnerOfLead } from "@/lib/email/notify-lead";
 import { notifyOwnerHumanRequested } from "@/lib/email/notify-human-requested";
 import { notifyOwnerOfBooking } from "@/lib/email/notify-booking";
 import { linkConversation, upsertContact } from "@/lib/contacts/upsert";
 import {
-  bookingRef,
   cancelBooking,
   describeBooking,
   insideCutoff,
   listManageableBookings,
-  logBookingEvent,
   rescheduleBooking,
 } from "@/lib/bookings/manage";
 import { notifyOwnerOfBookingChange } from "@/lib/email/notify-booking-change";
@@ -241,70 +234,29 @@ async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall: ToolCa
   const resolved = await resolveService(admin, tenantId, call.input.service);
   if (typeof resolved === "string") return resolved;
 
-  // Recomputed here even though the model should have just called
-  // check_availability — defends against a stale or made-up time.
-  const availability = await getOpenSlots(admin, tenantId, resolved.id, date);
-  if (!availability || !availability.slots.includes(time)) {
-    return `That time isn't available. Call check_availability again for ${date} and pick one of the returned times.`;
-  }
-
   const contactId = await rememberCustomer(admin, ctx, { name, phone, email });
-  const startsAt = localToUtcDate(date, time);
-  const endsAt = new Date(startsAt.getTime() + resolved.duration_minutes * 60_000);
-
-  const { data: lead, error: leadError } = await admin
-    .from("leads")
-    .insert({
-      tenant_id: tenantId,
-      conversation_id: conversationId,
-      contact_id: contactId,
-      name,
-      phone,
-      email,
-      interest: resolved.name,
-      summary: `Booked ${resolved.name} on ${date} at ${time}`,
-      status: "booked",
-      source: "booking",
-    })
-    .select("id")
-    .single();
-  if (leadError) return toolFailed(call.name, leadError);
-
-  const { data: booking, error: bookingError } = await admin
-    .from("bookings")
-    .insert({
-      tenant_id: tenantId,
-      service_id: resolved.id,
-      conversation_id: conversationId,
-      contact_id: contactId,
-      lead_id: lead.id,
-      name,
-      phone,
-      email,
-      starts_at: startsAt.toISOString(),
-      ends_at: endsAt.toISOString(),
-      source: ctx.channel,
-    })
-    .select("id")
-    .single();
-  if (bookingError) {
-    // Exclusion-violation: another booking took this slot between our
-    // availability check above and this insert.
-    if (bookingError.code === "23P01") {
-      return "That slot was just taken by someone else — please pick a different time.";
-    }
-    return toolFailed(call.name, bookingError);
-  }
-
-  await logBookingEvent(admin, {
+  // createBooking re-checks the time against the live calendar, so a stale
+  // or made-up time is refused here too.
+  const booked = await createBooking(admin, {
     tenantId,
-    bookingId: booking.id,
-    type: "created",
+    serviceId: resolved.id,
+    date,
+    time,
+    customer: { name, phone, email, contactId },
+    conversationId,
+    source: ctx.channel,
+    lead: { source: "booking", summary: `Booked ${resolved.name} on ${date} at ${time}` },
     actor: "ai",
     channel: ctx.channel,
   });
-
-  const when = formatLocalDateTime(startsAt);
+  if (!booked.ok) {
+    if (booked.reason === "unavailable") {
+      return `That time isn't available. Call check_availability again for ${date} and pick one of the returned times.`;
+    }
+    if (booked.reason === "slot_taken") return "That slot was just taken by someone else — please pick a different time.";
+    return toolFailed(call.name, booked.reason);
+  }
+  const when = formatLocalDateTime(booked.startsAt);
   await notifyOwnerOfBooking(
     admin,
     tenantId,
@@ -313,7 +265,7 @@ async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall: ToolCa
     conversationId,
   );
 
-  return `Booking confirmed: ${resolved.name} on ${when} (reference ${bookingRef(booking.id)}). Tell the visitor exactly this date and time.`;
+  return `Booking confirmed: ${resolved.name} on ${when} (reference ${booked.ref}). Tell the visitor exactly this date and time.`;
 }
 
 function formatNotice(minutes: number): string {

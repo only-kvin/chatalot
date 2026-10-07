@@ -4,7 +4,8 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
-import { formatLocalDateTime, getOpenSlots } from "@/lib/agent/availability";
+import { formatLocalDateTime } from "@/lib/time";
+import { getOpenSlots } from "@/lib/bookings/availability";
 import { cancelBooking, logBookingEvent, rescheduleBooking } from "@/lib/bookings/manage";
 import { sendTeamWhatsApp } from "@/lib/channels/team-whatsapp";
 import { formatPhone, canonicalPhone } from "@/lib/contacts/phone";
@@ -91,7 +92,10 @@ export async function getRescheduleSlotsAction(
   const booking = await loadBooking(s, bookingId);
   if (!booking) return { error: "Booking not found.", slots: [] };
 
-  const open = await getOpenSlots(s.supabase, s.tenantId, booking.service_id, date, booking.id);
+  const open = await getOpenSlots(s.supabase, s.tenantId, booking.service_id, date, {
+    excludeBookingId: booking.id,
+    forTeam: true,
+  });
   return { error: null, slots: open?.slots ?? [] };
 }
 

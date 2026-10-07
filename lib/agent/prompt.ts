@@ -1,4 +1,4 @@
-import { todayLocalLabel } from "./availability";
+import { todayLocalLabel } from "@/lib/time";
 
 export type AgentConfig = {
   business_name: string;

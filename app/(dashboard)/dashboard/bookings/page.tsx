@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
-import { formatLocalDateTime } from "@/lib/agent/availability";
+import { formatLocalDateTime } from "@/lib/time";
 import {
   describeEvent,
   formatShortLocal,

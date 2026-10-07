@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { formatLocalDateTime } from "@/lib/agent/availability";
+import { formatLocalDateTime } from "@/lib/time";
 import { isWithinServiceWindow, sendWhatsAppTemplate, sendWhatsAppText } from "@/lib/channels/whatsapp";
 import { canonicalPhone, formatPhone } from "@/lib/contacts/phone";
 import { isOptedOut } from "@/lib/contacts/consent";
