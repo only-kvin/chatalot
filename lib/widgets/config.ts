@@ -17,10 +17,15 @@ export type WidgetTheme = {
 
 export type BookingWidgetType = "schedule" | "appointment";
 // Every widget configured in widget_instances.
-export type WidgetType = BookingWidgetType | "contact";
+export type WidgetType = BookingWidgetType | "contact" | "registration";
 
 // Which form each widget shows (lib/widgets/fields.ts).
-export const FORM_KIND: Record<WidgetType, FormKind> = { schedule: "booking", appointment: "booking", contact: "contact" };
+export const FORM_KIND: Record<WidgetType, FormKind> = {
+  schedule: "booking",
+  appointment: "booking",
+  contact: "contact",
+  registration: "registration",
+};
 
 // Wording both booking widgets have.
 const baseCopy = {
@@ -86,6 +91,35 @@ export const WIDGET_SCHEMAS = {
       responseTime: "We usually reply within one working day.",
     },
     defaultSettings: { offerNewsletter: false, offerPromotions: false },
+  },
+  registration: {
+    copy: z.object({
+      title: z.string().trim().min(1).max(60),
+      submitButton: z.string().trim().min(1).max(40),
+      successTitle: z.string().trim().min(1).max(60),
+      successMessage: z.string().trim().max(300),
+      // Optional "Book now" link after signing up, to the business's own
+      // booking page.
+      bookingUrl: z
+        .string()
+        .trim()
+        .max(300)
+        .refine((v) => v === "" || /^https:\/\/\S+$/.test(v), "The booking page link must start with https://"),
+      bookLinkLabel: z.string().trim().min(1).max(40),
+    }),
+    settings: z.object({
+      // The optional, unticked "events and promotions" box.
+      offerMarketing: z.boolean(),
+    }),
+    defaultCopy: {
+      title: "Sign up",
+      submitButton: "Sign me up",
+      successTitle: "Check your email",
+      successMessage: "We've sent you a link to see your bookings and choose what we send you.",
+      bookingUrl: "",
+      bookLinkLabel: "Book now",
+    },
+    defaultSettings: { offerMarketing: true },
   },
 } as const;
 

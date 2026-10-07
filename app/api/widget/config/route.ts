@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   const admin = createAdminClient();
   const widget = url.searchParams.get("widget");
 
-  if (widget === "schedule" || widget === "appointment" || widget === "contact") {
+  if (widget === "schedule" || widget === "appointment" || widget === "contact" || widget === "registration") {
     const [theme, instance, { data: agentConfig }] = await Promise.all([
       loadWidgetTheme(admin, tenantId),
       loadWidget(admin, tenantId, widget),

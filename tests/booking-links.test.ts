@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { createBookingToken, readBookingToken } from "../lib/security/signed-token";
+import { createBookingToken, createCustomerToken, readBookingToken, readCustomerToken } from "../lib/security/signed-token";
+import { renderCustomerPageEmail } from "../lib/email/customer-page";
 import { bookingIcs } from "../lib/bookings/ics";
 import { renderCustomerBookingEmail } from "../lib/email/customer-booking";
 import { looksLikeBot } from "../lib/widgets/spam";
@@ -88,5 +89,33 @@ describe("looksLikeBot", () => {
     expect(looksLikeBot({ honeypot: "", elapsedMs: 20_000 })).toBe(false);
     expect(looksLikeBot({ honeypot: "http://spam", elapsedMs: 20_000 })).toBe(true);
     expect(looksLikeBot({ elapsedMs: 800 })).toBe(true);
+  });
+});
+
+describe("customer page links", () => {
+  const TENANT = "a1b2c3d4-0000-4000-8000-000000000001";
+
+  it("carries the business and the (lower-cased) email", () => {
+    const token = createCustomerToken(TENANT, " Thandi@Example.com ", FUTURE);
+    expect(readCustomerToken(token)).toEqual({ tenantId: TENANT, email: "thandi@example.com" });
+  });
+
+  it("rejects altered, expired and booking-link tokens", () => {
+    const token = createCustomerToken(TENANT, "thandi@example.com", FUTURE);
+    const [payload, sig] = token.split(".");
+    // Change the email inside the token.
+    const forged = Buffer.from(Buffer.from(payload, "base64url").toString("latin1").replace("thandi", "lebo00"), "latin1");
+    expect(readCustomerToken(`${forged.toString("base64url")}.${sig}`)).toBeNull();
+    expect(readCustomerToken(createCustomerToken(TENANT, "t@example.com", new Date("2020-01-01T00:00:00Z")))).toBeNull();
+    // A booking link isn't a customer link, and the other way round.
+    expect(readCustomerToken(createBookingToken(ID, FUTURE))).toBeNull();
+    expect(readBookingToken(token)).toBeNull();
+  });
+
+  it("emails the link, escaping the name", () => {
+    const email = renderCustomerPageEmail({ name: "<b>T</b>", businessName: "Demo Salon", url: "https://x.test/c/abc" });
+    expect(email.subject).toBe("Your bookings with Demo Salon");
+    expect(email.html).toContain("&lt;b&gt;T&lt;/b&gt;");
+    expect(email.html).toContain("https://x.test/c/abc");
   });
 });

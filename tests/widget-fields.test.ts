@@ -4,6 +4,7 @@ import {
   customKey,
   defaultFields,
   splitContactAnswers,
+  splitRegistrationAnswers,
   DEFAULT_FIELDS,
   fieldsInputSchema,
   normalizeFields,
@@ -161,5 +162,24 @@ describe("contact form", () => {
   it("offers the subject list as an optional built-in", () => {
     expect(addableBuiltins("contact", defaultFields("contact")).map((f) => f.key)).toEqual(["subject"]);
     expect(addableBuiltins("booking", DEFAULT_FIELDS)).toEqual([]);
+  });
+});
+
+describe("registration form", () => {
+  it("always asks name and email (the link goes by email)", () => {
+    const fields = normalizeFields([{ key: "phone", label: "Cell", type: "tel", required: false }], "registration");
+    expect(fields.map((f) => [f.key, f.required])).toEqual([
+      ["full_name", true],
+      ["phone", false],
+      ["email", true],
+    ]);
+    const schema = submissionSchema(defaultFields("registration"), "registration");
+    expect(schema.safeParse({ full_name: "T", email: "" }).success).toBe(false);
+    expect(splitRegistrationAnswers(schema.parse({ full_name: "T", email: "T@Example.com", phone: "" }))).toEqual({
+      name: "T",
+      email: "t@example.com",
+      phone: null,
+      details: {},
+    });
   });
 });

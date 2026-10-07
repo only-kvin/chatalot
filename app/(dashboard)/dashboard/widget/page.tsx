@@ -14,13 +14,14 @@ const TABS = [
   { id: "schedule", label: "Schedule" },
   { id: "appointment", label: "Appointment" },
   { id: "contact", label: "Contact" },
+  { id: "registration", label: "Registration" },
 ] as const;
 
 export default async function WidgetPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const tenantId = await getCurrentTenantId();
   if (!tenantId) redirect("/");
   const requested = (await searchParams).tab;
-  const tab = requested === "schedule" || requested === "appointment" || requested === "contact" ? requested : "chat";
+  const tab = TABS.find((t) => t.id === requested && t.id !== "chat")?.id ?? "chat";
 
   const supabase = await createClient();
   const { data: tenant } = await supabase.from("tenants").select("public_widget_key").eq("id", tenantId).single();

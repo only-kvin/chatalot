@@ -6,6 +6,13 @@ import { getCurrentTenantId } from "@/lib/db/current-tenant";
 import { formatPhone } from "@/lib/contacts/phone";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CONSENT_LABEL, type ConsentKind } from "@/lib/contacts/consents";
+
+const CONSENT_SOURCE: Record<string, string> = {
+  contact_widget: "website contact form",
+  registration_widget: "website sign-up",
+  customer_page: "their own page",
+};
 import { CustomerForm } from "./customer-form";
 import { DeleteCustomer } from "./delete-customer";
 import { formatShortLocal } from "@/lib/time";
@@ -26,13 +33,13 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   const supabase = await createClient();
   const { data: customer } = await supabase
     .from("contacts")
-    .select("id, name, name_source, phone_e164, email, notes, first_channel, first_seen_at, last_seen_at, consent_at, opted_out_at")
+    .select("id, name, name_source, phone_e164, email, notes, first_channel, first_seen_at, last_seen_at, consent_at, opted_out_at, registered_at")
     .eq("id", id)
     .eq("tenant_id", tenantId)
     .maybeSingle();
   if (!customer) notFound();
 
-  const [{ data: conversations }, { data: leads }, { data: bookings }] = await Promise.all([
+  const [{ data: conversations }, { data: leads }, { data: bookings }, { data: consentHistory }] = await Promise.all([
     supabase
       .from("conversations")
       .select("id, channel, status, last_message_at")
@@ -51,6 +58,12 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       .eq("tenant_id", tenantId)
       .eq("contact_id", id)
       .order("starts_at", { ascending: false }),
+    supabase
+      .from("consents")
+      .select("id, kind, granted, source, created_at")
+      .eq("tenant_id", tenantId)
+      .eq("contact_id", id)
+      .order("created_at", { ascending: false }),
   ]);
 
   const displayName = customer.name || customer.email || "Unnamed customer";
@@ -90,7 +103,25 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             {customer.consent_at
               ? `Agreed to their details being saved on ${when(customer.consent_at)}.`
               : "Hasn't been asked to save their details yet (known from their WhatsApp number)."}
+            {customer.registered_at && ` Signed up on your website on ${when(customer.registered_at)}.`}
           </p>
+          {!!consentHistory?.length && (
+            <details className="text-xs">
+              <summary className="cursor-pointer text-zinc-600 dark:text-zinc-400">
+                Consent history ({consentHistory.length})
+              </summary>
+              <ul className="mt-2 flex flex-col gap-1 text-zinc-500">
+                {consentHistory.map((c) => (
+                  <li key={c.id}>
+                    {when(c.created_at)}: {c.granted ? "said yes to" : "said no to"}{" "}
+                    {CONSENT_LABEL[c.kind as ConsentKind]?.toLowerCase() ?? c.kind}
+                    {" · "}
+                    {CONSENT_SOURCE[c.source] ?? c.source}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
           <CustomerForm
             customer={{
               id: customer.id,

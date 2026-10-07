@@ -219,3 +219,13 @@ Manual steps the platform owner needs to do. Kept up to date as new phases add n
 - **Contact widget** (`<div data-chatalot="contact">`, Dashboard → Widgets → Contact): the business's own fields (name and message always; an email or phone required so they can be answered; an optional subject list), optional and unticked "newsletter" and "events and promotions" boxes, the same spam checks and limits as bookings, and a thank-you with the expected response time. Each message becomes a contact message and a `contact_widget` lead, with a bell alert and owner email. The sender becomes a customer record only if they tick a consent box.
 - **Messages** (new in the dashboard nav): an inbox of contact-form messages, New / All. Opening one marks it read; "Reply by email" (from the owner's own email, so it works without a verified sending domain) marks it replied. The daily summary counts unread ones.
 - Form rules per widget live in `lib/widgets/fields.ts` (`FormKind`: booking, contact, registration); the dashboard's form builder adapts to each.
+
+## Widget suite, Phase E2: registration and the customer's own page (2026-10-07)
+
+**Manual step:** none. The `registration_widget` migration (`contacts.registered_at`) is already applied. As with all customer emails, the sign-up link only reaches real customers once a Resend sending domain is verified (see Phase C1).
+
+**What's new:**
+
+- **Registration widget** (`<div data-chatalot="registration">`, Dashboard → Widgets → Registration): sign up as a customer with no password. Name and email are always asked (the link goes by email), mobile optional, plus the business's own questions; a required "booking confirmations and reminders" consent and an optional, unticked "events and promotions" one. Signing up saves or updates the customer (never duplicated), records the consents, and emails a link to their own page. The answer is always "check your email", so the form can't reveal who is already a customer. An unticked box never withdraws an earlier yes. Optionally shows a "Book now" link to the business's booking page.
+- **The customer's own page** (`/c/<signed token>`, link valid 30 days): their upcoming and recent bookings with that business, each with its change/cancel link, and newsletter / promotions switches; every change is added to the consent history. It only shows bookings made **with that email address**, so registering with someone else's phone number reveals nothing.
+- **Customers in the dashboard** now show when they signed up on the website and their consent history.

@@ -238,3 +238,19 @@ export function splitContactAnswers(values: Record<string, unknown>): ContactAns
     details: splitAnswers({ ...values, full_name: "", phone: "" }).details,
   };
 }
+
+export type RegistrationAnswers = {
+  name: string;
+  email: string;
+  phone: string | null;
+  details: Record<string, string | boolean>;
+};
+
+export function splitRegistrationAnswers(values: Record<string, unknown>): RegistrationAnswers {
+  return {
+    name: String(values.full_name),
+    email: String(values.email),
+    phone: typeof values.phone === "string" && values.phone ? values.phone : null,
+    details: splitAnswers({ ...values, full_name: "", phone: "" }).details,
+  };
+}

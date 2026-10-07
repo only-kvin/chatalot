@@ -152,6 +152,21 @@ const WIDGET_UI: Record<
     ],
     place: "the form",
   },
+  registration: {
+    name: "Registration widget",
+    description:
+      "Visitors sign up as customers with no password: we email them a link to their own page with their bookings and what we may send them.",
+    copy: [
+      ["title", "Title"],
+      ["submitButton", "Sign-up button"],
+      ["successTitle", "Signed up: heading"],
+      ["successMessage", "Signed up: message"],
+      ["bookingUrl", "Your booking page link, for a \"Book now\" button after signing up (optional)"],
+      ["bookLinkLabel", "\"Book now\" button text"],
+    ],
+    toggles: [["offerMarketing", "Offer an events and promotions box (unticked)"]],
+    place: "the sign-up form",
+  },
 };
 
 type WidgetValues = {

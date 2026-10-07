@@ -106,7 +106,7 @@ export async function updateWidgetThemeAction(formData: FormData): Promise<{ err
   return { error: null };
 }
 
-const widgetTypeSchema = z.enum(["schedule", "appointment", "contact"]);
+const widgetTypeSchema = z.enum(["schedule", "appointment", "contact", "registration"]);
 
 function inputSchema(type: WidgetType) {
   return z.object({

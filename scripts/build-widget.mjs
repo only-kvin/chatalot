@@ -11,6 +11,7 @@ const bundles = [
   { entry: "widget/appointment/index.ts", out: "public/widgets/appointment.js" },
   { entry: "widget/reschedule/index.ts", out: "public/widgets/reschedule.js" },
   { entry: "widget/contact/index.ts", out: "public/widgets/contact.js" },
+  { entry: "widget/registration/index.ts", out: "public/widgets/registration.js" },
 ];
 
 // All widgets together must stay under this, gzipped (see CLAUDE.md).
