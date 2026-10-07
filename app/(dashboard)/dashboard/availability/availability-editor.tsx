@@ -25,6 +25,7 @@ export type BookingRules = {
   booking_horizon_days: number;
   slot_minutes: number;
   booking_change_cutoff_minutes: number;
+  bookings_need_approval: boolean;
 };
 
 const LEAD_OPTIONS = [
@@ -136,6 +137,21 @@ export function BookingRulesForm({ rules }: { rules: BookingRules }) {
           ))}
         </select>
         <p className="text-xs text-zinc-500">After that, the AI hands them over to you.</p>
+      </div>
+      <div className="flex flex-col gap-1">
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="bookings_need_approval"
+            defaultChecked={rules.bookings_need_approval}
+            className="size-4"
+          />
+          I approve bookings before they&apos;re confirmed
+        </label>
+        <p className="text-xs text-zinc-500">
+          Bookings from your website and the AI then wait under Bookings → To approve, holding their time, until you
+          approve or decline them. Customers are told it&apos;s a request.
+        </p>
       </div>
       <p className="text-xs text-zinc-500">
         These apply to customers. You can still book and move bookings at short notice from the dashboard.

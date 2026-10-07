@@ -2,7 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { notificationPath, recordNotification } from "@/lib/notifications";
 import { sendOwnerEmail } from "./send";
 
-// A customer cancelled or moved a booking through the AI.
+// A customer cancelled or moved a booking: through the AI in chat, or with
+// the link in their booking email.
 export async function notifyOwnerOfBookingChange(
   admin: SupabaseClient,
   tenantId: string,
@@ -11,7 +12,9 @@ export async function notifyOwnerOfBookingChange(
     | { kind: "cancelled"; customer: string; booking: string; reason: string | null }
     | { kind: "rescheduled"; customer: string; serviceName: string; from: string; to: string },
   conversationId?: string | null,
+  via: "chat" | "email_link" = "chat",
 ): Promise<void> {
+  const how = via === "chat" ? "through your AI receptionist" : "using the link in their booking email";
   const type = change.kind === "cancelled" ? "booking_cancelled" : "booking_rescheduled";
   const title =
     change.kind === "cancelled" ? `Booking cancelled: ${change.customer}` : `Booking moved: ${change.customer}`;
@@ -26,8 +29,8 @@ export async function notifyOwnerOfBookingChange(
     subject: `${title} (${businessName})`,
     intro:
       change.kind === "cancelled"
-        ? "A customer cancelled their booking through your AI receptionist. The slot is free again."
-        : "A customer moved their booking through your AI receptionist.",
+        ? `A customer cancelled their booking ${how}. The slot is free again.`
+        : `A customer moved their booking ${how}.`,
     details:
       change.kind === "cancelled"
         ? [

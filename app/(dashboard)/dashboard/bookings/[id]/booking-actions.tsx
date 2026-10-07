@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import {
   cancelBookingAction,
+  decideBookingAction,
   getRescheduleSlotsAction,
   rescheduleBookingAction,
   setBookingOutcomeAction,
@@ -12,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-type Mode = "idle" | "reschedule" | "cancel";
+type Mode = "idle" | "reschedule" | "cancel" | "decline";
 
 export function BookingActions({
   bookingId,
@@ -86,7 +87,51 @@ export function BookingActions({
         {notice && <p className="feedback-enter rounded-lg bg-muted px-3 py-2 text-sm">{notice}</p>}
         {error && <p className="feedback-enter text-sm text-red-600">{error}</p>}
 
-        {status === "confirmed" && !started && mode === "idle" && (
+        {status === "pending" && mode === "idle" && (
+          <div className="flex flex-col gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-950">
+            <p className="text-sm">This booking is waiting for your approval. The time is held until you decide.</p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                disabled={pending}
+                onClick={() => run(() => decideBookingAction({ bookingId, approve: true, reason: "" }))}
+              >
+                {pending ? "Saving…" : "Approve"}
+              </Button>
+              <Button variant="outline" disabled={pending} onClick={() => setMode("decline")}>
+                Decline
+              </Button>
+            </div>
+            <p className="text-xs text-zinc-500">The customer is emailed either way, if they gave an email address.</p>
+          </div>
+        )}
+
+        {mode === "decline" && (
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="decline-reason">Message to the customer (optional)</Label>
+              <Input
+                id="decline-reason"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Sorry, we're fully booked that day. Could you try Friday?"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="destructive"
+                disabled={pending}
+                onClick={() => run(() => decideBookingAction({ bookingId, approve: false, reason }))}
+              >
+                {pending ? "Declining…" : "Decline booking"}
+              </Button>
+              <Button variant="outline" onClick={() => setMode("idle")} disabled={pending}>
+                Back
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {(status === "confirmed" || status === "pending") && !started && mode === "idle" && (
           <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"
@@ -173,7 +218,7 @@ export function BookingActions({
           </div>
         )}
 
-        {started && (
+        {started && status !== "pending" && (
           <div className="flex flex-col gap-2">
             <p className="text-sm text-zinc-500">Did the customer come in?</p>
             <div className="flex flex-wrap gap-2">

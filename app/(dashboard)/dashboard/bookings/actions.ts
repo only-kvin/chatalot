@@ -6,7 +6,8 @@ import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
 import { formatLocalDateTime } from "@/lib/time";
 import { getOpenSlots } from "@/lib/bookings/availability";
-import { assignStaff, cancelBooking, logBookingEvent, rescheduleBooking } from "@/lib/bookings/manage";
+import { assignStaff, cancelBooking, decidePendingBooking, logBookingEvent, rescheduleBooking } from "@/lib/bookings/manage";
+import { emailCustomerAboutBooking } from "@/lib/email/customer-booking";
 import { sendTeamWhatsApp } from "@/lib/channels/team-whatsapp";
 import { formatPhone, canonicalPhone } from "@/lib/contacts/phone";
 import { isOptedOut } from "@/lib/contacts/consent";
@@ -190,6 +191,30 @@ export async function assignStaffAction(bookingId: string, staffId: string): Pro
   });
   if (!result.ok) return { error: result.error };
   revalidate(bookingId);
+  return { error: null };
+}
+
+// Approves or declines a booking waiting for approval, and emails the
+// customer the answer (when they gave an email address).
+export async function decideBookingAction(input: { bookingId: string; approve: boolean; reason: string }): Promise<Result> {
+  const s = await session();
+  if (!s) return { error: "Not authorized." };
+  if (!uuid.safeParse(input.bookingId).success) return { error: "Invalid booking." };
+  const reason = input.reason.trim().slice(0, 300) || null;
+
+  const result = await decidePendingBooking(s.supabase, {
+    tenantId: s.tenantId,
+    bookingId: input.bookingId,
+    approve: input.approve,
+    reason,
+    actor: "team",
+    channel: "dashboard",
+    createdBy: s.userId,
+  });
+  if (!result.ok) return { error: result.error };
+
+  await emailCustomerAboutBooking(s.supabase, s.tenantId, input.bookingId, input.approve ? "approved" : "declined", { reason });
+  revalidate(input.bookingId);
   return { error: null };
 }
 

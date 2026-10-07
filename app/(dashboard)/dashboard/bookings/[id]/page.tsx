@@ -125,7 +125,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
         </CardContent>
       </Card>
 
-      {booking.status === "confirmed" && !started && staffNames.size > 0 && (
+      {(booking.status === "confirmed" || booking.status === "pending") && !started && staffNames.size > 0 && (
         <Card>
           <CardContent className="pt-6">
             <AssignStaff

@@ -28,6 +28,7 @@ import {
 
 const TABS = [
   { id: "upcoming", label: "Upcoming" },
+  { id: "pending", label: "To approve" },
   { id: "past", label: "Past" },
   { id: "cancelled", label: "Cancelled" },
 ] as const;
@@ -73,6 +74,7 @@ export default async function BookingsPage({
   if (staffFilter === "none") query = query.is("staff_id", null);
   else if (staffFilter) query = query.eq("staff_id", staffFilter);
   if (tab === "upcoming") query = query.neq("status", "cancelled").gte("starts_at", now).order("starts_at");
+  if (tab === "pending") query = query.eq("status", "pending").order("starts_at");
   if (tab === "past") query = query.neq("status", "cancelled").lt("starts_at", now).order("starts_at", { ascending: false });
   if (tab === "cancelled") query = query.eq("status", "cancelled").order("updated_at", { ascending: false });
   const { data: bookings } = await query;
@@ -204,7 +206,14 @@ export default async function BookingsPage({
           {!bookings?.length && (
             <TableRow>
               <TableCell colSpan={staffNames.size > 0 ? 7 : 6} className="text-center text-zinc-500">
-                {tab === "upcoming" ? "No upcoming bookings." : tab === "past" ? "No past bookings." : "No cancelled bookings."}
+                {
+                  {
+                    upcoming: "No upcoming bookings.",
+                    pending: "Nothing waiting for approval.",
+                    past: "No past bookings.",
+                    cancelled: "No cancelled bookings.",
+                  }[tab]
+                }
               </TableCell>
             </TableRow>
           )}

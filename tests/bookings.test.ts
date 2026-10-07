@@ -43,6 +43,7 @@ function fakeClient(opts: { contactId: string | null; updated?: boolean }) {
   const bookingsQuery = {
     select: () => bookingsQuery,
     eq: (c: string, v: unknown) => (filters.push(`eq ${c}=${v}`), bookingsQuery),
+    in: (c: string, v: unknown[]) => (filters.push(`in ${c}=${v.join(",")}`), bookingsQuery),
     gt: () => bookingsQuery,
     order: () => bookingsQuery,
     or: (expr: string) => (filters.push(`or ${expr}`), bookingsQuery),
@@ -65,6 +66,7 @@ function fakeClient(opts: { contactId: string | null; updated?: boolean }) {
         update: () => {
           const u = {
             eq: () => u,
+            in: () => u,
             select: () => u,
             maybeSingle: async () => ({ data: opts.updated ? { id: "b1" } : null, error: null }),
           };
@@ -90,10 +92,10 @@ describe("listManageableBookings", () => {
     expect(filters).toContain("or conversation_id.eq.conv,contact_id.eq.contact-1");
   });
 
-  it("always filters by tenant and active bookings", async () => {
+  it("always filters by tenant and active (confirmed or awaiting approval) bookings", async () => {
     const { client, filters } = fakeClient({ contactId: null });
     await listManageableBookings(client, { tenantId: "t", conversationId: "conv", channel: "web" });
-    expect(filters).toEqual(expect.arrayContaining(["eq tenant_id=t", "eq status=confirmed"]));
+    expect(filters).toEqual(expect.arrayContaining(["eq tenant_id=t", "in status=confirmed,pending"]));
   });
 });
 

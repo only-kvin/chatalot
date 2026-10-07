@@ -25,7 +25,7 @@ type WidgetSettings = {
   whatsapp_link: string;
 };
 
-function CopySnippetButton({ snippet }: { snippet: string }) {
+export function CopySnippetButton({ snippet }: { snippet: string }) {
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {

@@ -1,0 +1,80 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createBooking, type BookingFailure, type CreatedBooking } from "@/lib/bookings/create";
+import { upsertContact } from "@/lib/contacts/upsert";
+import { emailCustomerAboutBooking } from "@/lib/email/customer-booking";
+import { notifyOwnerOfBooking } from "@/lib/email/notify-booking";
+import { formatLocalDateTime } from "@/lib/time";
+import type { Answers } from "./fields";
+
+// A booking made by a customer through a website widget. The answers have
+// already been validated against the business's stored form fields. The
+// customer ticked the consent box, so their details are saved as a contact.
+
+export async function bookFromWidget(
+  admin: SupabaseClient,
+  b: {
+    tenantId: string;
+    serviceId: string;
+    staffId: string | null;
+    date: string;
+    time: string;
+    answers: Answers;
+    idempotencyKey: string;
+    widget: "schedule";
+  },
+): Promise<CreatedBooking | BookingFailure> {
+  const { answers } = b;
+  const contactId = await upsertContact(admin, {
+    tenantId: b.tenantId,
+    name: answers.name,
+    phone: answers.phone,
+    email: answers.email,
+    nameSource: "customer",
+    channel: "web",
+    consent: true,
+  }).catch((err) => {
+    console.error("Saving the widget customer failed:", err);
+    return null;
+  });
+
+  const booked = await createBooking(admin, {
+    tenantId: b.tenantId,
+    serviceId: b.serviceId,
+    staffId: b.staffId,
+    date: b.date,
+    time: b.time,
+    customer: { name: answers.name, phone: answers.phone, email: answers.email, contactId },
+    conversationId: null,
+    source: "widget",
+    notes: answers.notes,
+    details: answers.details,
+    idempotencyKey: b.idempotencyKey,
+    lead: { source: `${b.widget}_widget`, summary: `Booked on the website for ${b.date} at ${b.time}` },
+    actor: "customer",
+    channel: "web",
+  });
+  if (!booked.ok || booked.repeat) return booked;
+
+  const [{ data: config }, { data: staff }] = await Promise.all([
+    admin.from("agent_configs").select("business_name").eq("tenant_id", b.tenantId).maybeSingle(),
+    booked.staffId
+      ? admin.from("staff").select("name").eq("tenant_id", b.tenantId).eq("id", booked.staffId).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const pending = booked.status === "pending";
+  await Promise.all([
+    notifyOwnerOfBooking(admin, b.tenantId, config?.business_name ?? "", {
+      name: answers.name,
+      phone: answers.phone,
+      email: answers.email,
+      serviceName: booked.serviceName,
+      startsAtLabel: formatLocalDateTime(booked.startsAt),
+      staffName: staff?.name ?? null,
+      viaWidget: true,
+      pending,
+      bookingId: booked.bookingId,
+    }),
+    emailCustomerAboutBooking(admin, b.tenantId, booked.bookingId, pending ? "requested" : "confirmed"),
+  ]);
+  return booked;
+}

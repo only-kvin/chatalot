@@ -32,7 +32,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard/services", label: "Services", icon: BriefcaseIcon },
   { href: "/dashboard/staff", label: "Staff", icon: UserRoundCogIcon },
   { href: "/dashboard/availability", label: "Availability", icon: ClockIcon },
-  { href: "/dashboard/widget", label: "Widget", icon: MessageCircleIcon },
+  { href: "/dashboard/widget", label: "Widgets", icon: MessageCircleIcon },
   { href: "/dashboard/settings", label: "Settings", icon: SettingsIcon },
 ];
 

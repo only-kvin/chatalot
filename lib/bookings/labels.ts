@@ -4,9 +4,10 @@ import { NOT_SENT_REASON, type NotSentReason } from "./reminders";
 // Human wording for the booking history and status badges. Pure, so both
 // server pages and tests use it.
 
-export type BookingStatus = "confirmed" | "cancelled" | "completed" | "no_show";
+export type BookingStatus = "pending" | "confirmed" | "cancelled" | "completed" | "no_show";
 
 export const STATUS_LABEL: Record<BookingStatus, string> = {
+  pending: "Awaiting approval",
   confirmed: "Confirmed",
   cancelled: "Cancelled",
   completed: "Attended",
@@ -16,6 +17,7 @@ export const STATUS_LABEL: Record<BookingStatus, string> = {
 export function statusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
   if (status === "cancelled" || status === "no_show") return "destructive";
   if (status === "completed") return "secondary";
+  if (status === "pending") return "outline";
   return "default";
 }
 
@@ -23,6 +25,7 @@ export const SOURCE_LABEL: Record<string, string> = {
   web: "Website chat",
   whatsapp: "WhatsApp",
   team: "Your team",
+  widget: "Website booking",
 };
 
 export { formatShortLocal } from "@/lib/time";
@@ -45,6 +48,7 @@ export type BookingEvent = {
 function who(e: BookingEvent, currentUserId: string | null): string {
   if (e.actor === "team") return e.created_by && e.created_by === currentUserId ? "you" : "your team";
   if (e.actor === "system") return "ChatAlot";
+  if (e.actor === "customer") return e.channel === "web" ? "the customer on your website" : "the customer";
   const via = e.channel === "whatsapp" ? "on WhatsApp" : e.channel === "web" ? "in the website chat" : "";
   return `the customer ${via}`.trim();
 }
@@ -78,6 +82,10 @@ export function describeEvent(
       return `Marked attended by ${who(e, currentUserId)}`;
     case "no_show":
       return `Marked no-show by ${who(e, currentUserId)}`;
+    case "approved":
+      return `Approved by ${who(e, currentUserId)}`;
+    case "declined":
+      return `Declined by ${who(e, currentUserId)}${typeof d.reason === "string" && d.reason ? `: "${d.reason}"` : ""}`;
     case "reopened":
       return `Set back to confirmed by ${who(e, currentUserId)}`;
     case "reminder_sent":

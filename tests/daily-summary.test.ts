@@ -15,6 +15,7 @@ function data(overrides: Partial<DailySummaryData> = {}): DailySummaryData {
     today: [],
     waitingChats: 0,
     newLeads: 0,
+    pendingBookings: 0,
     unmarkedBookings: 0,
     yesterday: { leads: 0, bookingsMade: 0, cancelled: 0, attended: 0, noShows: 0, conversations: 0, ratings: [] },
     ...overrides,

@@ -26,6 +26,7 @@ export type DailySummaryData = {
   today: SummaryBooking[];
   waitingChats: number;
   newLeads: number;
+  pendingBookings: number;
   unmarkedBookings: number;
   yesterday: {
     leads: number;
@@ -77,6 +78,7 @@ export function buildDailySummary(d: DailySummaryData): OwnerEmail | null {
   const attentionLines = [
     d.waitingChats && `${plural(d.waitingChats, "chat")} waiting for a person to reply`,
     d.newLeads && `${plural(d.newLeads, "new lead")} not contacted yet`,
+    d.pendingBookings && `${plural(d.pendingBookings, "booking")} waiting for your approval`,
     d.unmarkedBookings &&
       `${plural(d.unmarkedBookings, "past booking")} not marked Attended or No-show. ` +
         `Mark them so customers who came get a review request`,
@@ -143,6 +145,7 @@ export async function loadDailySummaryData(
     todayResult,
     waitingChats,
     newLeads,
+    pendingBookings,
     unmarkedBookings,
     leads,
     bookingsMade,
@@ -161,6 +164,14 @@ export async function loadDailySummaryData(
       .lt("starts_at", days.tomorrowStart),
     count(admin.from("conversations").select("id", head).eq("tenant_id", tenantId).eq("status", "human")),
     count(admin.from("leads").select("id", head).eq("tenant_id", tenantId).eq("status", "new")),
+    count(
+      admin
+        .from("bookings")
+        .select("id", head)
+        .eq("tenant_id", tenantId)
+        .eq("status", "pending")
+        .gte("starts_at", days.todayStart),
+    ),
     count(
       admin
         .from("bookings")
@@ -232,6 +243,7 @@ export async function loadDailySummaryData(
     })),
     waitingChats,
     newLeads,
+    pendingBookings,
     unmarkedBookings,
     yesterday: {
       leads,

@@ -43,6 +43,9 @@ export type CreatedBooking = {
   serviceName: string;
   staffId: string | null;
   startsAt: string;
+  endsAt: string;
+  // pending = waiting for the business to approve it.
+  status: "confirmed" | "pending";
   // An earlier request with the same idempotency key made it.
   repeat: boolean;
 };
@@ -59,7 +62,7 @@ type RpcResult = { ok: true; booking_id: string; repeat: boolean } | { ok: false
 async function findByIdempotencyKey(admin: SupabaseClient, tenantId: string, key: string) {
   const { data } = await admin
     .from("bookings")
-    .select("id, staff_id, starts_at, services(name)")
+    .select("id, staff_id, starts_at, ends_at, status, services(name)")
     .eq("tenant_id", tenantId)
     .eq("idempotency_key", key)
     .maybeSingle();
@@ -82,6 +85,8 @@ export async function createBooking(
         serviceName: (existing.services as unknown as { name: string } | null)?.name ?? "Booking",
         staffId: existing.staff_id,
         startsAt: existing.starts_at,
+        endsAt: existing.ends_at,
+        status: existing.status === "pending" ? "pending" : "confirmed",
         repeat: true,
       };
     }
@@ -100,6 +105,17 @@ export async function createBooking(
   if (!slot || slot.staffIds.length === 0) return { ok: false, reason: "unavailable" };
 
   const startsAt = localToUtcDate(input.date, input.time).toISOString();
+  // Customers' bookings wait for approval when the business wants that;
+  // the team's own bookings never do.
+  let status: CreatedBooking["status"] = "confirmed";
+  if (!input.forTeam) {
+    const { data: config } = await client
+      .from("agent_configs")
+      .select("bookings_need_approval")
+      .eq("tenant_id", input.tenantId)
+      .maybeSingle();
+    if (config?.bookings_need_approval) status = "pending";
+  }
   // With "anyone", try each free person in turn: if the first was just
   // taken, the next may still be free.
   let lastReason: BookingFailure["reason"] = "slot_taken";
@@ -123,6 +139,7 @@ export async function createBooking(
       p_actor: input.actor,
       p_channel: input.channel,
       p_created_by: input.createdBy ?? null,
+      p_status: status,
     });
     if (error) {
       console.error(`Creating a booking for tenant ${input.tenantId} failed:`, error);
@@ -137,6 +154,8 @@ export async function createBooking(
         serviceName: availability.service.name,
         staffId,
         startsAt,
+        endsAt: new Date(new Date(startsAt).getTime() + availability.service.durationMinutes * 60_000).toISOString(),
+        status,
         repeat: result.repeat,
       };
     }

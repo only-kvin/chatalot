@@ -26,7 +26,7 @@ export default async function AvailabilityPage() {
       .gte("date", todayLocalISO()),
     supabase
       .from("agent_configs")
-      .select("booking_lead_time_minutes, booking_horizon_days, slot_minutes, booking_change_cutoff_minutes")
+      .select("booking_lead_time_minutes, booking_horizon_days, slot_minutes, booking_change_cutoff_minutes, bookings_need_approval")
       .eq("tenant_id", tenantId)
       .single(),
   ]);
@@ -72,6 +72,7 @@ export default async function AvailabilityPage() {
               booking_horizon_days: config?.booking_horizon_days ?? 60,
               slot_minutes: config?.slot_minutes ?? 15,
               booking_change_cutoff_minutes: config?.booking_change_cutoff_minutes ?? 120,
+              bookings_need_approval: config?.bookings_need_approval ?? false,
             }}
           />
         </CardContent>

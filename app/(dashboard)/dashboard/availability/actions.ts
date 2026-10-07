@@ -39,6 +39,7 @@ const rulesSchema = z.object({
   booking_horizon_days: z.coerce.number().int().min(1).max(365),
   slot_minutes: z.coerce.number().int().refine((v) => [15, 30, 60].includes(v), "Pick 15, 30 or 60 minutes"),
   booking_change_cutoff_minutes: z.coerce.number().int().min(0).max(10080),
+  bookings_need_approval: z.boolean(),
 });
 
 const uuid = z.string().uuid();
@@ -156,6 +157,8 @@ export async function updateBookingRulesAction(formData: FormData): Promise<Resu
     booking_horizon_days: formData.get("booking_horizon_days"),
     slot_minutes: formData.get("slot_minutes"),
     booking_change_cutoff_minutes: formData.get("booking_change_cutoff_minutes"),
+    // An unticked checkbox isn't submitted at all.
+    bookings_need_approval: formData.get("bookings_need_approval") === "on",
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
 

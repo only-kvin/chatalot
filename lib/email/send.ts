@@ -83,3 +83,32 @@ export async function sendOwnerEmail(
     console.error(`Owner email "${email.subject}" failed:`, err);
   }
 }
+
+export type CustomerEmail = {
+  to: string;
+  subject: string;
+  html: string;
+  attachments?: { filename: string; content: string; contentType?: string }[];
+};
+
+// Emails a customer (booking confirmations and changes). Best-effort like
+// owner emails. Until a sending domain is verified in Resend this only
+// delivers to the Resend account's own address (see docs/SETUP.md).
+export async function sendCustomerEmail(email: CustomerEmail): Promise<void> {
+  try {
+    const { error } = await getResend().emails.send({
+      from: FROM,
+      to: email.to,
+      subject: email.subject,
+      html: email.html,
+      attachments: email.attachments?.map((a) => ({
+        filename: a.filename,
+        content: Buffer.from(a.content, "utf8"),
+        contentType: a.contentType,
+      })),
+    });
+    if (error) console.error(`Customer email "${email.subject}" failed:`, error);
+  } catch (err) {
+    console.error(`Customer email "${email.subject}" failed:`, err);
+  }
+}

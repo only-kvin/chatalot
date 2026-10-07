@@ -169,3 +169,17 @@ Manual steps the platform owner needs to do. Kept up to date as new phases add n
 - **Bookings**: a Staff column and filter once staff exist (including "Not assigned"), and on an upcoming booking a "Staff member" picker to give it to someone else at the same time. That person must be working and free then. The customer isn't messaged; the history records it.
 
 **Worth knowing:** a staff member's own hours *replace* the opening hours for them, so someone with Monday hours can be booked on a Monday even if the business is otherwise closed. Closures on the Availability page still close everyone.
+
+## Widget suite, Phase C1: schedule widget server side (2026-10-07)
+
+**Manual steps:**
+
+1. **Migration** `schedule_widget` is already applied to the dev project (push it to any other database before deploying).
+2. **Customer emails need a verified sending domain.** Booking confirmations, approvals, declines and cancellations now go to *customers* (when they give an email). Resend's shared sender (`onboarding@resend.dev`) only delivers to your own Resend account's address, so until a domain is verified customers receive nothing (owners' emails are unaffected). To fix: Resend → Domains → add e.g. `chatalot.co.za`, add the DNS records it shows (SPF, DKIM, optionally DMARC) at your DNS host, wait for "Verified", then change `FROM` in `lib/email/send.ts` to e.g. `ChatAlot <bookings@chatalot.co.za>`.
+
+**What's new:**
+
+- **Public widget API** (`/api/widget/config?widget=schedule`, `/api/public/services`, `/api/public/availability`, `/api/public/appointments`), all behind the business's widget key and allowed-domains check, rate-limited per IP and per key (`lib/security/rate-limit.ts`), with a hidden spam-trap field and a minimum fill time on bookings. Answers are validated against the business's *stored* form fields (`lib/widgets/fields.ts`), never a field list from the browser.
+- **Booking approval** (Availability → Booking rules → "I approve bookings before they're confirmed"): bookings from the website and the AI arrive as *Awaiting approval*, holding their time; the owner gets a "Booking to approve" alert, and approves or declines on the booking (Bookings → To approve). The customer is emailed either way. The daily summary lists them.
+- **Customer emails** (`lib/email/customer-booking.ts`) with the reference, an attached calendar file (`.ics`) and a **manage link** (`/b/<signed token>`, signed with a key derived from `ENCRYPTION_KEY`, valid until a month after the appointment) where the customer can cancel, within the business's change cutoff.
+- **Dashboard → Widgets → Schedule**: the shared look (colours, roundness, font, light/dark), the schedule widget's wording, "let customers choose staff", the booking-form builder (name and mobile always; email, notes and custom questions optional) and the install snippet. The widget itself arrives in Phase C2.

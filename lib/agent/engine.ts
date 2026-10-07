@@ -10,6 +10,7 @@ import { formatLocalDate, formatLocalDateTime } from "@/lib/time";
 import { notifyOwnerOfLead } from "@/lib/email/notify-lead";
 import { notifyOwnerHumanRequested } from "@/lib/email/notify-human-requested";
 import { notifyOwnerOfBooking } from "@/lib/email/notify-booking";
+import { emailCustomerAboutBooking } from "@/lib/email/customer-booking";
 import { linkConversation, upsertContact } from "@/lib/contacts/upsert";
 import {
   cancelBooking,
@@ -257,14 +258,19 @@ async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall: ToolCa
     return toolFailed(call.name, booked.reason);
   }
   const when = formatLocalDateTime(booked.startsAt);
+  const pending = booked.status === "pending";
   await notifyOwnerOfBooking(
     admin,
     tenantId,
     businessName,
-    { name, phone, email, serviceName: resolved.name, startsAtLabel: when },
+    { name, phone, email, serviceName: resolved.name, startsAtLabel: when, pending, bookingId: booked.bookingId },
     conversationId,
   );
+  if (!booked.repeat) await emailCustomerAboutBooking(admin, tenantId, booked.bookingId, pending ? "requested" : "confirmed");
 
+  if (pending) {
+    return `Booking requested (not yet confirmed): ${resolved.name} on ${when} (reference ${booked.ref}). The business approves bookings first and will confirm soon; the time is held meanwhile. Tell the visitor exactly this, and don't call it confirmed.`;
+  }
   return `Booking confirmed: ${resolved.name} on ${when} (reference ${booked.ref}). Tell the visitor exactly this date and time.`;
 }
 

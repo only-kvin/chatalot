@@ -55,3 +55,34 @@ export async function checkDailyTenantCap(
 
   return { allowed: (count ?? 0) < cap };
 }
+
+// Public booking widgets. Reads (services, availability) are cheap and
+// frequent: a customer flicking through weeks. Bookings are rare per person,
+// and each one emails the owner, so they're limited much harder.
+const widgetReadLimiter = new Ratelimit({
+  redis,
+  prefix: "ratelimit:widget-read",
+  limiter: Ratelimit.slidingWindow(120, "10 m"),
+});
+const widgetBookingIpLimiter = new Ratelimit({
+  redis,
+  prefix: "ratelimit:widget-book-ip",
+  limiter: Ratelimit.slidingWindow(5, "10 m"),
+});
+const widgetBookingKeyLimiter = new Ratelimit({
+  redis,
+  prefix: "ratelimit:widget-book-key",
+  limiter: Ratelimit.slidingWindow(60, "1 h"),
+});
+
+export async function checkWidgetReadLimit(ip: string): Promise<boolean> {
+  return (await widgetReadLimiter.limit(ip)).success;
+}
+
+export async function checkWidgetBookingLimit(ip: string, publicKey: string): Promise<boolean> {
+  const [ipResult, keyResult] = await Promise.all([
+    widgetBookingIpLimiter.limit(ip),
+    widgetBookingKeyLimiter.limit(publicKey),
+  ]);
+  return ipResult.success && keyResult.success;
+}

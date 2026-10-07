@@ -7,7 +7,8 @@ import { getAvailability } from "./availability";
 // scopes every read and write to their tenant). Every change is logged to
 // booking_events so the owner can see who changed what, and when.
 
-export type BookingActor = "ai" | "team" | "system";
+// customer = the customer themselves (a booking widget, their email link).
+export type BookingActor = "ai" | "team" | "system" | "customer";
 export type BookingEventChannel = "web" | "whatsapp" | "dashboard";
 export type BookingEventType =
   | "created"
@@ -16,6 +17,8 @@ export type BookingEventType =
   | "attended"
   | "no_show"
   | "reopened"
+  | "approved"
+  | "declined"
   | "reminder_sent"
   | "reminder_not_sent"
   | "review_requested"
@@ -35,6 +38,9 @@ export type BookingSummary = {
 };
 
 type Actor = { actor: BookingActor; channel: BookingEventChannel; createdBy?: string | null };
+
+// Upcoming bookings that still hold their slot and can be changed.
+export const ACTIVE_STATUSES = ["confirmed", "pending"];
 
 export function bookingRef(id: string): string {
   return id.slice(0, 8).toUpperCase();
@@ -83,7 +89,7 @@ export async function listManageableBookings(
     .from("bookings")
     .select("id, service_id, starts_at, status, name, services(name)")
     .eq("tenant_id", s.tenantId)
-    .eq("status", "confirmed")
+    .in("status", ACTIVE_STATUSES)
     .gt("starts_at", new Date().toISOString())
     .order("starts_at");
   query = contactId
@@ -121,7 +127,7 @@ export async function cancelBooking(
     .update({ status: "cancelled", updated_at: new Date().toISOString() })
     .eq("id", c.bookingId)
     .eq("tenant_id", c.tenantId)
-    .eq("status", "confirmed")
+    .in("status", ACTIVE_STATUSES)
     .select("id")
     .maybeSingle();
   if (error) {
@@ -148,7 +154,7 @@ export async function rescheduleBooking(
     .eq("id", r.bookingId)
     .eq("tenant_id", r.tenantId)
     .maybeSingle();
-  if (!booking || booking.status !== "confirmed") {
+  if (!booking || !ACTIVE_STATUSES.includes(booking.status)) {
     return { ok: false, error: "That booking isn't active any more." };
   }
 
@@ -206,7 +212,7 @@ export async function assignStaff(
     .eq("id", a.bookingId)
     .eq("tenant_id", a.tenantId)
     .maybeSingle();
-  if (!booking || booking.status !== "confirmed") return { ok: false, error: "That booking isn't active any more." };
+  if (!booking || !ACTIVE_STATUSES.includes(booking.status)) return { ok: false, error: "That booking isn't active any more." };
   if (booking.staff_id === a.staffId) return { ok: true };
 
   const date = localDateISO(new Date(booking.starts_at));
@@ -244,5 +250,33 @@ export async function assignStaff(
   if (!result.ok) {
     return { ok: false, error: result.reason === "slot_taken" ? "They were just booked at that time." : "That booking isn't active any more." };
   }
+  return { ok: true };
+}
+
+// The owner's answer to a booking waiting for approval. Declining cancels
+// it, freeing the slot. Only acts on a booking that's still pending.
+export async function decidePendingBooking(
+  client: SupabaseClient,
+  d: Actor & { tenantId: string; bookingId: string; approve: boolean; reason?: string | null },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { data, error } = await client
+    .from("bookings")
+    .update({ status: d.approve ? "confirmed" : "cancelled", updated_at: new Date().toISOString() })
+    .eq("id", d.bookingId)
+    .eq("tenant_id", d.tenantId)
+    .eq("status", "pending")
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error(`Deciding on booking ${d.bookingId} failed:`, error);
+    return { ok: false, error: "The booking couldn't be updated due to a technical problem." };
+  }
+  if (!data) return { ok: false, error: "That booking isn't waiting for approval any more." };
+
+  await logBookingEvent(client, {
+    ...d,
+    type: d.approve ? "approved" : "declined",
+    details: !d.approve && d.reason ? { reason: d.reason } : {},
+  });
   return { ok: true };
 }
