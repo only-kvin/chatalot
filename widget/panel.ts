@@ -10,6 +10,8 @@ export type WidgetConfig = {
   teaserText: string | null;
   quickReplies: string[];
   whatsappLink: string | null;
+  // Website AI is on. Older API responses lack it; treat those as on.
+  aiOnline?: boolean;
 };
 
 export type WidgetApi = {
@@ -87,11 +89,15 @@ export function createWidget(
   who.className = "who";
   const title = document.createElement("strong");
   title.textContent = config.businessName;
-  const status = document.createElement("span");
-  const live = document.createElement("i");
-  live.className = "live";
-  status.append(live, "Online · replies instantly");
-  who.append(title, status);
+  who.append(title);
+  // Only promise instant replies while the AI is actually answering.
+  if (config.aiOnline !== false) {
+    const status = document.createElement("span");
+    const live = document.createElement("i");
+    live.className = "live";
+    status.append(live, "Online · replies instantly");
+    who.append(status);
+  }
   header.appendChild(who);
   const closeBtn = document.createElement("button");
   closeBtn.className = "close-btn";

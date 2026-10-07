@@ -48,7 +48,7 @@ export async function GET(request: Request) {
       .select("primary_color, position, avatar_url, launcher_text, teaser_text, quick_replies, whatsapp_link")
       .eq("tenant_id", tenantId)
       .single(),
-    admin.from("agent_configs").select("business_name, greeting").eq("tenant_id", tenantId).single(),
+    admin.from("agent_configs").select("business_name, greeting, web_ai_enabled").eq("tenant_id", tenantId).single(),
   ]);
 
   return NextResponse.json(
@@ -62,6 +62,8 @@ export async function GET(request: Request) {
       teaserText: widgetSettings?.teaser_text ?? null,
       quickReplies: widgetSettings?.quick_replies ?? [],
       whatsappLink: widgetSettings?.whatsapp_link ?? null,
+      // False when the owner paused website AI: the header drops "Online".
+      aiOnline: agentConfig?.web_ai_enabled !== false,
     },
     { headers },
   );
