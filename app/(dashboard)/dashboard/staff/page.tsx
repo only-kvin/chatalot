@@ -35,7 +35,7 @@ export default async function StaffPage() {
   });
 
   return (
-    <div className="mx-auto max-w-3xl p-8">
+    <div className="mx-auto max-w-3xl px-4 py-6 sm:p-8">
       <PageHeader
         title="Staff"
         description="The people customers can book. Without any staff, the business takes one booking at a time."

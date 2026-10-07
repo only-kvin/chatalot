@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 
 type Mode = "idle" | "reschedule" | "cancel" | "decline";
 
@@ -70,8 +71,8 @@ export function BookingActions({
   }
 
   const notifyToggle = (
-    <label className="flex items-center gap-2 text-sm">
-      <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
+    <label className="flex items-center gap-3 text-sm">
+      <Switch checked={notify} onChange={(e) => setNotify(e.target.checked)} />
       {canMessageOnWhatsApp
         ? "Tell the customer on WhatsApp (if they messaged in the last 24 hours)"
         : "Remind me to tell the customer"}

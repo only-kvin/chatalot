@@ -48,7 +48,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
   if (tab !== "chat") {
     const [theme, instance] = await Promise.all([loadWidgetTheme(supabase, tenantId), loadWidget(supabase, tenantId, tab)]);
     return (
-      <div className="mx-auto max-w-6xl p-8">
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:p-8">
         <PageHeader title="Widgets" description="What customers see on your website." />
         {nav}
         <div className="flex flex-col gap-8">
@@ -77,7 +77,7 @@ ${script}`} />
     .single();
 
   return (
-    <div className="mx-auto max-w-5xl p-8">
+    <div className="mx-auto max-w-5xl px-4 py-6 sm:p-8">
       <PageHeader title="Widgets" description="What customers see on your website." />
       {nav}
       <WidgetEditor

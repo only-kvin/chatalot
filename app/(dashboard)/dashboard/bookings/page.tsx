@@ -97,7 +97,7 @@ export default async function BookingsPage({
   }
 
   return (
-    <div className="mx-auto max-w-6xl p-8">
+    <div className="mx-auto max-w-6xl px-4 py-6 sm:p-8">
       <PageHeader title="Bookings" description="Every booking, how it was made, and every change since." />
 
       <nav className="mb-4 flex gap-1 border-b" aria-label="Booking views">

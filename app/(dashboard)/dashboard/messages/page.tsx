@@ -31,7 +31,7 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
   const { data: messages } = await query;
 
   return (
-    <div className="mx-auto max-w-5xl p-8">
+    <div className="mx-auto max-w-5xl px-4 py-6 sm:p-8">
       <PageHeader title="Messages" description="What people sent through the contact form on your website." />
       <nav className="mb-4 flex gap-1 border-b" aria-label="Message views">
         {TABS.map((t) => (

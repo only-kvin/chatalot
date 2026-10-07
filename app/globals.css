@@ -7,9 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -50,72 +50,119 @@
 
 :root {
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  /* Overshoots slightly — for knobs and pills that should land with a little bounce. */
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --background: oklch(0.955 0.004 286);
+  --foreground: oklch(0.21 0.006 286);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.21 0.006 286);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.21 0.006 286);
+  --primary: oklch(0.511 0.262 277);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.955 0.006 286);
+  --secondary-foreground: oklch(0.25 0.006 286);
+  --muted: oklch(0.955 0.005 286);
+  --muted-foreground: oklch(0.5 0.012 286);
+  --accent: oklch(0.95 0.025 277);
+  --accent-foreground: oklch(0.36 0.17 277);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --border: oklch(0.915 0.005 286);
+  --input: oklch(0.89 0.006 286);
+  --ring: oklch(0.6 0.2 277);
+  --chart-1: oklch(0.585 0.233 277);
+  --chart-2: oklch(0.6 0.118 184.7);
+  --chart-3: oklch(0.656 0.241 354.3);
+  --chart-4: oklch(0.705 0.187 47.6);
+  --chart-5: oklch(0.723 0.219 149.6);
+  --radius: 0.75rem;
+  --sidebar: oklch(1 0 0 / 55%);
+  --sidebar-foreground: oklch(0.21 0.006 286);
+  --sidebar-primary: oklch(0.511 0.262 277);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(1 0 0);
+  --sidebar-accent-foreground: oklch(0.21 0.006 286);
+  --sidebar-border: oklch(0.21 0.006 286 / 6%);
+  --sidebar-ring: oklch(0.6 0.2 277);
+
+  /* Depth: layered shadows that make cards read as raised objects. */
+  --surface-highlight: oklch(1 0 0);
+  --surface-shadow: oklch(0.2 0.02 286 / 12%);
+  --surface-shadow-strong: oklch(0.2 0.02 286 / 18%);
+  --surface-glow: oklch(0.51 0.26 277 / 16%);
+  --surface-glow-strong: oklch(0.51 0.26 277 / 30%);
+  --backdrop-glow-1: oklch(0.62 0.2 277 / 14%);
+  --backdrop-glow-2: oklch(0.72 0.19 150 / 8%);
+  --skeleton: oklch(0.93 0.005 286);
+  --skeleton-shine: oklch(1 0 0 / 70%);
+  --switch-off: oklch(0.88 0.006 286);
+
+  /* Tinted status pills (see components/ui/badge.tsx). */
+  --tone-success-bg: oklch(0.97 0.03 155);
+  --tone-success-fg: oklch(0.45 0.11 155);
+  --tone-warning-bg: oklch(0.97 0.035 70);
+  --tone-warning-fg: oklch(0.47 0.14 45);
+  --tone-info-bg: oklch(0.95 0.03 277);
+  --tone-info-fg: oklch(0.4 0.18 277);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --background: oklch(0.13 0.005 286);
+  --foreground: oklch(0.97 0.002 286);
+  --card: oklch(0.205 0.006 286);
+  --card-foreground: oklch(0.97 0.002 286);
+  --popover: oklch(0.225 0.006 286);
+  --popover-foreground: oklch(0.97 0.002 286);
+  --primary: oklch(0.585 0.233 277);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.27 0.006 286);
+  --secondary-foreground: oklch(0.97 0.002 286);
+  --muted: oklch(0.255 0.006 286);
+  --muted-foreground: oklch(0.72 0.01 286);
+  --accent: oklch(0.3 0.06 277);
+  --accent-foreground: oklch(0.87 0.06 277);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 13%);
+  --ring: oklch(0.68 0.16 277);
+  --chart-1: oklch(0.73 0.15 277);
+  --chart-2: oklch(0.78 0.12 182);
+  --chart-3: oklch(0.82 0.11 346);
+  --chart-4: oklch(0.84 0.11 58);
+  --chart-5: oklch(0.8 0.15 152);
+  --sidebar: oklch(0.17 0.006 286 / 70%);
+  --sidebar-foreground: oklch(0.97 0.002 286);
+  --sidebar-primary: oklch(0.68 0.16 277);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.27 0.006 286);
+  --sidebar-accent-foreground: oklch(0.97 0.002 286);
+  --sidebar-border: oklch(1 0 0 / 7%);
+  --sidebar-ring: oklch(0.68 0.16 277);
+
+  --surface-highlight: oklch(1 0 0 / 6%);
+  --surface-shadow: oklch(0 0 0 / 50%);
+  --surface-shadow-strong: oklch(0 0 0 / 65%);
+  --surface-glow: oklch(0.58 0.23 277 / 16%);
+  --surface-glow-strong: oklch(0.58 0.23 277 / 34%);
+  --backdrop-glow-1: oklch(0.58 0.23 277 / 22%);
+  --backdrop-glow-2: oklch(0.72 0.19 150 / 7%);
+  --skeleton: oklch(0.25 0.006 286);
+  --skeleton-shine: oklch(1 0 0 / 6%);
+  --switch-off: oklch(0.36 0.008 286);
+
+  --tone-success-bg: oklch(0.72 0.19 150 / 16%);
+  --tone-success-fg: oklch(0.87 0.13 155);
+  --tone-warning-bg: oklch(0.75 0.18 55 / 16%);
+  --tone-warning-fg: oklch(0.84 0.11 60);
+  --tone-info-bg: oklch(0.58 0.23 277 / 20%);
+  --tone-info-fg: oklch(0.87 0.06 277);
+
+  /* Pages use zinc greys for secondary text; lift them so they stay readable
+     on the dark cards instead of rewriting every page. */
+  --color-zinc-400: oklch(0.66 0.012 286);
+  --color-zinc-500: oklch(0.72 0.01 286);
+  --color-zinc-600: oklch(0.78 0.008 286);
+  color-scheme: dark;
 }
 
 @layer base {
@@ -124,6 +171,10 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: var(--primary);
   }
   html {
     @apply font-sans;
@@ -177,4 +228,209 @@
     animation-name: fade-in;
     animation-duration: 120ms;
   }
+}
+
+/* -------------------------------------------------------------------------
+   Premium surfaces, skeletons, switch and theme transition.
+   ------------------------------------------------------------------------- */
+@layer components {
+  /* Soft colour glows behind the dashboard. */
+  .app-backdrop {
+    background:
+      radial-gradient(1200px 600px at 85% -10%, var(--backdrop-glow-1), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, var(--backdrop-glow-2), transparent 60%),
+      var(--background);
+  }
+
+  /* A raised card: top highlight + close shadow + far tinted shadow. */
+  .surface {
+    background: linear-gradient(180deg, var(--card) 0%, color-mix(in oklch, var(--card), var(--background) 12%) 100%);
+    border: 1px solid var(--border);
+    box-shadow:
+      0 1px 0 var(--surface-highlight) inset,
+      0 1px 2px oklch(0.2 0.02 286 / 4%),
+      0 8px 24px -12px var(--surface-shadow),
+      0 24px 48px -32px var(--surface-glow);
+  }
+
+  /* Hover lifts the card and tips it toward the viewer; press settles it. */
+  .surface-lift {
+    transition:
+      transform 350ms var(--ease-out),
+      box-shadow 350ms var(--ease-out);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .surface-lift:hover {
+      transform: translateY(-4px) perspective(900px) rotateX(1.5deg);
+      box-shadow:
+        0 1px 0 var(--surface-highlight) inset,
+        0 2px 4px oklch(0.2 0.02 286 / 5%),
+        0 18px 36px -14px var(--surface-shadow-strong),
+        0 36px 64px -36px var(--surface-glow-strong);
+    }
+  }
+  .surface-lift:active {
+    transform: translateY(-1px) scale(0.995);
+    transition-duration: 120ms;
+  }
+
+  /* Glossy coloured icon tile, used on cards and in the overview. */
+  .icon-tile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    box-shadow:
+      0 1px 0 oklch(1 0 0 / 40%) inset,
+      0 6px 14px -6px var(--tile-glow, oklch(0.51 0.26 277 / 55%));
+  }
+
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    background: var(--skeleton);
+    border-radius: 0.5rem;
+  }
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, var(--skeleton-shine), transparent);
+    animation: shimmer 1.4s ease-in-out infinite;
+  }
+
+  /* iOS-style switch on a native checkbox, so it still works in plain forms. */
+  .switch {
+    appearance: none;
+    position: relative;
+    flex-shrink: 0;
+    width: 2.75rem;
+    height: 1.625rem;
+    border-radius: 9999px;
+    background: var(--switch-off);
+    box-shadow: inset 0 1px 2px oklch(0 0 0 / 12%);
+    cursor: pointer;
+    transition: background-color 250ms ease;
+  }
+  .switch::before {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 1.375rem;
+    height: 1.375rem;
+    border-radius: 9999px;
+    background: white;
+    box-shadow:
+      0 3px 8px oklch(0 0 0 / 15%),
+      0 1px 1px oklch(0 0 0 / 16%);
+    transition:
+      transform 320ms var(--ease-spring),
+      width 180ms ease;
+  }
+  .switch:active::before {
+    width: 1.625rem;
+  }
+  .switch:checked {
+    background: oklch(0.72 0.19 150);
+  }
+  .switch:checked::before {
+    transform: translateX(1.125rem);
+  }
+  .switch:checked:active::before {
+    transform: translateX(0.875rem);
+  }
+  .switch:focus-visible {
+    outline: 3px solid color-mix(in oklch, var(--ring), transparent 50%);
+    outline-offset: 2px;
+  }
+  .switch:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  /* Staggered entrance for cards and rows; set --i on each item. */
+  .rise-in {
+    animation: page-enter 450ms var(--ease-out) both;
+    animation-delay: calc(var(--i, 0) * 50ms);
+  }
+
+  .live-dot {
+    position: relative;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background: oklch(0.72 0.19 150);
+  }
+  .live-dot::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 9999px;
+    border: 2px solid oklch(0.72 0.19 150);
+    opacity: 0;
+    animation: ping-ring 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+}
+
+@keyframes shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes ping-ring {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+/* Added to <html> for a moment while the theme switches, so colours fade
+   instead of snapping (see lib/theme.ts). */
+.theme-transition,
+.theme-transition *,
+.theme-transition *::before,
+.theme-transition *::after {
+  transition:
+    background-color 350ms ease,
+    border-color 350ms ease,
+    color 350ms ease,
+    fill 350ms ease,
+    stroke 350ms ease,
+    box-shadow 350ms ease !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .surface-lift:hover,
+  .surface-lift:active {
+    transform: none;
+  }
+  .rise-in {
+    animation-name: fade-in;
+    animation-duration: 200ms;
+  }
+  .skeleton::after,
+  .live-dot::after {
+    animation: none;
+  }
+  .switch,
+  .switch::before {
+    transition-duration: 1ms;
+  }
+}
+
+/* Appearance switcher pill follows <html data-theme-pref>, which is correct
+   before hydration — see components/dashboard/theme-switcher.tsx. */
+[data-theme-pref="dark"] .theme-seg-pill {
+  transform: translateX(100%);
+}
+html:not([data-theme-pref]) .theme-seg-pill,
+[data-theme-pref="system"] .theme-seg-pill {
+  transform: translateX(200%);
 }

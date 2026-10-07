@@ -63,7 +63,7 @@ export default async function StaffMemberPage({ params }: { params: Promise<{ id
   const ownHours = (rules ?? []).length > 0;
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
+    <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-6 sm:p-8">
       <div>
         <Link href="/dashboard/staff" className="mb-3 inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-foreground">
           <ArrowLeftIcon className="size-4" /> Staff

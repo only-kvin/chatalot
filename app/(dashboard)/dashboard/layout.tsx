@@ -3,6 +3,7 @@ import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
 import { DashboardNav } from "./dashboard-nav";
 import { PageTransition } from "./page-transition";
+import { ThemeSync } from "@/components/dashboard/theme-switcher";
 
 export default async function DashboardLayout({
   children,
@@ -20,15 +21,15 @@ export default async function DashboardLayout({
 
   // RLS on platform_admins only returns the caller's own row, so this is the
   // same check the /admin layout makes.
-  const { data: adminRow } = await supabase
-    .from("platform_admins")
-    .select("user_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const [{ data: adminRow }, { data: tenant }] = await Promise.all([
+    supabase.from("platform_admins").select("user_id").eq("user_id", user.id).maybeSingle(),
+    supabase.from("tenants").select("name").eq("id", tenantId).maybeSingle(),
+  ]);
 
   return (
-    <div className="flex min-h-screen flex-col bg-zinc-50 md:flex-row dark:bg-black">
-      <DashboardNav isPlatformAdmin={!!adminRow} />
+    <div className="app-backdrop flex min-h-screen flex-col md:flex-row">
+      <ThemeSync />
+      <DashboardNav isPlatformAdmin={!!adminRow} tenantName={tenant?.name ?? null} />
       <PageTransition>{children}</PageTransition>
     </div>
   );

@@ -28,7 +28,7 @@ export default async function AdminPage() {
     .order("created_at", { ascending: false });
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-8 p-8">
+    <div className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-6 sm:p-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Tenants</h1>
         <Link href="/admin/usage" className="text-sm text-zinc-500 hover:underline">

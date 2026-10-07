@@ -30,7 +30,7 @@ export default async function MessagePage({ params }: { params: Promise<{ id: st
   const details = Object.entries((m.details as Record<string, string | boolean>) ?? {});
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
+    <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-6 sm:p-8">
       <div>
         <Link href="/dashboard/messages" className="mb-3 inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-foreground">
           <ArrowLeftIcon className="size-4" /> Messages

@@ -2,86 +2,99 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboardIcon,
-  UsersIcon,
-  MessageSquareIcon,
-  BookOpenIcon,
-  CalendarIcon,
-  BriefcaseIcon,
-  ClockIcon,
-  MessageCircleIcon,
-  SettingsIcon,
-  ShieldIcon,
-  ContactRoundIcon,
-  InboxIcon,
-  UserRoundCogIcon,
-  type LucideIcon,
-} from "lucide-react";
+import { MessageCircleIcon } from "lucide-react";
 import { cn } from "cn";
 import { NotificationsBell } from "./notifications-bell";
+import { CommandMenu } from "./command-menu";
+import { ThemeSwitcher } from "@/components/dashboard/theme-switcher";
+import { ADMIN_ITEM, NAV_GROUPS, isActive, type NavGroup, type NavItem } from "./nav-items";
 
-type NavItem = { href: string; label: string; icon: LucideIcon; exact?: boolean };
-
-const NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard", label: "Overview", icon: LayoutDashboardIcon, exact: true },
-  { href: "/dashboard/customers", label: "Customers", icon: ContactRoundIcon },
-  { href: "/dashboard/leads", label: "Leads", icon: UsersIcon },
-  { href: "/dashboard/conversations", label: "Conversations", icon: MessageSquareIcon },
-  { href: "/dashboard/messages", label: "Messages", icon: InboxIcon },
-  { href: "/dashboard/knowledge", label: "Knowledge", icon: BookOpenIcon },
-  { href: "/dashboard/bookings", label: "Bookings", icon: CalendarIcon },
-  { href: "/dashboard/services", label: "Services", icon: BriefcaseIcon },
-  { href: "/dashboard/staff", label: "Staff", icon: UserRoundCogIcon },
-  { href: "/dashboard/availability", label: "Availability", icon: ClockIcon },
-  { href: "/dashboard/widget", label: "Widgets", icon: MessageCircleIcon },
-  { href: "/dashboard/settings", label: "Settings", icon: SettingsIcon },
-];
-
-function isActive(pathname: string, href: string, exact?: boolean) {
-  return exact ? pathname === href : pathname === href || pathname.startsWith(href + "/");
+function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
+  const active = isActive(pathname, item.href, item.exact);
+  const Icon = item.icon;
+  return (
+    <Link
+      href={item.href}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "group/nav flex min-h-10 shrink-0 items-center gap-2.5 rounded-xl px-3 text-sm font-medium whitespace-nowrap",
+        "transition-[background-color,color,box-shadow,transform] duration-200 ease-(--ease-out) active:scale-[0.98]",
+        active
+          ? "bg-card text-foreground shadow-[inset_0_1px_0_var(--surface-highlight),0_1px_2px_oklch(0.2_0.02_286/6%),0_4px_12px_-4px_var(--surface-shadow)] ring-1 ring-border/60"
+          : "text-muted-foreground hover:bg-primary/[0.07] hover:text-foreground",
+      )}
+    >
+      <Icon
+        className={cn(
+          "size-[18px] shrink-0 transition-transform duration-200 ease-(--ease-out) group-hover/nav:translate-x-px group-hover/nav:scale-105 motion-reduce:transform-none",
+          active && "text-primary dark:text-indigo-300",
+        )}
+      />
+      {item.label}
+    </Link>
+  );
 }
 
-// Platform admins also run the /admin area (tenants, WhatsApp numbers, usage),
-// which isn't otherwise linked from anywhere.
-const ADMIN_ITEM: NavItem = { href: "/admin", label: "Admin", icon: ShieldIcon };
-
-export function DashboardNav({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
+export function DashboardNav({
+  isPlatformAdmin,
+  tenantName,
+}: {
+  isPlatformAdmin: boolean;
+  tenantName: string | null;
+}) {
   const pathname = usePathname();
+  const groups: NavGroup[] = isPlatformAdmin
+    ? [...NAV_GROUPS, { label: "Platform", items: [ADMIN_ITEM] }]
+    : NAV_GROUPS;
 
   return (
     <nav
       aria-label="Dashboard"
       className={cn(
-        // Horizontal scroll strip on mobile, fixed sidebar from md up.
-        "flex shrink-0 gap-1 overflow-x-auto border-b bg-white p-2 dark:bg-zinc-950",
-        "md:sticky md:top-0 md:h-screen md:w-56 md:flex-col md:overflow-visible md:border-b-0 md:border-r md:p-4",
+        // Top bar + horizontal scroll strip on mobile, fixed sidebar from md up.
+        "z-30 flex shrink-0 flex-col gap-3 border-b border-sidebar-border bg-sidebar p-3 backdrop-blur-xl",
+        "md:sticky md:top-0 md:h-screen md:w-64 md:gap-5 md:overflow-y-auto md:border-r md:border-b-0 md:px-3.5 md:py-5",
       )}
     >
-      <div className="flex shrink-0 items-center md:justify-between md:pb-4 md:pl-2">
-        <span className="hidden text-sm font-semibold tracking-tight md:block">ChatAlot</span>
+      <div className="flex items-center gap-2.5 md:px-1.5">
+        <div className="icon-tile size-9 shrink-0 rounded-[10px] bg-[linear-gradient(145deg,#6D67F5_0%,#3F35C4_100%)]">
+          <MessageCircleIcon className="size-[18px]" strokeWidth={2.2} />
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <span className="text-[15px] font-bold tracking-tight">ChatAlot</span>
+          {tenantName && <span className="truncate text-xs text-muted-foreground">{tenantName}</span>}
+        </div>
         <NotificationsBell />
+        <div className="md:hidden">
+          <ThemeSwitcher compact />
+        </div>
       </div>
-      {(isPlatformAdmin ? [...NAV_ITEMS, ADMIN_ITEM] : NAV_ITEMS).map((item) => {
-        const active = isActive(pathname, item.href, item.exact);
-        const Icon = item.icon;
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            aria-current={active ? "page" : undefined}
-            className={cn(
-              "flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors duration-150",
-              active
-                ? "bg-muted text-foreground"
-                : "text-zinc-500 hover:bg-muted/60 hover:text-foreground",
+
+      <div className="hidden md:block">
+        <CommandMenu isPlatformAdmin={isPlatformAdmin} />
+      </div>
+
+      <div className="-mx-3 flex gap-1 overflow-x-auto px-3 [scrollbar-width:none] md:mx-0 md:flex-col md:gap-5 md:overflow-visible md:px-0">
+        {groups.map((group, gi) => (
+          <div key={group.label ?? gi} className="flex shrink-0 gap-1 md:flex-col md:gap-0.5">
+            {group.label && (
+              <span className="hidden px-3 pb-1.5 text-[11px] font-semibold tracking-[0.08em] text-muted-foreground/80 uppercase md:block">
+                {group.label}
+              </span>
             )}
-          >
-            <Icon className="size-4 shrink-0" />
-            {item.label}
-          </Link>
-        );
-      })}
+            {group.items.map((item) => (
+              <NavLink key={item.href} item={item} pathname={pathname} />
+            ))}
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-auto hidden flex-col gap-2 md:flex">
+        <span className="px-1.5 text-[11px] font-semibold tracking-[0.08em] text-muted-foreground/80 uppercase">
+          Appearance
+        </span>
+        <ThemeSwitcher />
+      </div>
     </nav>
   );
 }

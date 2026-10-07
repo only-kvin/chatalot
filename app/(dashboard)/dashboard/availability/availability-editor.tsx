@@ -11,6 +11,7 @@ import { formatLocalDate } from "@/lib/time";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 type Exception = {
   id: string;
@@ -139,13 +140,8 @@ export function BookingRulesForm({ rules }: { rules: BookingRules }) {
         <p className="text-xs text-zinc-500">After that, the AI hands them over to you.</p>
       </div>
       <div className="flex flex-col gap-1">
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            name="bookings_need_approval"
-            defaultChecked={rules.bookings_need_approval}
-            className="size-4"
-          />
+        <label className="flex items-center gap-3 text-sm">
+          <Switch name="bookings_need_approval" defaultChecked={rules.bookings_need_approval} />
           I approve bookings before they&apos;re confirmed
         </label>
         <p className="text-xs text-zinc-500">
@@ -188,8 +184,8 @@ export function ExceptionsEditor({ exceptions }: { exceptions: Exception[] }) {
           <Label htmlFor="exc_end_time">To</Label>
           <Input id="exc_end_time" name="end_time" type="time" />
         </div>
-        <label className="flex items-center gap-2 pb-2 text-sm">
-          <input name="is_closed" type="checkbox" defaultChecked className="size-4" />
+        <label className="flex items-center gap-3 pb-2 text-sm">
+          <Switch name="is_closed" defaultChecked />
           Closed all day
         </label>
         <Button type="submit" disabled={pending}>

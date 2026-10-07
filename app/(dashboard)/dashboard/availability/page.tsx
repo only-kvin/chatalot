@@ -32,7 +32,7 @@ export default async function AvailabilityPage() {
   ]);
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-8 p-8">
+    <div className="mx-auto flex max-w-2xl flex-col gap-8 px-4 py-6 sm:p-8">
       <PageHeader title="Availability" description="When customers can book, and the rules for booking." />
 
       <Card>
