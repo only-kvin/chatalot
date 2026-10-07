@@ -2,9 +2,10 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { InboxIcon } from "lucide-react";
+import { ArrowRightIcon, InboxIcon, LockIcon, SparklesIcon } from "lucide-react";
 import { createClient } from "@/lib/db/supabase-server";
-import { getCurrentTenantId } from "@/lib/db/current-tenant";
+import { currentTenantFeatures } from "@/lib/dashboard-features";
+import { FEATURE_INFO, FEATURES, PLAN_LABEL, planFor } from "@/lib/plans";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { ThemeFlipButton } from "@/components/theme/theme-switcher";
@@ -26,8 +27,10 @@ function greeting(now: Date): string {
 }
 
 export default async function OverviewPage() {
-  const tenantId = await getCurrentTenantId();
-  if (!tenantId) redirect("/");
+  const current = await currentTenantFeatures();
+  if (!current) redirect("/");
+  const { tenantId, features } = current;
+  const bookingsOn = features.bookings === "on";
 
   const supabase = await createClient();
   const [{ data: config }, cookieStore] = await Promise.all([
@@ -59,16 +62,18 @@ export default async function OverviewPage() {
 
       <section aria-label="Key numbers" className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
         <Suspense fallback={<KpisSkeleton />}>
-          <Kpis tenantId={tenantId} />
+          <Kpis tenantId={tenantId} bookings={bookingsOn} />
         </Suspense>
       </section>
 
       <section className="grid grid-cols-[repeat(auto-fit,minmax(min(340px,100%),1fr))] gap-4">
-        <Panel title="Today’s bookings" link={{ href: "/dashboard/bookings", label: "View calendar" }}>
-          <Suspense fallback={<RowsSkeleton />}>
-            <TodaysBookings tenantId={tenantId} />
-          </Suspense>
-        </Panel>
+        {bookingsOn && (
+          <Panel title="Today’s bookings" link={{ href: "/dashboard/bookings", label: "View calendar" }}>
+            <Suspense fallback={<RowsSkeleton />}>
+              <TodaysBookings tenantId={tenantId} />
+            </Suspense>
+          </Panel>
+        )}
         <Panel
           title="Live conversations"
           live
@@ -95,11 +100,44 @@ export default async function OverviewPage() {
           className="flex-[1_1_320px] from-card to-[#f4f3ff] dark:from-[#1b1b22] dark:to-[#1c1a30]"
         >
           <Suspense fallback={<RowsSkeleton />}>
-            <AiPanel tenantId={tenantId} />
+            <AiPanel tenantId={tenantId} features={features} />
           </Suspense>
         </Panel>
       </section>
+
+      <MoreWithPlan locked={FEATURES.filter((f) => features[f] === "locked")} />
     </div>
+  );
+}
+
+// The one upsell on the Overview: features on a higher plan, each linking to
+// its upgrade page. Nothing when the plan already has everything.
+function MoreWithPlan({ locked }: { locked: (typeof FEATURES)[number][] }) {
+  if (!locked.length) return null;
+  const plan = planFor(locked[0]);
+  return (
+    <Card className="gap-4 px-[22px] py-[22px] sm:flex-row sm:items-center">
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-linear-145 from-[#7c76f7] to-[#4338ca] shadow-[0_6px_14px_-6px_rgb(67_56_202/0.55)]">
+        <SparklesIcon className="size-5 text-white" />
+      </span>
+      <div className="flex flex-1 flex-col gap-1">
+        <h2 className="text-[17px] font-semibold tracking-[-0.01em]">Do more with {PLAN_LABEL[plan]}</h2>
+        <p className="text-[13px] text-muted-foreground">{FEATURE_INFO[locked[0]].pitch}</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {locked.map((f) => (
+          <Link
+            key={f}
+            href={`/dashboard/upgrade/${f}`}
+            className="group/more flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-[13px] font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+          >
+            <LockIcon className="size-3" />
+            {FEATURE_INFO[f].title}
+            <ArrowRightIcon className="size-3 transition-transform group-hover/more:translate-x-0.5" />
+          </Link>
+        ))}
+      </div>
+    </Card>
   );
 }
 

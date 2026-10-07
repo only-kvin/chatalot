@@ -41,7 +41,7 @@ export async function POST(request: Request) {
   // The key is read on its own so a form with a mistake still gets a
   // readable error (with CORS headers) rather than "not found".
   const key = json && typeof json === "object" && "key" in json && typeof json.key === "string" ? json.key : null;
-  const resolved = await resolvePublicTenant(request, key);
+  const resolved = await resolvePublicTenant(request, key, "bookings");
   if (resolved instanceof Response) return resolved;
   const { tenantId, headers } = resolved;
   const parsed = bodySchema.safeParse(json);

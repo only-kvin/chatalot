@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { cn } from "cn";
 import { createClient } from "@/lib/db/supabase-server";
-import { getCurrentTenantId } from "@/lib/db/current-tenant";
+import { requireFeaturePage } from "@/lib/dashboard-features";
 import { formatShortLocal } from "@/lib/time";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -16,8 +15,7 @@ const TABS = [
 const STATUS = { new: "New", read: "Read", replied: "Replied" } as Record<string, string>;
 
 export default async function MessagesPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  const tenantId = await getCurrentTenantId();
-  if (!tenantId) redirect("/");
+  const tenantId = await requireFeaturePage("contact_form");
   const tab = (await searchParams).tab === "all" ? "all" : "new";
 
   const supabase = await createClient();

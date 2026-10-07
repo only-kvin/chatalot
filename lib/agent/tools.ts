@@ -164,6 +164,15 @@ const optionalText = z
 const dateText = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "must be YYYY-MM-DD");
 const timeText = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "must be 24-hour HH:MM");
 
+// Tools that work without online bookings on the business's plan.
+export const CORE_TOOL_NAMES = ["save_lead", "request_human"];
+
+// The tools offered to the model: the booking ones only when the business
+// takes bookings, so it never offers what the business can't do.
+export function toolsFor(takesBookings: boolean): ToolDef[] {
+  return takesBookings ? AGENT_TOOLS : AGENT_TOOLS.filter((t) => CORE_TOOL_NAMES.includes(t.name));
+}
+
 // Zod mirrors of AGENT_TOOLS' JSON schemas above — model output is an API
 // boundary like any other, so every tool input is validated before it runs.
 export const TOOL_INPUT_SCHEMAS = {

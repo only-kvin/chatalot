@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/db/supabase-server";
-import { getCurrentTenantId } from "@/lib/db/current-tenant";
+import { currentTenantFeatures } from "@/lib/dashboard-features";
 import { ThemeScript } from "@/components/theme/theme-script";
 import { parseTheme, THEME_COOKIE } from "@/components/theme/theme";
 import { DashboardNav } from "./dashboard-nav";
@@ -18,8 +18,9 @@ export default async function DashboardLayout({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const tenantId = await getCurrentTenantId();
-  if (!tenantId) redirect("/");
+  const current = await currentTenantFeatures();
+  if (!current) redirect("/");
+  const { tenantId, features } = current;
 
   // RLS on platform_admins only returns the caller's own row, so this is the
   // same check the /admin layout makes.
@@ -43,6 +44,7 @@ export default async function DashboardLayout({
         userEmail={user.email ?? ""}
         needsYou={needsYou ?? 0}
         theme={theme}
+        features={features}
       />
       <PageTransition>{children}</PageTransition>
     </div>

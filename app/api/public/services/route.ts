@@ -8,7 +8,7 @@ export const OPTIONS = preflight;
 // The services a business shows on its website, and the staff who offer
 // each one. No customer data.
 export async function GET(request: Request) {
-  const resolved = await resolvePublicTenant(request, new URL(request.url).searchParams.get("key"));
+  const resolved = await resolvePublicTenant(request, new URL(request.url).searchParams.get("key"), "bookings");
   if (resolved instanceof Response) return resolved;
   const { tenantId, headers } = resolved;
   if (!(await checkWidgetReadLimit(clientIp(request)))) {

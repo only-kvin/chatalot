@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/db/supabase-server";
 import { createAdminClient } from "@/lib/db/supabase-admin";
 import { encrypt } from "@/lib/security/crypto";
+import { overridesSchema, PLANS } from "@/lib/plans";
 
 const connectSchema = z.object({
   tenantId: z.string().uuid(),
@@ -89,4 +90,50 @@ export async function disconnectWhatsAppChannelAction(formData: FormData) {
   if (error) throw new Error(error.message);
 
   revalidatePath(`/admin/tenants/${tenantId}`);
+}
+
+const planSchema = z.object({
+  tenantId: z.string().uuid(),
+  plan: z.enum(PLANS),
+  overrides: overridesSchema,
+});
+
+// Plan and per-feature overrides. Returns errors rather than throwing (they're
+// shown inline). Runs on the admin's own client: `tenants` RLS only lets
+// platform admins update it.
+export async function updatePlanAction(input: {
+  tenantId: string;
+  plan: string;
+  overrides: Record<string, string>;
+}): Promise<{ error: string | null }> {
+  const parsed = planSchema.safeParse(input);
+  if (!parsed.success) return { error: "Invalid plan settings." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tenants")
+    .update({ plan: parsed.data.plan, feature_overrides: parsed.data.overrides })
+    .eq("id", parsed.data.tenantId)
+    .select("id");
+  if (error || !data?.length) {
+    if (error) console.error(`Saving plan for ${parsed.data.tenantId} failed:`, error);
+    return { error: "Couldn't save. Are you signed in as a platform admin?" };
+  }
+  revalidatePath(`/admin/tenants/${parsed.data.tenantId}`);
+  revalidatePath("/admin");
+  return { error: null };
+}
+
+export async function markUpgradeHandledAction(formData: FormData) {
+  await requirePlatformAdmin();
+  const id = z.string().uuid().parse(formData.get("requestId"));
+  const tenantId = z.string().uuid().parse(formData.get("tenantId"));
+  const supabase = await createClient();
+  await supabase
+    .from("upgrade_requests")
+    .update({ handled_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("tenant_id", tenantId);
+  revalidatePath(`/admin/tenants/${tenantId}`);
+  revalidatePath("/admin");
 }

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
+import { featureError } from "@/lib/dashboard-features";
 
 // Services and who offers them. Uses the signed-in user's client, so RLS
 // keeps everything inside their business. Results are returned, not thrown
@@ -101,6 +102,8 @@ async function setStaff(s: Session, serviceId: string, d: z.infer<typeof service
 }
 
 export async function createServiceAction(formData: FormData): Promise<Result> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
   const s = await session();
   if (!s) return { error: "Not authorized." };
   const parsed = parseForm(formData);
@@ -126,6 +129,8 @@ export async function createServiceAction(formData: FormData): Promise<Result> {
 }
 
 export async function updateServiceAction(serviceId: string, formData: FormData): Promise<Result> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
   const s = await session();
   if (!s) return { error: "Not authorized." };
   if (!uuid.safeParse(serviceId).success) return { error: "Invalid request." };
@@ -145,6 +150,8 @@ export async function updateServiceAction(serviceId: string, formData: FormData)
 }
 
 export async function deleteServiceAction(serviceId: string): Promise<Result> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
   const s = await session();
   if (!s) return { error: "Not authorized." };
   if (!uuid.safeParse(serviceId).success) return { error: "Invalid request." };
@@ -164,6 +171,8 @@ export async function deleteServiceAction(serviceId: string): Promise<Result> {
 }
 
 export async function moveServiceAction(serviceId: string, direction: "up" | "down"): Promise<Result> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
   const s = await session();
   if (!s) return { error: "Not authorized." };
   if (!uuid.safeParse(serviceId).success) return { error: "Invalid request." };

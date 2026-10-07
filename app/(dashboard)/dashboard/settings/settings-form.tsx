@@ -21,7 +21,19 @@ type Settings = {
   allowed_domains: string[];
 };
 
-export function SettingsForm({ initialSettings, hostedBookingUrl }: { initialSettings: Settings; hostedBookingUrl: string }) {
+// Sections for features not on their plan are left out; the menu's lock
+// is where those get offered, so Settings stays uncluttered.
+export function SettingsForm({
+  initialSettings,
+  hostedBookingUrl,
+  showBookingPage,
+  showReviews,
+}: {
+  initialSettings: Settings;
+  hostedBookingUrl: string;
+  showBookingPage: boolean;
+  showReviews: boolean;
+}) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -100,56 +112,60 @@ export function SettingsForm({ initialSettings, hostedBookingUrl }: { initialSet
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Online booking page</CardTitle>
-          <CardDescription>
-            Where the AI sends customers who&apos;d rather book by clicking. By default it&apos;s your page on
-            ChatAlot, with your appointment widget: {" "}
-            <a href={hostedBookingUrl} target="_blank" rel="noreferrer" className="underline">
-              {hostedBookingUrl}
-            </a>
-            .
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-2">
-          <Label htmlFor="booking_page_url">Use my own page instead (optional)</Label>
-          <Input
-            id="booking_page_url"
-            name="booking_page_url"
-            type="url"
-            defaultValue={initialSettings.booking_page_url}
-            placeholder="https://yourbusiness.co.za/book"
-          />
-          <p className="text-xs text-muted-foreground">
-            Only if that page has your appointment widget on it (Widgets → Appointment). Leave empty to use the page above.
-          </p>
-        </CardContent>
-      </Card>
+      {showBookingPage && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Online booking page</CardTitle>
+            <CardDescription>
+              Where the AI sends customers who&apos;d rather book by clicking. By default it&apos;s your page on
+              ChatAlot, with your appointment widget: {" "}
+              <a href={hostedBookingUrl} target="_blank" rel="noreferrer" className="underline">
+                {hostedBookingUrl}
+              </a>
+              .
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2">
+            <Label htmlFor="booking_page_url">Use my own page instead (optional)</Label>
+            <Input
+              id="booking_page_url"
+              name="booking_page_url"
+              type="url"
+              defaultValue={initialSettings.booking_page_url}
+              placeholder="https://yourbusiness.co.za/book"
+            />
+            <p className="text-xs text-muted-foreground">
+              Only if that page has your appointment widget on it (Widgets → Appointment). Leave empty to use the page above.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Reviews</CardTitle>
-          <CardDescription>
-            The morning after you mark a booking Attended, we ask the customer on WhatsApp to rate their visit
-            from 1 to 5 and share your Google review link. Low scores (3 or below) alert you so you can follow up.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-2">
-          <Label htmlFor="google_review_url">Google review link</Label>
-          <Input
-            id="google_review_url"
-            name="google_review_url"
-            type="url"
-            defaultValue={initialSettings.google_review_url}
-            placeholder="https://g.page/r/…/review"
-          />
-          <p className="text-xs text-muted-foreground">
-            Find it in your Google Business Profile under &ldquo;Ask for reviews&rdquo;. Leave empty to turn review
-            requests off. Every customer gets the link, whatever their score, as Google requires.
-          </p>
-        </CardContent>
-      </Card>
+      {showReviews && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Reviews</CardTitle>
+            <CardDescription>
+              The morning after you mark a booking Attended, we ask the customer on WhatsApp to rate their visit
+              from 1 to 5 and share your Google review link. Low scores (3 or below) alert you so you can follow up.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2">
+            <Label htmlFor="google_review_url">Google review link</Label>
+            <Input
+              id="google_review_url"
+              name="google_review_url"
+              type="url"
+              defaultValue={initialSettings.google_review_url}
+              placeholder="https://g.page/r/…/review"
+            />
+            <p className="text-xs text-muted-foreground">
+              Find it in your Google Business Profile under &ldquo;Ask for reviews&rdquo;. Leave empty to turn review
+              requests off. Every customer gets the link, whatever their score, as Google requires.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

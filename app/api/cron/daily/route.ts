@@ -3,6 +3,8 @@ import { sendBookingReminder } from "@/lib/bookings/reminders";
 import { REVIEW_LOOKBACK_DAYS, sendReviewRequest } from "@/lib/bookings/review-requests";
 import { tenantWhatsAppLookup, type TenantWhatsApp } from "@/lib/bookings/whatsapp-channel";
 import { sendDailySummary } from "@/lib/email/send-daily-summary";
+import { tenantFeaturesLookup } from "@/lib/features";
+import type { Features } from "@/lib/plans";
 
 // The daily jobs: booking reminders and review requests on WhatsApp, then the
 // owners' summary email. Runs once a day at 06:00 UTC = 08:00 SA (see
@@ -20,13 +22,14 @@ const HOUR_MS = 60 * 60 * 1000;
 
 type Admin = ReturnType<typeof createAdminClient>;
 type ChannelFor = (tenantId: string) => Promise<TenantWhatsApp | null>;
+type FeaturesFor = (tenantId: string) => Promise<Features>;
 
 // A many-to-one embed comes back as an object, not an array.
 function serviceName(services: unknown): string {
   return (services as { name: string } | null)?.name ?? "appointment";
 }
 
-async function sendReminders(admin: Admin, channelFor: ChannelFor) {
+async function sendReminders(admin: Admin, channelFor: ChannelFor, featuresFor: FeaturesFor) {
   const now = Date.now();
   const { data: bookings, error } = await admin
     .from("bookings")
@@ -41,7 +44,10 @@ async function sendReminders(admin: Admin, channelFor: ChannelFor) {
   let notSent = 0;
   for (const booking of bookings ?? []) {
     try {
-      // Tenants without WhatsApp don't have reminders at all.
+      // Reminders need bookings and WhatsApp on the plan, and a connected
+      // number. Left unsent otherwise, so an upgrade picks them up.
+      const features = await featuresFor(booking.tenant_id);
+      if (features.bookings !== "on" || features.whatsapp !== "on") continue;
       const channel = await channelFor(booking.tenant_id);
       if (!channel) continue;
       const result = await sendBookingReminder(admin, { ...booking, serviceName: serviceName(booking.services) }, channel);
@@ -56,7 +62,7 @@ async function sendReminders(admin: Admin, channelFor: ChannelFor) {
   return { checked: bookings?.length ?? 0, sent, notSent };
 }
 
-async function sendReviewRequests(admin: Admin, channelFor: ChannelFor) {
+async function sendReviewRequests(admin: Admin, channelFor: ChannelFor, featuresFor: FeaturesFor) {
   const now = Date.now();
   const { data: bookings, error } = await admin
     .from("bookings")
@@ -71,9 +77,12 @@ async function sendReviewRequests(admin: Admin, channelFor: ChannelFor) {
   let notSent = 0;
   for (const booking of bookings ?? []) {
     try {
-      // Only tenants with WhatsApp and a Google review link send requests.
+      // Only tenants with review requests and WhatsApp on their plan, a
+      // connected number and a Google review link send requests.
       // Left unclaimed otherwise, so adding the link later still covers
       // the last few days' visits.
+      const features = await featuresFor(booking.tenant_id);
+      if (features.reviews !== "on" || features.whatsapp !== "on") continue;
       const channel = await channelFor(booking.tenant_id);
       if (!channel?.googleReviewUrl) continue;
       const result = await sendReviewRequest(
@@ -120,11 +129,12 @@ export async function GET(request: Request) {
   const admin = createAdminClient();
   // One WhatsApp number and settings lookup per tenant, shared by both jobs.
   const channelFor = tenantWhatsAppLookup(admin);
+  const featuresFor = tenantFeaturesLookup(admin);
 
   // Each job runs even if the other fails.
   const [reminders, reviews] = await Promise.allSettled([
-    sendReminders(admin, channelFor),
-    sendReviewRequests(admin, channelFor),
+    sendReminders(admin, channelFor, featuresFor),
+    sendReviewRequests(admin, channelFor, featuresFor),
   ]);
   for (const [job, result] of [["reminders", reminders], ["review requests", reviews]] as const) {
     if (result.status === "rejected") console.error(`Daily ${job} failed:`, result.reason);

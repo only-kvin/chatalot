@@ -1,12 +1,10 @@
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/db/supabase-server";
-import { getCurrentTenantId } from "@/lib/db/current-tenant";
+import { requireFeaturePage } from "@/lib/dashboard-features";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { ServicesEditor } from "./services-editor";
 
 export default async function ServicesPage() {
-  const tenantId = await getCurrentTenantId();
-  if (!tenantId) redirect("/");
+  const tenantId = await requireFeaturePage("bookings");
 
   const supabase = await createClient();
   const [{ data: services }, { data: staff }, { data: links }] = await Promise.all([

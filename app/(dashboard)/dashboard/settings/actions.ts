@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/db/supabase-server";
 import { createAdminClient } from "@/lib/db/supabase-admin";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
+import { loadTenantFeatures } from "@/lib/features";
 
 const settingsSchema = z.object({
   business_name: z.string().min(1, "Business name is required"),
@@ -59,6 +60,9 @@ export async function updateSettingsAction(formData: FormData): Promise<{ error:
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
 
   const supabase = await createClient();
+  // Sections for features not on their plan aren't shown, so their fields
+  // aren't submitted: keep what's saved rather than clearing it.
+  const { features } = await loadTenantFeatures(supabase, tenantId);
 
   const { error: configError } = await supabase
     .from("agent_configs")
@@ -68,8 +72,8 @@ export async function updateSettingsAction(formData: FormData): Promise<{ error:
       greeting: parsed.data.greeting,
       system_prompt_extra: parsed.data.system_prompt_extra,
       handoff_contact: parsed.data.handoff_contact,
-      google_review_url: parsed.data.google_review_url || null,
-      booking_page_url: parsed.data.booking_page_url || null,
+      ...(features.reviews === "on" && { google_review_url: parsed.data.google_review_url || null }),
+      ...(features.bookings === "on" && { booking_page_url: parsed.data.booking_page_url || null }),
       daily_summary_enabled: parsed.data.daily_summary_enabled,
       updated_at: new Date().toISOString(),
     })

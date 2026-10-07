@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
 import { checkNewWindow } from "@/lib/bookings/hours";
+import { featureError } from "@/lib/dashboard-features";
 
 // Opening hours, one-off exceptions and booking rules. Weekly hours belong
 // to the business (staff_id null) or to one staff member. Results are
@@ -50,6 +51,8 @@ function revalidate(staffId: string | null) {
 }
 
 export async function createAvailabilityRuleAction(formData: FormData): Promise<Result> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
   const tenantId = await getCurrentTenantId();
   if (!tenantId) return { error: "Not authorized." };
   const parsed = ruleSchema.safeParse({
@@ -84,6 +87,8 @@ export async function createAvailabilityRuleAction(formData: FormData): Promise<
 }
 
 export async function deleteAvailabilityRuleAction(id: string): Promise<Result> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
   const tenantId = await getCurrentTenantId();
   if (!tenantId) return { error: "Not authorized." };
   if (!uuid.safeParse(id).success) return { error: "Invalid request." };
@@ -104,6 +109,8 @@ export async function deleteAvailabilityRuleAction(id: string): Promise<Result> 
 }
 
 export async function createAvailabilityExceptionAction(formData: FormData): Promise<Result> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
   const tenantId = await getCurrentTenantId();
   if (!tenantId) return { error: "Not authorized." };
   const parsed = exceptionSchema.safeParse({
@@ -135,6 +142,8 @@ export async function createAvailabilityExceptionAction(formData: FormData): Pro
 }
 
 export async function deleteAvailabilityExceptionAction(id: string): Promise<Result> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
   const tenantId = await getCurrentTenantId();
   if (!tenantId) return { error: "Not authorized." };
   if (!uuid.safeParse(id).success) return { error: "Invalid request." };
@@ -150,6 +159,8 @@ export async function deleteAvailabilityExceptionAction(id: string): Promise<Res
 }
 
 export async function updateBookingRulesAction(formData: FormData): Promise<Result> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
   const tenantId = await getCurrentTenantId();
   if (!tenantId) return { error: "Not authorized." };
   const parsed = rulesSchema.safeParse({

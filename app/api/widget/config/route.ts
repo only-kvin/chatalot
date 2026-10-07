@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/db/supabase-admin";
 import { loadWidget, loadWidgetTheme } from "@/lib/widgets/config";
 import { preflight, resolvePublicTenant } from "@/lib/widgets/public-request";
+import { WIDGET_FEATURE } from "@/lib/plans";
 
 export const OPTIONS = preflight;
 
@@ -11,11 +12,13 @@ export const OPTIONS = preflight;
 // wording, settings and form fields.
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const resolved = await resolvePublicTenant(request, url.searchParams.get("key"));
+  const widget = url.searchParams.get("widget");
+  // Each widget needs its own plan feature; unknown names 404 further down.
+  const feature = WIDGET_FEATURE[(widget ?? "chat") as keyof typeof WIDGET_FEATURE] ?? "web_chat";
+  const resolved = await resolvePublicTenant(request, url.searchParams.get("key"), feature);
   if (resolved instanceof Response) return resolved;
   const { tenantId, headers } = resolved;
   const admin = createAdminClient();
-  const widget = url.searchParams.get("widget");
 
   if (widget === "schedule" || widget === "appointment" || widget === "contact" || widget === "registration") {
     const [theme, instance, { data: agentConfig }] = await Promise.all([

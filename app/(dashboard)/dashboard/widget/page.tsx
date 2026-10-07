@@ -3,7 +3,8 @@ import { appUrl } from "@/lib/app-url";
 import { redirect } from "next/navigation";
 import { cn } from "cn";
 import { createClient } from "@/lib/db/supabase-server";
-import { getCurrentTenantId } from "@/lib/db/current-tenant";
+import { currentTenantFeatures } from "@/lib/dashboard-features";
+import { WIDGET_FEATURE } from "@/lib/plans";
 import { loadWidget, loadWidgetTheme } from "@/lib/widgets/config";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { WidgetEditor } from "./widget-editor";
@@ -18,10 +19,20 @@ const TABS = [
 ] as const;
 
 export default async function WidgetPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  const tenantId = await getCurrentTenantId();
-  if (!tenantId) redirect("/");
+  const current = await currentTenantFeatures();
+  if (!current) redirect("/");
+  const { tenantId, features } = current;
+  // Only widgets on their plan; the menu's lock is where the rest are offered.
+  const tabs = TABS.filter((t) => features[WIDGET_FEATURE[t.id]] === "on");
   const requested = (await searchParams).tab;
-  const tab = TABS.find((t) => t.id === requested && t.id !== "chat")?.id ?? "chat";
+  const tab = (tabs.find((t) => t.id === requested) ?? tabs[0])?.id;
+  if (!tab) {
+    return (
+      <div className="mx-auto max-w-5xl p-8">
+        <PageHeader title="Widgets" description="No website widgets are included in your plan." />
+      </div>
+    );
+  }
 
   const supabase = await createClient();
   const { data: tenant } = await supabase.from("tenants").select("public_widget_key").eq("id", tenantId).single();
@@ -29,7 +40,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
 
   const nav = (
     <nav className="mb-6 flex gap-1 border-b" aria-label="Widgets">
-      {TABS.map((t) => (
+      {tabs.map((t) => (
         <Link
           key={t.id}
           href={t.id === "chat" ? "/dashboard/widget" : `/dashboard/widget?tab=${t.id}`}

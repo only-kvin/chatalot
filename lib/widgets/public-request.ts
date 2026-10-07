@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/db/supabase-admin";
 import { isOriginAllowed, isOwnAppRequest } from "@/lib/security/origin-check";
+import { parsePlan, resolveFeatures, type Feature } from "@/lib/plans";
 
 // Shared front door for the public widget API. Resolves the business from
 // its public widget key server-side, refuses suspended businesses and
@@ -31,18 +32,24 @@ export type PublicTenant = {
   headers: Record<string, string>;
 };
 
+// `feature`: the plan feature this endpoint belongs to. A business without it
+// gets the same 404 as an unknown key — customers never see plans.
 export async function resolvePublicTenant(
   request: Request,
   key: string | null | undefined,
+  feature: Feature,
 ): Promise<PublicTenant | Response> {
   if (!key || key.length > 100) return Response.json({ error: "Not found" }, { status: 404 });
   const origin = request.headers.get("origin");
   const { data: tenant } = await createAdminClient()
     .from("tenants")
-    .select("id, status, allowed_domains")
+    .select("id, status, allowed_domains, plan, feature_overrides")
     .eq("public_widget_key", key)
     .maybeSingle();
   if (!tenant || tenant.status !== "active") return Response.json({ error: "Not found" }, { status: 404 });
+  if (resolveFeatures(parsePlan(tenant.plan), tenant.feature_overrides)[feature] !== "on") {
+    return Response.json({ error: "Not found" }, { status: 404 });
+  }
   if (!isOwnAppRequest(request) && !isOriginAllowed(origin, tenant.allowed_domains)) {
     return Response.json({ error: "Origin not allowed" }, { status: 403 });
   }

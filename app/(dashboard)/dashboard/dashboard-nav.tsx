@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MessageCircleIcon } from "lucide-react";
+import { LockIcon, MessageCircleIcon } from "lucide-react";
 import { cn } from "cn";
 import { ThemeSwitcher } from "@/components/theme/theme-switcher";
 import type { Theme } from "@/components/theme/theme";
+import type { Features } from "@/lib/plans";
 import { NotificationsBell } from "./notifications-bell";
 import { JumpTo } from "./jump-to";
-import { ADMIN_ITEM, NAV_GROUPS, isActive, type NavItem } from "./nav-items";
+import { ADMIN_ITEM, NAV_GROUPS, isActive, navForFeatures, type NavItem } from "./nav-items";
 
 export function DashboardNav({
   isPlatformAdmin,
@@ -16,6 +17,7 @@ export function DashboardNav({
   userEmail,
   needsYou,
   theme,
+  features,
 }: {
   isPlatformAdmin: boolean;
   businessName: string;
@@ -23,11 +25,11 @@ export function DashboardNav({
   // Conversations the team has taken over: shown as a count on Conversations.
   needsYou: number;
   theme: Theme;
+  features: Features;
 }) {
   const pathname = usePathname();
-  const groups = isPlatformAdmin
-    ? [...NAV_GROUPS, { label: "Platform", items: [ADMIN_ITEM] }]
-    : NAV_GROUPS;
+  const planGroups = navForFeatures(NAV_GROUPS, features);
+  const groups = isPlatformAdmin ? [...planGroups, { label: "Platform", items: [ADMIN_ITEM] }] : planGroups;
   const allItems = groups.flatMap((g) => g.items);
 
   const link = (item: NavItem, compact = false) => {
@@ -43,6 +45,7 @@ export function DashboardNav({
           active
             ? "bg-raised text-foreground shadow-raised"
             : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
+          item.locked && !active && "opacity-70",
           compact && "min-h-9",
         )}
       >
@@ -53,6 +56,7 @@ export function DashboardNav({
           )}
         />
         <span className="flex-1">{item.label}</span>
+        {item.locked && <LockIcon className="size-3.5 shrink-0" aria-label="Not on your plan" />}
         {count !== null && (
           <span
             className="rounded-full bg-primary px-1.5 py-0.5 text-[11px] leading-none font-semibold text-white"

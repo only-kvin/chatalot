@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { ArrowLeftIcon } from "lucide-react";
 import { createClient } from "@/lib/db/supabase-server";
-import { getCurrentTenantId } from "@/lib/db/current-tenant";
+import { requireFeaturePage } from "@/lib/dashboard-features";
 import { StaffAvatar } from "@/components/dashboard/staff-avatar";
 import { WeeklyHours } from "@/components/dashboard/weekly-hours";
 import { Badge } from "@/components/ui/badge";
@@ -13,8 +13,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 export default async function StaffMemberPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const tenantId = await getCurrentTenantId();
-  if (!tenantId) redirect("/");
+  const tenantId = await requireFeaturePage("bookings");
 
   const supabase = await createClient();
   const { data: person } = await supabase

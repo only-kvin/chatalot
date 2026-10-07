@@ -25,7 +25,7 @@ const bodySchema = z.object({
 export async function POST(request: Request) {
   const json: unknown = await request.json().catch(() => null);
   const key = json && typeof json === "object" && "key" in json && typeof json.key === "string" ? json.key : null;
-  const resolved = await resolvePublicTenant(request, key);
+  const resolved = await resolvePublicTenant(request, key, "contact_form");
   if (resolved instanceof Response) return resolved;
   const { tenantId, headers } = resolved;
   const parsed = bodySchema.safeParse(json);

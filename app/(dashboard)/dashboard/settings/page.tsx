@@ -1,13 +1,14 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/db/supabase-server";
-import { getCurrentTenantId } from "@/lib/db/current-tenant";
+import { currentTenantFeatures } from "@/lib/dashboard-features";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { SettingsForm } from "./settings-form";
 import { appUrl } from "@/lib/app-url";
 
 export default async function SettingsPage() {
-  const tenantId = await getCurrentTenantId();
-  if (!tenantId) redirect("/");
+  const current = await currentTenantFeatures();
+  if (!current) redirect("/");
+  const { tenantId, features } = current;
 
   const supabase = await createClient();
   const [{ data: config }, { data: tenant }] = await Promise.all([
@@ -24,6 +25,8 @@ export default async function SettingsPage() {
       <PageHeader title="Settings" />
       <SettingsForm
         hostedBookingUrl={appUrl(`/book/${tenant?.slug ?? ""}`)}
+        showBookingPage={features.bookings === "on"}
+        showReviews={features.reviews === "on"}
         initialSettings={{
           business_name: config?.business_name ?? "",
           tone: config?.tone ?? "",

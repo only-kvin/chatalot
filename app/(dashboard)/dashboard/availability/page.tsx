@@ -1,6 +1,5 @@
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/db/supabase-server";
-import { getCurrentTenantId } from "@/lib/db/current-tenant";
+import { requireFeaturePage } from "@/lib/dashboard-features";
 import { todayLocalISO } from "@/lib/time";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { WeeklyHours } from "@/components/dashboard/weekly-hours";
@@ -8,8 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { BookingRulesForm, ExceptionsEditor } from "./availability-editor";
 
 export default async function AvailabilityPage() {
-  const tenantId = await getCurrentTenantId();
-  if (!tenantId) redirect("/");
+  const tenantId = await requireFeaturePage("bookings");
 
   const supabase = await createClient();
   const [{ data: rules }, { data: exceptions }, { data: config }] = await Promise.all([

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createAdminClient } from "@/lib/db/supabase-admin";
+import { parsePlan, resolveFeatures } from "@/lib/plans";
 import { isOriginAllowed } from "@/lib/security/origin-check";
 
 const MAX_RESTORED_MESSAGES = 50;
@@ -29,11 +30,16 @@ export async function GET(request: Request) {
   const admin = createAdminClient();
   const { data: tenant } = await admin
     .from("tenants")
-    .select("id, status, allowed_domains")
+    .select("id, status, allowed_domains, plan, feature_overrides")
     .eq("public_widget_key", key)
     .single();
 
-  if (!tenant || tenant.status !== "active") {
+  // A business without website chat on its plan looks like an unknown key.
+  if (
+    !tenant ||
+    tenant.status !== "active" ||
+    resolveFeatures(parsePlan(tenant.plan), tenant.feature_overrides).web_chat !== "on"
+  ) {
     return Response.json({ error: "Not found" }, { status: 404 });
   }
   if (!isOriginAllowed(origin, tenant.allowed_domains)) {

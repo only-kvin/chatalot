@@ -1,16 +1,15 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { ArrowLeftIcon } from "lucide-react";
 import { createClient } from "@/lib/db/supabase-server";
-import { getCurrentTenantId } from "@/lib/db/current-tenant";
+import { requireFeaturePage } from "@/lib/dashboard-features";
 import { formatShortLocal } from "@/lib/time";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MessageActions } from "./message-actions";
 
 export default async function MessagePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const tenantId = await getCurrentTenantId();
-  if (!tenantId) redirect("/");
+  const tenantId = await requireFeaturePage("contact_form");
 
   const supabase = await createClient();
   const [{ data: m }, { data: config }, { data: widget }] = await Promise.all([

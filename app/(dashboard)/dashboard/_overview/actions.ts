@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/db/supabase-server";
+import { featureError } from "@/lib/dashboard-features";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
 
 const switchSchema = z.object({
@@ -16,6 +17,12 @@ export type AiSwitchKey = z.infer<typeof switchSchema>["key"];
 export async function setAiSwitchAction(key: AiSwitchKey, on: boolean): Promise<{ error: string | null }> {
   const parsed = switchSchema.safeParse({ key, on });
   if (!parsed.success) return { error: "Invalid setting." };
+
+  // Channel switches only for channels on their plan; lead emails are for everyone.
+  if (parsed.data.key !== "lead_email_enabled") {
+    const blocked = await featureError(parsed.data.key === "web_ai_enabled" ? "web_chat" : "whatsapp");
+    if (blocked) return { error: blocked };
+  }
 
   const tenantId = await getCurrentTenantId();
   if (!tenantId) return { error: "Not authorized." };

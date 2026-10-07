@@ -11,6 +11,7 @@ import { emailCustomerAboutBooking } from "@/lib/email/customer-booking";
 import { sendTeamWhatsApp } from "@/lib/channels/team-whatsapp";
 import { formatPhone, canonicalPhone } from "@/lib/contacts/phone";
 import { isOptedOut } from "@/lib/contacts/consent";
+import { featureError } from "@/lib/dashboard-features";
 
 // Team actions on a booking. They use the signed-in user's client, so RLS
 // scopes everything to their tenant, and every change is logged under their
@@ -85,6 +86,8 @@ export async function getRescheduleSlotsAction(
   bookingId: string,
   date: string,
 ): Promise<{ error: string | null; slots: string[] }> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked, slots: [] };
   const s = await session();
   if (!s) return { error: "Not authorized.", slots: [] };
   if (!uuid.safeParse(bookingId).success || !dateText.safeParse(date).success) {
@@ -105,6 +108,8 @@ export async function cancelBookingAction(input: {
   reason: string;
   notifyCustomer: boolean;
 }): Promise<Result> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
   const s = await session();
   if (!s) return { error: "Not authorized." };
   if (!uuid.safeParse(input.bookingId).success) return { error: "Invalid booking." };
@@ -140,6 +145,8 @@ export async function rescheduleBookingAction(input: {
   time: string;
   notifyCustomer: boolean;
 }): Promise<Result> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
   const s = await session();
   if (!s) return { error: "Not authorized." };
   if (
@@ -177,6 +184,8 @@ export async function rescheduleBookingAction(input: {
 // Gives the booking to another staff member at the same time. The customer
 // isn't told: who does the appointment isn't part of what they were promised.
 export async function assignStaffAction(bookingId: string, staffId: string): Promise<Result> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
   const s = await session();
   if (!s) return { error: "Not authorized." };
   if (!uuid.safeParse(bookingId).success || !uuid.safeParse(staffId).success) return { error: "Invalid request." };
@@ -197,6 +206,8 @@ export async function assignStaffAction(bookingId: string, staffId: string): Pro
 // Approves or declines a booking waiting for approval, and emails the
 // customer the answer (when they gave an email address).
 export async function decideBookingAction(input: { bookingId: string; approve: boolean; reason: string }): Promise<Result> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
   const s = await session();
   if (!s) return { error: "Not authorized." };
   if (!uuid.safeParse(input.bookingId).success) return { error: "Invalid booking." };
@@ -223,6 +234,8 @@ const outcomeSchema = z.enum(["completed", "no_show", "confirmed"]);
 // Attended / no-show once the appointment has started; "confirmed" undoes
 // either. Cancelled bookings can't be reopened here — the slot may be taken.
 export async function setBookingOutcomeAction(bookingId: string, outcome: string): Promise<Result> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
   const s = await session();
   if (!s) return { error: "Not authorized." };
   const parsed = outcomeSchema.safeParse(outcome);

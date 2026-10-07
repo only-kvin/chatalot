@@ -84,6 +84,23 @@ export async function sendOwnerEmail(
   }
 }
 
+// Emails every platform admin (you, running ChatAlot). Best-effort, like
+// owner emails.
+export async function sendPlatformAdminEmail(admin: SupabaseClient, email: OwnerEmail): Promise<void> {
+  const { data: admins } = await admin.from("platform_admins").select("user_id");
+  const to: string[] = [];
+  for (const row of admins ?? []) {
+    const { data } = await admin.auth.admin.getUserById(row.user_id);
+    if (data?.user?.email) to.push(data.user.email);
+  }
+  if (to.length === 0) return;
+  try {
+    await getResend().emails.send({ from: FROM, to, subject: email.subject, html: renderOwnerEmail(email) });
+  } catch (err) {
+    console.error(`Platform admin email "${email.subject}" failed:`, err);
+  }
+}
+
 export type CustomerEmail = {
   to: string;
   subject: string;

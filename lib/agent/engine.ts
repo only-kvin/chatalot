@@ -1,7 +1,8 @@
 import { createAdminClient } from "@/lib/db/supabase-admin";
 import { buildSystemPrompt, type AgentConfig } from "./prompt";
 import { runAgentTurn, type ChatMessage } from "./model";
-import { AGENT_TOOLS, parseToolInput, type ToolCall } from "./tools";
+import { CORE_TOOL_NAMES, parseToolInput, toolsFor, type ToolCall } from "./tools";
+import { hasFeature } from "@/lib/features";
 import { getRelevantKnowledge } from "./retrieval";
 import { findServiceByName, listActiveServiceNames, listActiveServices, listActiveStaff, matchStaff } from "@/lib/bookings/catalog";
 import { bookingLinkFor } from "@/lib/widgets/booking-link";
@@ -111,6 +112,9 @@ export type ToolContext = {
   whatsappAvailable: boolean;
   // Minimum notice for customers to cancel or reschedule in chat.
   cutoffMinutes: number;
+  // Online bookings are on the business's plan. Without them only the core
+  // tools run, whatever the model asks for.
+  takesBookings: boolean;
 };
 
 // Tool result for request_human on the website, where the owner can't reply
@@ -159,6 +163,9 @@ export async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall:
   const parsed = parseToolInput(rawCall);
   if (!parsed.ok) return parsed.error;
   const call = parsed.call;
+  if (!ctx.takesBookings && !CORE_TOOL_NAMES.includes(call.name)) {
+    return "Bookings can't be made in this chat. Offer to take their name and phone number for a callback (save_lead).";
+  }
 
   if (call.name === "save_lead") {
     const lead = call.input;
@@ -413,11 +420,11 @@ export async function* runAgent(params: {
     // to just the tenant layer of the prompt.
   }
 
-  const [services, staff] = await Promise.all([
-    listActiveServices(admin, params.tenantId),
-    listActiveStaff(admin, params.tenantId),
-  ]);
-  const system = buildSystemPrompt(agentConfig as AgentConfig, knowledgeText, services, staff);
+  const takesBookings = await hasFeature(admin, params.tenantId, "bookings");
+  const [services, staff] = takesBookings
+    ? await Promise.all([listActiveServices(admin, params.tenantId), listActiveStaff(admin, params.tenantId)])
+    : [[], []];
+  const system = buildSystemPrompt(agentConfig as AgentConfig, knowledgeText, services, staff, takesBookings);
 
   let fullText = "";
   let tokensIn = 0;
@@ -429,7 +436,7 @@ export async function* runAgent(params: {
     for await (const event of runAgentTurn({
       system,
       messages,
-      tools: AGENT_TOOLS,
+      tools: toolsFor(takesBookings),
       maxTokens: MAX_TOKENS,
       signal: AbortSignal.timeout(TURN_TIMEOUT_MS),
       executeTool: (call) =>
@@ -442,6 +449,7 @@ export async function* runAgent(params: {
             channel: params.channel,
             whatsappAvailable: params.whatsappAvailable ?? false,
             cutoffMinutes: agentConfig.booking_change_cutoff_minutes ?? 120,
+            takesBookings,
           },
           call,
         ),

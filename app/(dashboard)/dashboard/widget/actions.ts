@@ -7,6 +7,8 @@ import { getCurrentTenantId } from "@/lib/db/current-tenant";
 import { whatsappContinueUrl } from "@/lib/channels/web-handoff";
 import { FORM_KIND, WIDGET_SCHEMAS, type WidgetType } from "@/lib/widgets/config";
 import { fieldsInputSchema, normalizeFields } from "@/lib/widgets/fields";
+import { featureError } from "@/lib/dashboard-features";
+import { WIDGET_FEATURE } from "@/lib/plans";
 
 const widgetSchema = z.object({
   primary_color: z
@@ -30,6 +32,8 @@ const widgetSchema = z.object({
 // Returns errors rather than throwing: Next.js hides thrown server action
 // messages in production, and these are meant for the owner to read.
 export async function updateWidgetSettingsAction(formData: FormData): Promise<{ error: string | null }> {
+  const blocked = await featureError("web_chat");
+  if (blocked) return { error: blocked };
   const tenantId = await getCurrentTenantId();
   if (!tenantId) return { error: "Not authorized." };
 
@@ -121,6 +125,8 @@ export async function saveBookingWidgetAction(type: WidgetType, input: unknown):
   const tenantId = await getCurrentTenantId();
   if (!tenantId) return { error: "Not authorized." };
   if (!widgetTypeSchema.safeParse(type).success) return { error: "Invalid widget." };
+  const blocked = await featureError(WIDGET_FEATURE[type]);
+  if (blocked) return { error: blocked };
   const parsed = inputSchema(type).safeParse(input);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];

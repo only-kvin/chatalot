@@ -60,7 +60,7 @@ describe("AI booking tools with staff", { timeout: 30_000 }, () => {
       .insert({ tenant_id: tenantId, channel: "web", external_id: `test-${suffix}` })
       .select("id")
       .single();
-    ctx = { tenantId, businessName: "Test Agent Staff", conversationId: conversation!.id, channel: "web", whatsappAvailable: false, cutoffMinutes: 120 };
+    ctx = { tenantId, businessName: "Test Agent Staff", conversationId: conversation!.id, channel: "web", whatsappAvailable: false, cutoffMinutes: 120, takesBookings: true };
   });
 
   afterAll(async () => {

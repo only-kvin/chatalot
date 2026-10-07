@@ -14,6 +14,7 @@ import { formatPhone } from "@/lib/contacts/phone";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Sparkline } from "./sparkline";
+import type { Features } from "@/lib/plans";
 import { AiSwitches } from "./ai-switches";
 
 // Each section fetches its own data so the Overview can stream them in
@@ -56,7 +57,7 @@ type Kpi = {
   trend: number[] | null;
 };
 
-export async function Kpis({ tenantId }: { tenantId: string }) {
+export async function Kpis({ tenantId, bookings: showBookings }: { tenantId: string; bookings: boolean }) {
   const supabase = await createClient();
   const days = lastSevenDays();
   const weekStart = localToUtcDate(days[0], "00:00").toISOString();
@@ -157,7 +158,7 @@ export async function Kpis({ tenantId }: { tenantId: string }) {
 
   return (
     <>
-      {kpis.map((k, i) => (
+      {kpis.filter((k) => showBookings || k.icon !== CalendarIcon).map((k, i) => (
         <Link key={k.label} href={k.href} className="fade-up rounded-[20px] outline-none focus-visible:ring-3 focus-visible:ring-ring/50" style={{ "--i": i } as React.CSSProperties}>
           <Card lift className="h-[156px] gap-3 px-5">
             <div className="flex items-center justify-between gap-2">
@@ -374,7 +375,7 @@ export async function NewLeads({ tenantId }: { tenantId: string }) {
 // AI receptionist switches
 // ---------------------------------------------------------------------------
 
-export async function AiPanel({ tenantId }: { tenantId: string }) {
+export async function AiPanel({ tenantId, features }: { tenantId: string; features: Features }) {
   const supabase = await createClient();
   const [{ data: config }, { count: whatsappChannels }] = await Promise.all([
     supabase
@@ -392,6 +393,8 @@ export async function AiPanel({ tenantId }: { tenantId: string }) {
 
   return (
     <AiSwitches
+      webChat={features.web_chat}
+      whatsapp={features.whatsapp}
       whatsappConnected={(whatsappChannels ?? 0) > 0}
       initial={{
         web_ai_enabled: config?.web_ai_enabled ?? true,

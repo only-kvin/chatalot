@@ -1,8 +1,10 @@
 "use client";
 
 import { useOptimistic, useState, useTransition } from "react";
-import { BellIcon, GlobeIcon, MessageCircleIcon, type LucideIcon } from "lucide-react";
+import Link from "next/link";
+import { BellIcon, GlobeIcon, LockIcon, MessageCircleIcon, type LucideIcon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { PLAN_LABEL, planFor, type FeatureState } from "@/lib/plans";
 import { setAiSwitchAction, type AiSwitchKey } from "./actions";
 
 type Values = Record<AiSwitchKey, boolean>;
@@ -43,7 +45,19 @@ const ROWS: Row[] = [
   },
 ];
 
-export function AiSwitches({ initial, whatsappConnected }: { initial: Values; whatsappConnected: boolean }) {
+// A channel's switch: hidden when the platform admin switched the feature
+// off, locked (with an upgrade link) when it isn't on their plan.
+export function AiSwitches({
+  initial,
+  webChat,
+  whatsapp,
+  whatsappConnected,
+}: {
+  initial: Values;
+  webChat: FeatureState;
+  whatsapp: FeatureState;
+  whatsappConnected: boolean;
+}) {
   const [values, setValues] = useState(initial);
   const [optimistic, setOptimistic] = useOptimistic(values);
   const [, startTransition] = useTransition();
@@ -59,16 +73,33 @@ export function AiSwitches({ initial, whatsappConnected }: { initial: Values; wh
     });
   }
 
-  const channelsOn = [optimistic.web_ai_enabled, whatsappConnected && optimistic.whatsapp_ai_enabled].filter(Boolean).length;
-  const channels = whatsappConnected ? 2 : 1;
+  const webUsable = webChat === "on";
+  const waUsable = whatsapp === "on" && whatsappConnected;
+  const channels = [webUsable, waUsable].filter(Boolean).length;
+  const channelsOn = [webUsable && optimistic.web_ai_enabled, waUsable && optimistic.whatsapp_ai_enabled].filter(Boolean).length;
   const summary =
-    channelsOn === channels ? (channels === 1 ? "On for website chat" : "On for every channel") : channelsOn === 0 ? "Paused everywhere" : "On for one channel";
+    channels === 0
+      ? "Leads and messages still reach you"
+      : channelsOn === channels
+        ? channels === 1
+          ? webUsable
+            ? "On for website chat"
+            : "On for WhatsApp"
+          : "On for every channel"
+        : channelsOn === 0
+          ? "Paused everywhere"
+          : "On for one channel";
+  const rows = ROWS.filter(
+    (row) =>
+      !(row.key === "web_ai_enabled" && webChat !== "on") && !(row.key === "whatsapp_ai_enabled" && whatsapp === "hidden"),
+  );
 
   return (
     <>
       <p className="-mt-3 text-[13px] text-muted-foreground">{summary}</p>
       <div className="flex flex-col gap-1">
-        {ROWS.map((row) => {
+        {rows.map((row) => {
+          const locked = row.key === "whatsapp_ai_enabled" && whatsapp === "locked";
           const connected = row.key !== "whatsapp_ai_enabled" || whatsappConnected;
           const on = optimistic[row.key];
           const id = `ai-switch-${row.key}`;
@@ -80,10 +111,26 @@ export function AiSwitches({ initial, whatsappConnected }: { initial: Values; wh
               <label htmlFor={connected ? id : undefined} className="flex flex-1 flex-col gap-0.5">
                 <span className="text-sm font-semibold">{row.title}</span>
                 <span className="text-xs text-muted-foreground">
-                  {connected ? (on ? row.on : row.off) : "No WhatsApp number connected yet"}
+                  {locked
+                    ? `Available on ${PLAN_LABEL[planFor("whatsapp")]}`
+                    : connected
+                      ? on
+                        ? row.on
+                        : row.off
+                      : "No WhatsApp number connected yet"}
                 </span>
               </label>
-              {connected && <Switch id={id} checked={on} onChange={(e) => toggle(row.key, e.target.checked)} />}
+              {locked ? (
+                <Link
+                  href="/dashboard/upgrade/whatsapp"
+                  className="flex items-center gap-1.5 text-[13px] font-semibold text-link hover:underline"
+                >
+                  <LockIcon className="size-3.5" />
+                  Upgrade
+                </Link>
+              ) : (
+                connected && <Switch id={id} checked={on} onChange={(e) => toggle(row.key, e.target.checked)} />
+              )}
             </div>
           );
         })}

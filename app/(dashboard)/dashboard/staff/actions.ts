@@ -7,6 +7,7 @@ import { getCurrentTenantId } from "@/lib/db/current-tenant";
 import { timeOffRange } from "@/lib/bookings/hours";
 import { createAdminClient } from "@/lib/db/supabase-admin";
 import { imageKind, MAX_PHOTO_BYTES, PHOTO_BUCKET, storedPhotoPath } from "@/lib/staff/photo";
+import { featureError } from "@/lib/dashboard-features";
 
 // Staff, their services, hours and time off. The signed-in user's client is
 // used throughout, so RLS keeps every read and write inside their business;
@@ -48,6 +49,8 @@ function failed(what: string, err: unknown): Result {
 }
 
 export async function createStaffAction(formData: FormData): Promise<Result & { id?: string }> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
   const s = await session();
   if (!s) return { error: "Not authorized." };
   const parsed = detailsSchema.pick({ name: true, role: true }).safeParse({
@@ -75,6 +78,8 @@ export async function createStaffAction(formData: FormData): Promise<Result & { 
 }
 
 export async function updateStaffAction(staffId: string, formData: FormData): Promise<Result> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
   const s = await session();
   if (!s) return { error: "Not authorized." };
   if (!uuid.safeParse(staffId).success) return { error: "Invalid request." };
@@ -99,6 +104,8 @@ export async function updateStaffAction(staffId: string, formData: FormData): Pr
 
 // Swaps a person with their neighbour in the order customers see.
 export async function moveStaffAction(staffId: string, direction: "up" | "down"): Promise<Result> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
   const s = await session();
   if (!s) return { error: "Not authorized." };
   if (!uuid.safeParse(staffId).success) return { error: "Invalid request." };
@@ -132,6 +139,8 @@ export async function moveStaffAction(staffId: string, direction: "up" | "down")
 // Only for someone who never had a booking; anyone else is deactivated, so
 // their past bookings keep their name.
 export async function deleteStaffAction(staffId: string): Promise<Result> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
   const s = await session();
   if (!s) return { error: "Not authorized." };
   if (!uuid.safeParse(staffId).success) return { error: "Invalid request." };
@@ -154,6 +163,8 @@ export async function deleteStaffAction(staffId: string): Promise<Result> {
 // Ticks or unticks a service for someone. Only for services limited to
 // chosen staff; a service anyone can do is changed on the Services page.
 export async function setStaffServiceAction(staffId: string, serviceId: string, offered: boolean): Promise<Result> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
   const s = await session();
   if (!s) return { error: "Not authorized." };
   if (!uuid.safeParse(staffId).success || !uuid.safeParse(serviceId).success) return { error: "Invalid request." };
@@ -187,6 +198,8 @@ export async function setStaffServiceAction(staffId: string, serviceId: string, 
 
 // Own hours start as a copy of the business's, ready to adjust.
 export async function switchToOwnHoursAction(staffId: string): Promise<Result> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
   const s = await session();
   if (!s) return { error: "Not authorized." };
   if (!uuid.safeParse(staffId).success) return { error: "Invalid request." };
@@ -208,6 +221,8 @@ export async function switchToOwnHoursAction(staffId: string): Promise<Result> {
 }
 
 export async function switchToBusinessHoursAction(staffId: string): Promise<Result> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
   const s = await session();
   if (!s) return { error: "Not authorized." };
   if (!uuid.safeParse(staffId).success) return { error: "Invalid request." };
@@ -231,6 +246,8 @@ const timeOffSchema = z.object({
 });
 
 export async function addTimeOffAction(staffId: string, formData: FormData): Promise<Result> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
   const s = await session();
   if (!s) return { error: "Not authorized." };
   if (!uuid.safeParse(staffId).success) return { error: "Invalid request." };
@@ -259,6 +276,8 @@ export async function addTimeOffAction(staffId: string, formData: FormData): Pro
 }
 
 export async function deleteTimeOffAction(timeOffId: string): Promise<Result> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
   const s = await session();
   if (!s) return { error: "Not authorized." };
   if (!uuid.safeParse(timeOffId).success) return { error: "Invalid request." };
@@ -279,6 +298,8 @@ export async function deleteTimeOffAction(timeOffId: string): Promise<Result> {
 // service-role client does the storage work, only after confirming through
 // the user's own RLS-scoped client that this staff member is theirs.
 export async function uploadStaffPhotoAction(staffId: string, formData: FormData): Promise<Result> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
   const s = await session();
   if (!s) return { error: "Not authorized." };
   if (!uuid.safeParse(staffId).success) return { error: "Invalid request." };
@@ -317,6 +338,8 @@ export async function uploadStaffPhotoAction(staffId: string, formData: FormData
 }
 
 export async function removeStaffPhotoAction(staffId: string): Promise<Result> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
   const s = await session();
   if (!s) return { error: "Not authorized." };
   if (!uuid.safeParse(staffId).success) return { error: "Invalid request." };

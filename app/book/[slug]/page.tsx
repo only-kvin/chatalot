@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { createAdminClient } from "@/lib/db/supabase-admin";
 import { loadWidget } from "@/lib/widgets/config";
+import { parsePlan, resolveFeatures } from "@/lib/plans";
 
 // ChatAlot's hosted booking page for a business: its appointment widget,
 // in its own look, for customers who'd rather click than chat (the AI's
@@ -11,10 +12,12 @@ async function load(slug: string) {
   const admin = createAdminClient();
   const { data: tenant } = await admin
     .from("tenants")
-    .select("id, status, public_widget_key")
+    .select("id, status, public_widget_key, plan, feature_overrides")
     .eq("slug", slug)
     .maybeSingle();
   if (!tenant || tenant.status !== "active") return null;
+  // No online bookings on their plan: same as an unknown business.
+  if (resolveFeatures(parsePlan(tenant.plan), tenant.feature_overrides).bookings !== "on") return null;
   const [{ data: config }, widget] = await Promise.all([
     admin.from("agent_configs").select("business_name, handoff_contact").eq("tenant_id", tenant.id).maybeSingle(),
     loadWidget(admin, tenant.id, "appointment"),

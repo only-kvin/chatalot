@@ -1,7 +1,10 @@
 import { appUrl } from "@/lib/app-url";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/db/supabase-server";
-import { connectWhatsAppChannelAction, disconnectWhatsAppChannelAction } from "./actions";
+import { connectWhatsAppChannelAction, disconnectWhatsAppChannelAction, markUpgradeHandledAction } from "./actions";
+import { PlanEditor } from "./plan-editor";
+import { FEATURE_INFO, FEATURES, overridesSchema, parsePlan, type Feature } from "@/lib/plans";
+import { formatShortLocal } from "@/lib/time";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,10 +27,18 @@ export default async function TenantDetailPage({
 
   const { data: tenant } = await supabase
     .from("tenants")
-    .select("id, name, slug, public_widget_key")
+    .select("id, name, slug, public_widget_key, plan, feature_overrides")
     .eq("id", id)
     .single();
   if (!tenant) notFound();
+
+  const { data: requests } = await supabase
+    .from("upgrade_requests")
+    .select("id, feature, created_at")
+    .eq("tenant_id", id)
+    .is("handled_at", null)
+    .order("created_at");
+  const overrides = overridesSchema.safeParse(tenant.feature_overrides);
 
   const { data: channel } = await supabase
     .from("channels")
@@ -42,6 +53,41 @@ export default async function TenantDetailPage({
         <h1 className="text-2xl font-semibold">{tenant.name}</h1>
         <p className="text-sm text-muted-foreground">/{tenant.slug}</p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Plan &amp; features</CardTitle>
+          <CardDescription>
+            Features not in the plan show to the owner as locked, with an upgrade page. &ldquo;Off&rdquo; hides a
+            feature completely, for businesses it doesn&apos;t fit. Their data is kept either way.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-6">
+          {!!requests?.length && (
+            <div className="flex flex-col gap-2 rounded-xl bg-tone-warn p-3 text-tone-warn-foreground">
+              <span className="text-sm font-semibold">Upgrade requests</span>
+              {requests.map((r) => (
+                <form key={r.id} action={markUpgradeHandledAction} className="flex items-center justify-between gap-3 text-sm">
+                  <input type="hidden" name="requestId" value={r.id} />
+                  <input type="hidden" name="tenantId" value={tenant.id} />
+                  <span>
+                    {FEATURES.includes(r.feature as Feature) ? FEATURE_INFO[r.feature as Feature].title : r.feature} ·{" "}
+                    {formatShortLocal(r.created_at)}
+                  </span>
+                  <Button type="submit" size="sm" variant="outline">
+                    Mark handled
+                  </Button>
+                </form>
+              ))}
+            </div>
+          )}
+          <PlanEditor
+            tenantId={tenant.id}
+            plan={parsePlan(tenant.plan)}
+            overrides={overrides.success ? overrides.data : {}}
+          />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

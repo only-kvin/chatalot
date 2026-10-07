@@ -45,13 +45,25 @@ which one below. Follow these rules at all times:
 export type BookableService = { name: string; duration_minutes: number };
 export type PromptStaff = { name: string; role: string; services: string[] };
 
-function buildTenantLayer(config: AgentConfig, services: BookableService[], staff: PromptStaff[]): string {
+function buildTenantLayer(
+  config: AgentConfig,
+  services: BookableService[],
+  staff: PromptStaff[],
+  takesBookings: boolean,
+): string {
   const lines = [
     `You are the receptionist for ${config.business_name}.`,
     `Tone: ${config.tone}.`,
     `Today's date is ${todayLocalLabel()}.`,
   ];
   if (config.system_prompt_extra) lines.push(config.system_prompt_extra);
+  if (!takesBookings) {
+    // No booking tools are offered then; this keeps the model from promising
+    // one, without mentioning plans to the customer.
+    lines.push(
+      "You can't make, change or check bookings. If someone wants an appointment or a quote visit, offer to take their name and phone number so the team can call them back (save_lead).",
+    );
+  }
   if (services.length) {
     // Exact names matter: the booking tools look services up by name.
     lines.push(
@@ -104,11 +116,12 @@ export function buildSystemPrompt(
   knowledgeText: string,
   services: BookableService[] = [],
   staff: PromptStaff[] = [],
+  takesBookings = true,
 ): string {
   return [
     PLATFORM_LAYER,
     "\n---\n",
-    buildTenantLayer(config, services, staff),
+    buildTenantLayer(config, services, staff, takesBookings),
     "\n---\n",
     buildKnowledgeLayer(knowledgeText),
   ].join("\n");

@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/db/supabase-admin";
+import { hasFeature } from "@/lib/features";
 import { decrypt } from "@/lib/security/crypto";
 import { redis } from "@/lib/redis";
 import { isWithinServiceWindow, sendWhatsAppText } from "./whatsapp";
@@ -75,6 +76,17 @@ async function saveMessage(
     .insert({ tenant_id: tenantId, conversation_id: conversationId, role, content });
 }
 
+// The owner paused WhatsApp AI, or it isn't on their plan: messages are
+// still saved for the owner, but nothing replies automatically.
+async function whatsappAiOff(admin: AdminClient, tenantId: string): Promise<boolean> {
+  const { data: config } = await admin
+    .from("agent_configs")
+    .select("whatsapp_ai_enabled")
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  return config?.whatsapp_ai_enabled === false || !(await hasFeature(admin, tenantId, "whatsapp"));
+}
+
 async function handleMessage(
   admin: AdminClient,
   tenantId: string,
@@ -130,13 +142,8 @@ async function handleMessage(
     await saveMessage(admin, tenantId, conversation.id, "user", `[Customer sent ${nonTextLabel}]`);
     // In human mode the owner replies from the dashboard; no auto-reply.
     if (conversation.status === "human") return;
-    // Nor when the owner has paused WhatsApp AI.
-    const { data: config } = await admin
-      .from("agent_configs")
-      .select("whatsapp_ai_enabled")
-      .eq("tenant_id", tenantId)
-      .maybeSingle();
-    if (config?.whatsapp_ai_enabled === false) return;
+    // Nor when WhatsApp AI is paused or not on their plan.
+    if (await whatsappAiOff(admin, tenantId)) return;
     await saveMessage(admin, tenantId, conversation.id, "assistant", NON_TEXT_REPLY);
     await sendWhatsAppText(phoneNumberId, accessToken, customerPhone, NON_TEXT_REPLY);
     return;
@@ -205,7 +212,11 @@ async function handleMessage(
     return;
   }
 
-  if (conversation.status === "human" || agentConfig?.whatsapp_ai_enabled === false) {
+  if (
+    conversation.status === "human" ||
+    agentConfig?.whatsapp_ai_enabled === false ||
+    !(await hasFeature(admin, tenantId, "whatsapp"))
+  ) {
     // The owner is handling this one (or all WhatsApp chats) from the dashboard.
     await saveMessage(admin, tenantId, conversation.id, "user", text);
     return;

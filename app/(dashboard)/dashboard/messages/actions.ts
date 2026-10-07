@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
+import { featureError } from "@/lib/dashboard-features";
 
 // Contact-form messages: the dashboard only changes their status. The
 // user's own client is used, so RLS (and a column grant on status alone)
@@ -12,6 +13,8 @@ import { getCurrentTenantId } from "@/lib/db/current-tenant";
 const schema = z.object({ id: z.string().uuid(), status: z.enum(["new", "read", "replied"]) });
 
 export async function setMessageStatusAction(id: string, status: string): Promise<{ error: string | null }> {
+  const blocked = await featureError("contact_form");
+  if (blocked) return { error: blocked };
   const tenantId = await getCurrentTenantId();
   if (!tenantId) return { error: "Not authorized." };
   const parsed = schema.safeParse({ id, status });
@@ -35,6 +38,8 @@ export async function setMessageStatusAction(id: string, status: string): Promis
 // Opening a message: new -> read, and only from new, so it can never undo a
 // "replied" the owner set in the meantime.
 export async function markMessageReadAction(id: string): Promise<{ error: string | null }> {
+  const blocked = await featureError("contact_form");
+  if (blocked) return { error: blocked };
   const tenantId = await getCurrentTenantId();
   if (!tenantId) return { error: "Not authorized." };
   if (!z.string().uuid().safeParse(id).success) return { error: "Invalid request." };

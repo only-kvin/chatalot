@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/db/supabase-server";
-import { getCurrentTenantId } from "@/lib/db/current-tenant";
+import { requireFeaturePage } from "@/lib/dashboard-features";
 import { formatLocalDateTime } from "@/lib/time";
 import {
   describeEvent,
@@ -39,8 +38,7 @@ export default async function BookingsPage({
 }: {
   searchParams: Promise<{ tab?: string; staff?: string }>;
 }) {
-  const tenantId = await getCurrentTenantId();
-  if (!tenantId) redirect("/");
+  const tenantId = await requireFeaturePage("bookings");
   const params = await searchParams;
   const tab: Tab = TABS.some((t) => t.id === params.tab) ? (params.tab as Tab) : "upcoming";
 

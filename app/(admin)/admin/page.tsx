@@ -2,6 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/db/supabase-server";
 import { createTenantAction } from "./actions";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { PLAN_LABEL, parsePlan } from "@/lib/plans";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -26,6 +28,9 @@ export default async function AdminPage() {
     .from("tenants")
     .select("id, name, slug, status, plan, public_widget_key, created_at")
     .order("created_at", { ascending: false });
+  const { data: requests } = await supabase.from("upgrade_requests").select("tenant_id").is("handled_at", null);
+  const openRequests = new Map<string, number>();
+  for (const r of requests ?? []) openRequests.set(r.tenant_id, (openRequests.get(r.tenant_id) ?? 0) + 1);
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-8 p-8">
@@ -96,7 +101,14 @@ export default async function AdminPage() {
                   </TableCell>
                   <TableCell>{t.slug}</TableCell>
                   <TableCell>{t.status}</TableCell>
-                  <TableCell>{t.plan}</TableCell>
+                  <TableCell>
+                    {PLAN_LABEL[parsePlan(t.plan)]}
+                    {!!openRequests.get(t.id) && (
+                      <Badge variant="warning" className="ml-2">
+                        {openRequests.get(t.id)} upgrade request{openRequests.get(t.id) === 1 ? "" : "s"}
+                      </Badge>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
               {!tenants?.length && (

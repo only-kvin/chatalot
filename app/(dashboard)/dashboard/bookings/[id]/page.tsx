@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { ArrowLeftIcon } from "lucide-react";
 import { createClient } from "@/lib/db/supabase-server";
-import { getCurrentTenantId } from "@/lib/db/current-tenant";
+import { requireFeaturePage } from "@/lib/dashboard-features";
 import { formatLocalDateTime, localDateISO } from "@/lib/time";
 import { canonicalPhone, formatPhone } from "@/lib/contacts/phone";
 import {
@@ -21,8 +21,7 @@ import { AssignStaff } from "./assign-staff";
 
 export default async function BookingPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const tenantId = await getCurrentTenantId();
-  if (!tenantId) redirect("/");
+  const tenantId = await requireFeaturePage("bookings");
 
   const supabase = await createClient();
   const {
