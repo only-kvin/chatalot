@@ -7,9 +7,9 @@ import { createPicker } from "../booking/picker";
 import { createShell } from "../booking/shell";
 import { createDetails, renderDone, summaryList } from "../booking/steps";
 
-// The schedule widget: date first. Pick a day on a week strip (or the
-// month), a time, fill in the business's form, confirm. Service and person
-// are chosen at the top, since the times depend on them.
+// The schedule widget: date first. Pick a day on the month calendar, a
+// time, fill in the business's form, confirm. Service and person are chosen
+// at the top, since the times depend on them.
 
 type ScheduleConfig = BaseConfig & { settings: { allowStaffChoice: boolean } };
 type Step = "pick" | "details" | "done";
@@ -159,7 +159,6 @@ export function mountSchedule(host: HTMLElement, ctx: MountContext): void {
         h("h2", { id: `${shell.id}-title`, tabindex: -1 }, config!.copy.title),
         config!.businessName ? h("p", { class: "muted" }, config!.businessName) : null,
       ),
-      step === "pick" ? picker.viewToggle() : null,
     );
   }
 

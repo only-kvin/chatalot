@@ -96,7 +96,7 @@ function mountReschedule(host: HTMLElement, ctx: MountContext): void {
       );
     }
     shell.paint(() => [
-      h("div", { class: "head" }, h("h2", { id: `${shell.id}-title`, tabindex: -1 }, "Choose a new time"), picker.viewToggle()),
+      h("div", { class: "head" }, h("h2", { id: `${shell.id}-title`, tabindex: -1 }, "Choose a new time")),
       current ? h("p", { class: "muted note" }, `Now: ${dayLong(current.date)} at ${current.time}`) : null,
       ...picker.render(alert),
       chosen

@@ -31,15 +31,26 @@ export function onColor(hex: string): string {
 
 const DARK = { surface: "#18181b", text: "#fafafa" };
 
-function vars(t: { primary: string; surface: string; text: string; radius: number; family: string }): string {
+// Besides the business's own colours, a few derived ones give the widgets
+// the dashboard's depth: a top-lit gradient on buttons, a coloured glow
+// under them, and soft layered shadows that are darker on dark themes.
+function vars(t: { primary: string; surface: string; text: string; radius: number; family: string }, dark: boolean): string {
   return `
     --ca-primary: ${t.primary};
     --ca-on-primary: ${onColor(t.primary)};
+    --ca-primary-hi: color-mix(in srgb, ${t.primary} 84%, #fff);
+    --ca-primary-lo: color-mix(in srgb, ${t.primary} 86%, #000);
+    --ca-glow: color-mix(in srgb, ${t.primary} 45%, transparent);
     --ca-surface: ${t.surface};
+    --ca-surface-2: color-mix(in srgb, ${t.text} 2.5%, ${t.surface});
+    --ca-raised: ${dark ? `color-mix(in srgb, #fff 6%, ${t.surface})` : t.surface};
     --ca-text: ${t.text};
     --ca-muted: color-mix(in srgb, ${t.text} 55%, ${t.surface});
-    --ca-line: color-mix(in srgb, ${t.text} 14%, ${t.surface});
+    --ca-line: color-mix(in srgb, ${t.text} 12%, ${t.surface});
     --ca-soft: color-mix(in srgb, ${t.primary} 10%, ${t.surface});
+    --ca-hi: ${dark ? "rgba(255,255,255,.06)" : "rgba(255,255,255,.9)"};
+    --ca-shadow: ${dark ? "rgba(0,0,0,.5)" : "rgba(17,17,26,.12)"};
+    --ca-shade: ${dark ? "rgba(255,255,255,.06)" : "rgba(17,17,26,.05)"};
     --ca-radius: ${t.radius}px;
     --ca-font: ${t.family};`;
 }
@@ -48,11 +59,11 @@ export function themeCss(theme: Theme): string {
   const family = FONTS[theme.font]?.family ?? "inherit";
   const own = { ...theme, family };
   const dark = { ...theme, ...DARK, family };
-  if (theme.mode === "dark") return `:host { ${vars(dark)} }`;
+  if (theme.mode === "dark") return `:host { ${vars(dark, true)} }`;
   if (theme.mode === "auto") {
-    return `:host { ${vars(own)} } @media (prefers-color-scheme: dark) { :host { ${vars(dark)} } }`;
+    return `:host { ${vars(own, false)} } @media (prefers-color-scheme: dark) { :host { ${vars(dark, true)} } }`;
   }
-  return `:host { ${vars(own)} }`;
+  return `:host { ${vars(own, false)} }`;
 }
 
 // Web fonts must be declared in the page itself (not the shadow root).

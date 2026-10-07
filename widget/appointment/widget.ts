@@ -167,7 +167,6 @@ export function mountAppointment(host: HTMLElement, ctx: MountContext): void {
           h("span", {}, `Step ${index + 1} of ${list.length}: ${STEP_LABEL[step]}`),
         ),
       ),
-      step === "time" ? picker.viewToggle() : null,
     );
   }
 

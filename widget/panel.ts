@@ -68,10 +68,31 @@ export function createWidget(
 
   const header = document.createElement("div");
   header.className = "header";
+  // The business's avatar, or its first letter.
+  let avatar: HTMLElement;
+  if (config.avatarUrl?.startsWith("https://")) {
+    const img = document.createElement("img");
+    img.src = config.avatarUrl;
+    img.alt = "";
+    avatar = img;
+  } else {
+    avatar = document.createElement("span");
+    avatar.setAttribute("aria-hidden", "true");
+    avatar.textContent = (config.businessName.trim()[0] ?? "?").toUpperCase();
+  }
+  avatar.className = "avatar";
+  header.appendChild(avatar);
   // textContent, not innerHTML: businessName is tenant-controlled text.
-  const title = document.createElement("span");
+  const who = document.createElement("div");
+  who.className = "who";
+  const title = document.createElement("strong");
   title.textContent = config.businessName;
-  header.appendChild(title);
+  const status = document.createElement("span");
+  const live = document.createElement("i");
+  live.className = "live";
+  status.append(live, "Online · replies instantly");
+  who.append(title, status);
+  header.appendChild(who);
   const closeBtn = document.createElement("button");
   closeBtn.className = "close-btn";
   closeBtn.setAttribute("aria-label", "Close chat");

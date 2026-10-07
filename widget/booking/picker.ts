@@ -5,20 +5,18 @@ import {
   addMonths,
   dayLong,
   dayNumber,
-  dayShort,
   groupSlots,
   monthGrid,
   monthLabel,
   nearestAvailable,
-  weekDays,
-  weekStart,
   type Slot,
 } from "./calendar";
 import type { Shell } from "./shell";
 
-// The date-and-time picker shared by every booking widget: a week strip of
-// day circles (or the whole month), then the day's times grouped Morning /
-// Afternoon / Evening, with booked times shown disabled. Owns its own
+// The date-and-time picker shared by every booking widget: a month calendar
+// (days with free times marked with a dot), and the chosen day's times
+// grouped Morning / Afternoon / Evening, with booked times shown disabled.
+// Side by side on wide widgets, stacked on narrow ones. Owns its own
 // availability cache; the widget around it decides what happens when a
 // time is chosen.
 
@@ -27,15 +25,15 @@ export type Picker = {
   // chosen day when it changes.
   setQuery: (serviceId: string, staffId: string) => void;
   load: () => Promise<void>;
-  // The "Full month" / "Week view" toggle, for the widget's header.
-  viewToggle: () => HTMLElement;
-  // The strip or month, any loading error, and the times for the chosen day.
+  // The calendar and times, plus any loading error or alert above them.
   render: (alert: string | null) => Node[];
   // After "that time was just taken": reload the day and offer the nearest
   // free times; returns them.
   refreshAfterTaken: (date: string, time: string) => Promise<string[]>;
   clear: () => void;
 };
+
+const DOWS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export function createPicker(opts: {
   shell: Shell;
@@ -49,14 +47,16 @@ export function createPicker(opts: {
 }): Picker {
   const { shell } = opts;
   const today = localDateISO(new Date());
+  const thisMonth = `${today.slice(0, 7)}-01`;
   let serviceId = "";
   let staffId = "";
-  let view: "week" | "month" = "week";
-  let monday = weekStart(today);
-  let monthCursor = `${today.slice(0, 7)}-01`;
+  let month = thisMonth;
   let selectedDate: string | null = null;
   let loadError = false;
   let nearest: string[] = [];
+  // The day whose times last played their entrance; re-renders for other
+  // reasons (e.g. next month finishing loading) don't replay it.
+  let animated: string | null = null;
   // Slots per service/staff/day; a missing entry means "not loaded yet".
   const cache = new Map<string, Slot[]>();
   const inflight = new Set<string>();
@@ -67,6 +67,8 @@ export function createPicker(opts: {
     return slots && opts.hideTime ? slots.filter((s) => !opts.hideTime!(date, s.time)) : slots;
   };
   const hasFree = (date: string) => slotsFor(date)?.some((s) => s.available) ?? false;
+  // The days of a month (the 1st given), in order.
+  const daysOf = (first: string) => monthGrid(first).filter((d) => d.slice(0, 7) === first.slice(0, 7));
 
   async function ensure(from: string, to: string) {
     const start = from < today ? today : from;
@@ -91,45 +93,36 @@ export function createPicker(opts: {
     opts.rerender();
   }
 
-  // Loads what the current view shows, then the week after (so "next" is instant).
+  // Loads the month on show and picks its first free day, then quietly loads
+  // the next month so "›" is instant.
   async function load() {
-    if (view === "week") {
-      const days = weekDays(monday);
-      await ensure(days[0], days[6]);
-      if (!selectedDate) {
-        const first = days.find((d) => d >= today && hasFree(d));
-        if (first) {
-          selectedDate = first;
-          opts.rerender();
-        }
+    const days = daysOf(month);
+    await ensure(days[0], days[days.length - 1]);
+    if (!selectedDate || selectedDate.slice(0, 7) !== month.slice(0, 7)) {
+      const first = days.find((d) => d >= today && hasFree(d));
+      if (first) {
+        selectedDate = first;
+        opts.rerender();
       }
-      const next = weekDays(addDays(monday, 7));
-      ensure(next[0], next[6]);
-    } else {
-      const grid = monthGrid(monthCursor);
-      await ensure(grid[0], grid[41]);
     }
+    const next = daysOf(addMonths(month, 1));
+    ensure(next[0], next[next.length - 1]);
   }
 
-  function goWeek(delta: number) {
-    const next = addDays(monday, 7 * delta);
-    if (weekDays(next)[6] < today) return;
-    monday = next;
+  function goMonth(delta: number) {
+    const next = addMonths(month, delta);
+    if (next < thisMonth) return;
+    month = next;
     selectedDate = null;
     nearest = [];
     opts.rerender();
     load();
-    shell.announce(`Week of ${dayLong(monday)}`);
+    shell.announce(monthLabel(month));
   }
 
   function selectDate(date: string) {
     selectedDate = date;
     nearest = [];
-    if (view === "month") {
-      view = "week";
-      monday = weekStart(date);
-      load();
-    }
     opts.rerender();
     const free = slotsFor(date)?.filter((s) => s.available).length ?? 0;
     shell.announce(`${dayLong(date)}: ${free} time${free === 1 ? "" : "s"} available`);
@@ -138,13 +131,14 @@ export function createPicker(opts: {
   function dayButton(date: string) {
     const loaded = slotsFor(date) !== undefined;
     const past = date < today;
-    const disabled = past || (loaded && !hasFree(date));
+    const free = loaded && hasFree(date);
+    const disabled = past || (loaded && !free);
     const selected = date === selectedDate;
     const b = h(
       "button",
       {
         type: "button",
-        class: `day${date === today ? " today" : ""}${!loaded && !past ? " skeleton" : ""}`,
+        class: `day${date === today ? " today" : ""}${free ? " free" : ""}${!loaded && !past ? " skeleton" : ""}`,
         role: "radio",
         "aria-checked": selected ? "true" : "false",
         "aria-label": `${dayLong(date)}${disabled ? ", no times" : ""}`,
@@ -153,120 +147,123 @@ export function createPicker(opts: {
         "data-k": `day-${date}`,
         "data-date": date,
       },
-      h("span", { class: "dow", "aria-hidden": "true" }, dayShort(date)),
       h("span", { class: "num", "aria-hidden": "true" }, dayNumber(date)),
     );
     b.addEventListener("click", () => selectDate(date));
     return b;
   }
 
-  // Arrow keys move between days (and into the next/previous week).
+  // Arrow keys move a day (left/right) or a week (up/down) to the nearest
+  // open day; past the month's edge they turn the page.
   function onDayKeys(e: KeyboardEvent) {
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
-    const days = Array.from(shell.card.querySelectorAll<HTMLButtonElement>(".days .day:not(:disabled)"));
-    if (!days.length) return;
-    const current = days.findIndex((d) => d === shell.shadow.activeElement);
+    const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
+    if (step === undefined && e.key !== "Home" && e.key !== "End") return;
     e.preventDefault();
-    let target: HTMLButtonElement | undefined;
-    if (e.key === "Home") target = days[0];
-    else if (e.key === "End") target = days[days.length - 1];
-    else target = days[current + (e.key === "ArrowRight" ? 1 : -1)];
-    if (target) {
-      selectDate(target.dataset.date!);
-      shell.focusFirst(`[data-k="day-${target.dataset.date}"]`);
-    } else if (view === "week") {
-      goWeek(e.key === "ArrowRight" ? 1 : -1);
+    const open = daysOf(month).filter((d) => d >= today && hasFree(d));
+    if (!open.length) return;
+    let target: string | undefined;
+    if (e.key === "Home") target = open[0];
+    else if (e.key === "End") target = open[open.length - 1];
+    else {
+      const from = selectedDate ?? open[0];
+      for (let d = addDays(from, step!); d.slice(0, 7) === month.slice(0, 7); d = addDays(d, step! > 0 ? 1 : -1)) {
+        if (open.includes(d)) {
+          target = d;
+          break;
+        }
+      }
+      if (!target) return goMonth(step! > 0 ? 1 : -1);
     }
+    selectDate(target);
+    shell.focusFirst(`[data-k="day-${target}"]`);
   }
 
-  function dayGroup(days: Node[]) {
-    const group = h("div", { class: "days", role: "radiogroup", "aria-label": "Choose a day" }, days);
-    // Without a selected day, the first open day takes the tab stop.
-    if (!group.querySelector('[tabindex="0"]')) group.querySelector<HTMLElement>(".day:not(:disabled)")?.setAttribute("tabindex", "0");
-    group.addEventListener("keydown", onDayKeys);
-    return group;
-  }
-
-  function weekStrip() {
-    const strip = h(
+  function calendar() {
+    const inMonth = month.slice(0, 7);
+    // Most months need five weeks, not six: drop a sixth week that's all next month.
+    const grid = monthGrid(month);
+    const cells = grid[35].slice(0, 7) === inMonth ? grid : grid.slice(0, 35);
+    const days = h(
       "div",
-      { class: "week" },
-      shell.button("arrow", "‹", () => goWeek(-1), "prev", { "aria-label": "Previous week", disabled: monday <= weekStart(today) }),
-      dayGroup(weekDays(monday).map(dayButton)),
-      shell.button("arrow", "›", () => goWeek(1), "next", { "aria-label": "Next week" }),
+      { class: "days", role: "radiogroup", "aria-label": `Choose a day in ${monthLabel(month)}` },
+      cells.map((d) => (d.slice(0, 7) === inMonth ? dayButton(d) : h("span", { class: "day blank", "aria-hidden": "true" }))),
     );
-    let startX = 0;
-    strip.addEventListener("touchstart", (e) => (startX = e.touches[0].clientX), { passive: true });
-    strip.addEventListener("touchend", (e) => {
-      const dx = e.changedTouches[0].clientX - startX;
-      if (Math.abs(dx) > 50) goWeek(dx < 0 ? 1 : -1);
-    });
-    return strip;
-  }
+    // Without a selected day, the first open day takes the tab stop.
+    if (!days.querySelector('[tabindex="0"]')) days.querySelector<HTMLElement>(".day:not(:disabled)")?.setAttribute("tabindex", "0");
+    days.addEventListener("keydown", onDayKeys);
 
-  function monthView() {
-    const month = monthCursor.slice(0, 7);
-    const move = (n: number) => {
-      monthCursor = addMonths(monthCursor, n);
-      opts.rerender();
-      load();
-      shell.announce(monthLabel(monthCursor));
-    };
-    return h(
+    const cal = h(
       "div",
-      { class: "month" },
+      { class: "cal" },
       h(
         "div",
-        { class: "month-head" },
-        shell.button("arrow", "‹", () => move(-1), "mprev", { "aria-label": "Previous month", disabled: month <= today.slice(0, 7) }),
-        h("span", {}, monthLabel(monthCursor)),
-        shell.button("arrow", "›", () => move(1), "mnext", { "aria-label": "Next month" }),
+        { class: "cal-head" },
+        shell.button("arrow", "‹", () => goMonth(-1), "mprev", { "aria-label": "Previous month", disabled: month <= thisMonth }),
+        h("span", { "aria-live": "off" }, monthLabel(month)),
+        shell.button("arrow", "›", () => goMonth(1), "mnext", { "aria-label": "Next month" }),
       ),
-      dayGroup(
-        monthGrid(monthCursor).map((d) => (d.slice(0, 7) === month ? dayButton(d) : h("span", { class: "day blank", "aria-hidden": "true" }))),
-      ),
+      h("div", { class: "dows", "aria-hidden": "true" }, DOWS.map((d) => h("span", {}, d.slice(0, 2)))),
+      days,
     );
+    // Swipe sideways to change month.
+    let startX = 0;
+    cal.addEventListener("touchstart", (e) => (startX = e.touches[0].clientX), { passive: true });
+    cal.addEventListener("touchend", (e) => {
+      const dx = e.changedTouches[0].clientX - startX;
+      if (Math.abs(dx) > 50) goMonth(dx < 0 ? 1 : -1);
+    });
+    return cal;
   }
 
-  function slotList() {
+  function times() {
+    const days = daysOf(month);
     if (!selectedDate) {
-      const anyLoaded = weekDays(monday).some((d) => slotsFor(d) !== undefined);
-      const anyFree = weekDays(monday).some((d) => hasFree(d));
-      if (anyLoaded && !anyFree) return h("p", { class: "muted note" }, "No times this week. Try the next week.");
-      return null;
+      const loaded = days.filter((d) => d >= today).every((d) => slotsFor(d) !== undefined);
+      if (loaded && !days.some(hasFree)) {
+        return h(
+          "div",
+          { class: "times" },
+          h("p", { class: "muted note" }, `No times left in ${monthLabel(month).split(" ")[0]}.`),
+          shell.button("ghost", "Try next month", () => goMonth(1), "nextmonth"),
+        );
+      }
+      // Still loading: placeholders shaped like the times that will appear.
+      return h("div", { class: "times", "aria-hidden": "true" }, h("div", { class: "slot-grid" }, [0, 1, 2, 3, 4, 5].map(() => h("div", { class: "shimmer" }))));
     }
     const slots = slotsFor(selectedDate);
-    if (!slots) return h("p", { class: "muted note" }, "Loading times…");
     const date = selectedDate;
     const choose = (t: string) => opts.onChoose(date, t);
+    const freeCount = slots?.filter((s) => s.available).length ?? 0;
+    const animate = slots !== undefined && animated !== `${cacheKey(date)}|${nearest.join()}`;
+    if (animate) animated = `${cacheKey(date)}|${nearest.join()}`;
+    let i = 0;
+    const slotButton = (time: string, available = true) =>
+      shell.button(animate ? "slot in" : "slot", time, () => choose(time), "slot", {
+        disabled: !available,
+        "aria-label": `${time}${available ? "" : ", booked"}`,
+        style: animate ? `--i:${i++}` : false,
+      });
     return h(
       "div",
-      { class: "slots", role: "group", "aria-label": `Times on ${dayLong(date)}` },
-      nearest.length
-        ? h(
+      { class: "times" },
+      h(
+        "div",
+        { class: "times-head" },
+        h("strong", {}, dayLong(date)),
+        slots ? h("span", { class: "chip" }, `${freeCount} free`) : null,
+      ),
+      !slots
+        ? h("div", { class: "slot-grid", "aria-hidden": "true" }, [0, 1, 2, 3].map(() => h("div", { class: "shimmer" })))
+        : h(
             "div",
-            {},
-            h("h3", {}, "Nearest free times"),
-            h("div", { class: "slot-grid" }, nearest.map((t) => shell.button("slot", t, () => choose(t), "slot"))),
-          )
-        : null,
-      groupSlots(slots).map((g) =>
-        h(
-          "div",
-          {},
-          h("h3", {}, g.label),
-          h(
-            "div",
-            { class: "slot-grid" },
-            g.slots.map((s) =>
-              shell.button("slot", s.time, () => choose(s.time), "slot", {
-                disabled: !s.available,
-                "aria-label": `${s.time}${s.available ? "" : ", booked"}`,
-              }),
+            { class: "slots", role: "group", "aria-label": `Times on ${dayLong(date)}` },
+            nearest.length
+              ? h("div", {}, h("h3", {}, "Nearest free times"), h("div", { class: "slot-grid" }, nearest.map((t) => slotButton(t))))
+              : null,
+            groupSlots(slots).map((g) =>
+              h("div", {}, h("h3", {}, g.label), h("div", { class: "slot-grid" }, g.slots.map((s) => slotButton(s.time, s.available)))),
             ),
           ),
-        ),
-      ),
     );
   }
 
@@ -279,16 +276,8 @@ export function createPicker(opts: {
       nearest = [];
     },
     load,
-    viewToggle() {
-      return shell.button("ghost", view === "week" ? "Full month" : "Week view", () => {
-        view = view === "week" ? "month" : "week";
-        if (view === "month") monthCursor = `${(selectedDate ?? monday).slice(0, 7)}-01`;
-        opts.rerender();
-        load();
-      }, "view");
-    },
     render(alert) {
-      const nodes: (Node | null)[] = [view === "week" ? weekStrip() : monthView()];
+      const nodes: Node[] = [];
       if (loadError) {
         nodes.push(
           h("div", { class: "alert", role: "alert" }, `We couldn't load the available times.${opts.contactLine?.() ?? ""}`),
@@ -300,12 +289,13 @@ export function createPicker(opts: {
         );
       }
       if (alert) nodes.push(h("div", { class: "alert", role: "alert" }, alert));
-      if (view === "week") nodes.push(slotList());
-      return nodes.filter((n): n is Node => n !== null);
+      nodes.push(h("div", { class: "picker" }, calendar(), times()));
+      return nodes;
     },
     async refreshAfterTaken(date, time) {
       cache.delete(cacheKey(date));
       await ensure(date, date);
+      month = `${date.slice(0, 7)}-01`;
       selectedDate = date;
       nearest = nearestAvailable(slotsFor(date) ?? [], time);
       return nearest;
