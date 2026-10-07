@@ -49,15 +49,28 @@ function who(e: BookingEvent, currentUserId: string | null): string {
   return `the customer ${via}`.trim();
 }
 
-export function describeEvent(e: BookingEvent, currentUserId: string | null = null): string {
+// A reschedule that kept the time and only changed the staff member.
+export function isReassignment(e: Pick<BookingEvent, "type" | "details">): boolean {
   const d = e.details ?? {};
+  return e.type === "rescheduled" && d.from === d.to && typeof d.staff_to === "string";
+}
+
+export function describeEvent(
+  e: BookingEvent,
+  currentUserId: string | null = null,
+  // Staff names by id, to name who a booking moved to.
+  staffNames: Map<string, string> = new Map(),
+): string {
+  const d = e.details ?? {};
+  const staffTo = typeof d.staff_to === "string" ? (staffNames.get(d.staff_to) ?? "another staff member") : null;
+  if (isReassignment(e)) return `Given to ${staffTo} by ${who(e, currentUserId)}`;
   switch (e.type) {
     case "created":
       return e.actor === "team" ? `Booked by ${who(e, currentUserId)}` : `Booked by ${who(e, currentUserId)}`;
     case "rescheduled": {
       const from = typeof d.from === "string" ? formatLocalDateTime(d.from) : "?";
       const to = typeof d.to === "string" ? formatLocalDateTime(d.to) : "?";
-      return `Moved by ${who(e, currentUserId)}: ${from} → ${to}`;
+      return `Moved by ${who(e, currentUserId)}: ${from} → ${to}${staffTo ? `, now with ${staffTo}` : ""}`;
     }
     case "cancelled":
       return `Cancelled by ${who(e, currentUserId)}${typeof d.reason === "string" && d.reason ? `: "${d.reason}"` : ""}`;

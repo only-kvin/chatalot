@@ -1,34 +1,17 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
-  createAvailabilityRuleAction,
-  deleteAvailabilityRuleAction,
   createAvailabilityExceptionAction,
   deleteAvailabilityExceptionAction,
+  updateBookingRulesAction,
 } from "./actions";
-import { WEEKDAY_NAMES } from "@/lib/time";
+import { formatLocalDate } from "@/lib/time";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
-type Rule = { id: string; weekday: number; start_time: string; end_time: string };
 type Exception = {
   id: string;
   date: string;
@@ -37,216 +20,186 @@ type Exception = {
   end_time: string | null;
 };
 
-function formatTime(t: string): string {
-  return t.slice(0, 5);
-}
+export type BookingRules = {
+  booking_lead_time_minutes: number;
+  booking_horizon_days: number;
+  slot_minutes: number;
+  booking_change_cutoff_minutes: number;
+};
 
-export function AvailabilityEditor({
-  initialRules,
-  initialExceptions,
-}: {
-  initialRules: Rule[];
-  initialExceptions: Exception[];
-}) {
-  const [rules, setRules] = useState(initialRules);
-  const [exceptions, setExceptions] = useState(initialExceptions);
+const LEAD_OPTIONS = [
+  { value: 0, label: "No minimum" },
+  { value: 30, label: "30 minutes" },
+  { value: 60, label: "1 hour" },
+  { value: 120, label: "2 hours" },
+  { value: 240, label: "4 hours" },
+  { value: 1440, label: "24 hours" },
+  { value: 2880, label: "48 hours" },
+];
+const HORIZON_OPTIONS = [7, 14, 30, 60, 90, 180];
+const SLOT_OPTIONS = [15, 30, 60];
+// Minimum notice for customers to cancel or move a booking themselves in chat.
+const CUTOFF_OPTIONS = [
+  { value: 0, label: "Any time before the appointment" },
+  { value: 60, label: "1 hour before" },
+  { value: 120, label: "2 hours before" },
+  { value: 240, label: "4 hours before" },
+  { value: 720, label: "12 hours before" },
+  { value: 1440, label: "24 hours before" },
+  { value: 2880, label: "48 hours before" },
+];
+
+const selectClass = "h-9 w-full max-w-xs rounded-lg border bg-transparent px-3 text-sm";
+
+function useAction() {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-
-  function handleAddRule(formData: FormData) {
+  const [saved, setSaved] = useState(false);
+  function run(action: () => Promise<{ error: string | null }>) {
     setError(null);
+    setSaved(false);
     startTransition(async () => {
-      try {
-        await createAvailabilityRuleAction(formData);
-        window.location.reload();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Something went wrong");
+      const result = await action();
+      if (result.error) setError(result.error);
+      else {
+        setSaved(true);
+        router.refresh();
       }
     });
   }
+  return { pending, error, saved, run };
+}
 
-  function handleDeleteRule(id: string) {
-    startTransition(async () => {
-      const formData = new FormData();
-      formData.set("id", id);
-      await deleteAvailabilityRuleAction(formData);
-      setRules((prev) => prev.filter((r) => r.id !== id));
-    });
-  }
+// Keeps a value that isn't one of the presets (e.g. set in the database)
+// selectable instead of silently replacing it.
+function withCurrent<T extends { value: number }>(options: T[], current: number, label: (v: number) => string) {
+  return options.some((o) => o.value === current) ? options : [...options, { value: current, label: label(current) }];
+}
 
-  function handleAddException(formData: FormData) {
-    setError(null);
-    startTransition(async () => {
-      try {
-        await createAvailabilityExceptionAction(formData);
-        window.location.reload();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Something went wrong");
-      }
-    });
-  }
-
-  function handleDeleteException(id: string) {
-    startTransition(async () => {
-      const formData = new FormData();
-      formData.set("id", id);
-      await deleteAvailabilityExceptionAction(formData);
-      setExceptions((prev) => prev.filter((e) => e.id !== id));
-    });
-  }
-
-  const sortedRules = [...rules].sort(
-    (a, b) => a.weekday - b.weekday || a.start_time.localeCompare(b.start_time),
+export function BookingRulesForm({ rules }: { rules: BookingRules }) {
+  const { pending, error, saved, run } = useAction();
+  return (
+    <form action={(formData) => run(() => updateBookingRulesAction(formData))} className="flex flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="booking_lead_time_minutes">Minimum notice for new bookings</Label>
+        <select
+          id="booking_lead_time_minutes"
+          name="booking_lead_time_minutes"
+          defaultValue={rules.booking_lead_time_minutes}
+          className={selectClass}
+        >
+          {withCurrent(LEAD_OPTIONS, rules.booking_lead_time_minutes, (v) => `${v} minutes`).map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="booking_horizon_days">Customers can book up to</Label>
+        <select id="booking_horizon_days" name="booking_horizon_days" defaultValue={rules.booking_horizon_days} className={selectClass}>
+          {withCurrent(
+            HORIZON_OPTIONS.map((d) => ({ value: d, label: `${d} days ahead` })),
+            rules.booking_horizon_days,
+            (v) => `${v} days ahead`,
+          ).map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="slot_minutes">Offer start times every</Label>
+        <select id="slot_minutes" name="slot_minutes" defaultValue={rules.slot_minutes} className={selectClass}>
+          {SLOT_OPTIONS.map((m) => (
+            <option key={m} value={m}>
+              {m} minutes
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-zinc-500">Counted from opening time, e.g. 09:00, 09:30, 10:00 for every 30 minutes.</p>
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="booking_change_cutoff_minutes">Customers can change or cancel bookings in chat up to</Label>
+        <select
+          id="booking_change_cutoff_minutes"
+          name="booking_change_cutoff_minutes"
+          defaultValue={rules.booking_change_cutoff_minutes}
+          className={selectClass}
+        >
+          {withCurrent(CUTOFF_OPTIONS, rules.booking_change_cutoff_minutes, (v) => `${v} minutes before`).map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-zinc-500">After that, the AI hands them over to you.</p>
+      </div>
+      <p className="text-xs text-zinc-500">
+        These apply to customers. You can still book and move bookings at short notice from the dashboard.
+      </p>
+      {error && <p className="feedback-enter text-sm text-red-600">{error}</p>}
+      {saved && !error && <p className="feedback-enter text-sm text-green-600">Saved.</p>}
+      <div>
+        <Button type="submit" disabled={pending}>
+          {pending ? "Saving…" : "Save booking rules"}
+        </Button>
+      </div>
+    </form>
   );
-  const sortedExceptions = [...exceptions].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+const hhmm = (t: string) => t.slice(0, 5);
+
+export function ExceptionsEditor({ exceptions }: { exceptions: Exception[] }) {
+  const { pending, error, run } = useAction();
+  const sorted = [...exceptions].sort((a, b) => a.date.localeCompare(b.date));
 
   return (
-    <div className="flex flex-col gap-8">
-      <Card>
-        <CardHeader>
-          <CardTitle>Weekly hours</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <form action={handleAddRule} className="flex flex-wrap items-end gap-3">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="weekday">Day</Label>
-              <Select name="weekday" defaultValue="1">
-                <SelectTrigger id="weekday" className="w-36">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {WEEKDAY_NAMES.map((name, i) => (
-                    <SelectItem key={i} value={String(i)}>
-                      {name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="start_time">From</Label>
-              <Input id="start_time" name="start_time" type="time" required defaultValue="09:00" />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="end_time">To</Label>
-              <Input id="end_time" name="end_time" type="time" required defaultValue="17:00" />
-            </div>
-            <Button type="submit" disabled={pending}>
-              Add
-            </Button>
-          </form>
-          {error && <p className="feedback-enter text-sm text-red-600">{error}</p>}
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Day</TableHead>
-                <TableHead>Hours</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedRules.map((rule) => (
-                <TableRow key={rule.id}>
-                  <TableCell>{WEEKDAY_NAMES[rule.weekday]}</TableCell>
-                  <TableCell>
-                    {formatTime(rule.start_time)} – {formatTime(rule.end_time)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={pending}
-                      onClick={() => handleDeleteRule(rule.id)}
-                    >
-                      Delete
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {sortedRules.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-center text-zinc-500">
-                    No open hours set — the AI receptionist can&apos;t offer any bookings yet.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Exceptions</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <form action={handleAddException} className="flex flex-wrap items-end gap-3">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="date">Date</Label>
-              <Input id="date" name="date" type="date" required />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="exc_start_time">From (leave blank if closed)</Label>
-              <Input id="exc_start_time" name="start_time" type="time" />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="exc_end_time">To</Label>
-              <Input id="exc_end_time" name="end_time" type="time" />
-            </div>
-            <div className="flex items-center gap-2 pb-2">
-              <input
-                id="is_closed"
-                name="is_closed"
-                type="checkbox"
-                defaultChecked
-                className="h-4 w-4"
-              />
-              <Label htmlFor="is_closed">Closed all day</Label>
-            </div>
-            <Button type="submit" disabled={pending}>
-              Add
-            </Button>
-          </form>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Hours</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedExceptions.map((exc) => (
-                <TableRow key={exc.id}>
-                  <TableCell>{exc.date}</TableCell>
-                  <TableCell>
-                    {exc.is_closed
-                      ? "Closed"
-                      : `${formatTime(exc.start_time!)} – ${formatTime(exc.end_time!)}`}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={pending}
-                      onClick={() => handleDeleteException(exc.id)}
-                    >
-                      Delete
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {sortedExceptions.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-center text-zinc-500">
-                    No exceptions.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+    <div className="flex flex-col gap-4">
+      <form action={(formData) => run(() => createAvailabilityExceptionAction(formData))} className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="date">Date</Label>
+          <Input id="date" name="date" type="date" required />
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="exc_start_time">Special hours from</Label>
+          <Input id="exc_start_time" name="start_time" type="time" />
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="exc_end_time">To</Label>
+          <Input id="exc_end_time" name="end_time" type="time" />
+        </div>
+        <label className="flex items-center gap-2 pb-2 text-sm">
+          <input name="is_closed" type="checkbox" defaultChecked className="size-4" />
+          Closed all day
+        </label>
+        <Button type="submit" disabled={pending}>
+          Add
+        </Button>
+      </form>
+      {error && <p className="feedback-enter text-sm text-red-600">{error}</p>}
+      {sorted.length === 0 ? (
+        <p className="text-sm text-zinc-500">No closures or special hours.</p>
+      ) : (
+        <ul className="divide-y rounded-lg border text-sm">
+          {sorted.map((exc) => (
+            <li key={exc.id} className="flex items-center justify-between gap-2 px-3 py-2">
+              <span>
+                <span className="font-medium">{formatLocalDate(exc.date)}</span>
+                <span className="ml-2 text-zinc-500">
+                  {exc.is_closed ? "Closed" : `${hhmm(exc.start_time!)}–${hhmm(exc.end_time!)}`}
+                </span>
+              </span>
+              <Button variant="outline" size="sm" disabled={pending} onClick={() => run(() => deleteAvailabilityExceptionAction(exc.id))}>
+                Remove
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

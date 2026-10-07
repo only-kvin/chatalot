@@ -6,7 +6,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createAdminClient } from "../lib/db/supabase-admin";
 import { createTenant } from "../lib/db/create-tenant";
 import { createBooking, type CreateBookingInput } from "../lib/bookings/create";
-import { rescheduleBooking } from "../lib/bookings/manage";
+import { assignStaff, rescheduleBooking } from "../lib/bookings/manage";
 import { addDays, localDateISO } from "../lib/time";
 
 describe("booking concurrency", () => {
@@ -16,6 +16,8 @@ describe("booking concurrency", () => {
   const DATE = addDays(localDateISO(new Date()), 7);
   let tenantId: string;
   let serviceId: string;
+  let thandi: string;
+  let lebo: string;
 
   async function addService(name: string): Promise<string> {
     const { data, error } = await admin
@@ -151,8 +153,8 @@ describe("booking concurrency", () => {
   });
 
   it("spreads 'anyone' bookings across free staff, one each", async () => {
-    const thandi = await addStaff("Thandi");
-    const lebo = await addStaff("Lebo");
+    thandi = await addStaff("Thandi");
+    lebo = await addStaff("Lebo");
     const cut = await addService("Blow-dry");
     await admin.from("staff_services").insert([
       { tenant_id: tenantId, staff_id: thandi, service_id: cut },
@@ -164,5 +166,19 @@ describe("booking concurrency", () => {
     const booked = await bookingsAt("16:00");
     expect(booked).toHaveLength(2);
     expect(new Set(booked.map((b) => b.staff_id))).toEqual(new Set([thandi, lebo]));
+  });
+
+  it("gives an unassigned booking to someone free, and refuses someone busy", async () => {
+    // 11:00 was booked before the business had staff.
+    const [unassigned] = await bookingsAt("11:00");
+    expect(unassigned.staff_id).toBeNull();
+    const given = await assignStaff(admin, { tenantId, bookingId: unassigned.id, staffId: thandi, actor: "ai", channel: "web" });
+    expect(given).toEqual({ ok: true });
+    expect((await bookingsAt("11:00"))[0].staff_id).toBe(thandi);
+
+    // Both are booked at 16:00, so Thandi's can't go to Lebo.
+    const thandis = (await bookingsAt("16:00")).find((b) => b.staff_id === thandi)!;
+    const refused = await assignStaff(admin, { tenantId, bookingId: thandis.id, staffId: lebo, actor: "ai", channel: "web" });
+    expect(refused.ok).toBe(false);
   });
 });

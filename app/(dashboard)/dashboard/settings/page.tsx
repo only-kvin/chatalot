@@ -12,7 +12,7 @@ export default async function SettingsPage() {
   const [{ data: config }, { data: tenant }] = await Promise.all([
     supabase
       .from("agent_configs")
-      .select("business_name, tone, greeting, system_prompt_extra, handoff_contact, booking_change_cutoff_minutes, google_review_url, daily_summary_enabled")
+      .select("business_name, tone, greeting, system_prompt_extra, handoff_contact, google_review_url, daily_summary_enabled")
       .eq("tenant_id", tenantId)
       .single(),
     supabase.from("tenants").select("allowed_domains").eq("id", tenantId).single(),
@@ -28,7 +28,6 @@ export default async function SettingsPage() {
           greeting: config?.greeting ?? "",
           system_prompt_extra: config?.system_prompt_extra ?? "",
           handoff_contact: config?.handoff_contact ?? "",
-          booking_change_cutoff_minutes: config?.booking_change_cutoff_minutes ?? 120,
           google_review_url: config?.google_review_url ?? "",
           daily_summary_enabled: config?.daily_summary_enabled ?? true,
           allowed_domains: tenant?.allowed_domains ?? [],

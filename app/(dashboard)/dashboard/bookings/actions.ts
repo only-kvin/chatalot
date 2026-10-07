@@ -6,7 +6,7 @@ import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
 import { formatLocalDateTime } from "@/lib/time";
 import { getOpenSlots } from "@/lib/bookings/availability";
-import { cancelBooking, logBookingEvent, rescheduleBooking } from "@/lib/bookings/manage";
+import { assignStaff, cancelBooking, logBookingEvent, rescheduleBooking } from "@/lib/bookings/manage";
 import { sendTeamWhatsApp } from "@/lib/channels/team-whatsapp";
 import { formatPhone, canonicalPhone } from "@/lib/contacts/phone";
 import { isOptedOut } from "@/lib/contacts/consent";
@@ -171,6 +171,26 @@ export async function rescheduleBookingAction(input: {
   );
   revalidate(booking.id);
   return { error: null, notice };
+}
+
+// Gives the booking to another staff member at the same time. The customer
+// isn't told: who does the appointment isn't part of what they were promised.
+export async function assignStaffAction(bookingId: string, staffId: string): Promise<Result> {
+  const s = await session();
+  if (!s) return { error: "Not authorized." };
+  if (!uuid.safeParse(bookingId).success || !uuid.safeParse(staffId).success) return { error: "Invalid request." };
+
+  const result = await assignStaff(s.supabase, {
+    tenantId: s.tenantId,
+    bookingId,
+    staffId,
+    actor: "team",
+    channel: "dashboard",
+    createdBy: s.userId,
+  });
+  if (!result.ok) return { error: result.error };
+  revalidate(bookingId);
+  return { error: null };
 }
 
 const outcomeSchema = z.enum(["completed", "no_show", "confirmed"]);

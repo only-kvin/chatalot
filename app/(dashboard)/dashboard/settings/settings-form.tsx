@@ -14,22 +14,10 @@ type Settings = {
   greeting: string;
   system_prompt_extra: string;
   handoff_contact: string;
-  booking_change_cutoff_minutes: number;
   google_review_url: string;
   daily_summary_enabled: boolean;
   allowed_domains: string[];
 };
-
-// Minimum notice for customers to cancel or move a booking themselves in chat.
-const CUTOFF_OPTIONS = [
-  { value: 0, label: "Any time before the appointment" },
-  { value: 60, label: "1 hour before" },
-  { value: 120, label: "2 hours before" },
-  { value: 240, label: "4 hours before" },
-  { value: 720, label: "12 hours before" },
-  { value: 1440, label: "24 hours before" },
-  { value: 2880, label: "48 hours before" },
-];
 
 export function SettingsForm({ initialSettings }: { initialSettings: Settings }) {
   const [pending, startTransition] = useTransition();
@@ -107,36 +95,6 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
               Given to visitors, and used in the fallback reply, when a human needs to step in.
             </p>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Bookings</CardTitle>
-          <CardDescription>
-            How close to an appointment customers can still cancel or reschedule it themselves in chat.
-            After that, the AI hands them over to you.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-2">
-          <Label htmlFor="booking_change_cutoff_minutes">Customers can change bookings up to</Label>
-          <select
-            id="booking_change_cutoff_minutes"
-            name="booking_change_cutoff_minutes"
-            defaultValue={String(initialSettings.booking_change_cutoff_minutes)}
-            className="h-9 w-full max-w-xs rounded-lg border bg-transparent px-3 text-sm"
-          >
-            {CUTOFF_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-            {!CUTOFF_OPTIONS.some((o) => o.value === initialSettings.booking_change_cutoff_minutes) && (
-              <option value={initialSettings.booking_change_cutoff_minutes}>
-                {initialSettings.booking_change_cutoff_minutes} minutes before
-              </option>
-            )}
-          </select>
         </CardContent>
       </Card>
 

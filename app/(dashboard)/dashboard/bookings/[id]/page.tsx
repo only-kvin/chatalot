@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Rating } from "@/components/dashboard/rating";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BookingActions } from "./booking-actions";
+import { AssignStaff } from "./assign-staff";
 
 export default async function BookingPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -31,19 +32,24 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
   const { data: booking } = await supabase
     .from("bookings")
     .select(
-      "id, name, phone, email, starts_at, ends_at, status, source, created_at, contact_id, conversation_id, review_rating, services(name), conversations(channel)",
+      "id, name, phone, email, starts_at, ends_at, status, source, created_at, contact_id, conversation_id, staff_id, review_rating, services(name), conversations(channel)",
     )
     .eq("id", id)
     .eq("tenant_id", tenantId)
     .maybeSingle();
   if (!booking) notFound();
 
-  const { data: events } = await supabase
-    .from("booking_events")
-    .select("type, actor, channel, details, created_by, created_at")
-    .eq("tenant_id", tenantId)
-    .eq("booking_id", id)
-    .order("created_at");
+  const [{ data: events }, { data: staff }] = await Promise.all([
+    supabase
+      .from("booking_events")
+      .select("type, actor, channel, details, created_by, created_at")
+      .eq("tenant_id", tenantId)
+      .eq("booking_id", id)
+      .order("created_at"),
+    supabase.from("staff").select("id, name, active").eq("tenant_id", tenantId).order("sort_order").order("name"),
+  ]);
+  const staffNames = new Map((staff ?? []).map((p) => [p.id, p.name]));
+  const staffName = booking.staff_id ? staffNames.get(booking.staff_id) : null;
 
   const service = (booking.services as unknown as { name: string } | null)?.name ?? "Booking";
   const chatChannel = (booking.conversations as unknown as { channel: string } | null)?.channel ?? null;
@@ -67,6 +73,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
         </div>
         <p className="mt-1 text-sm text-zinc-500">
           {formatLocalDateTime(booking.starts_at)} – {formatLocalDateTime(booking.ends_at).split(" at ")[1]}
+          {staffName && ` · with ${staffName}`}
         </p>
       </div>
 
@@ -109,7 +116,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
             {events?.map((e, i) => (
               <li key={i} className="relative">
                 <span className="absolute top-1.5 -left-[21px] size-2 rounded-full bg-zinc-400" aria-hidden />
-                <p>{describeEvent(e, user?.id ?? null)}</p>
+                <p>{describeEvent(e, user?.id ?? null, staffNames)}</p>
                 <p className="text-xs text-zinc-500">{formatShortLocal(e.created_at)}</p>
               </li>
             ))}
@@ -117,6 +124,18 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
           </ol>
         </CardContent>
       </Card>
+
+      {booking.status === "confirmed" && !started && staffNames.size > 0 && (
+        <Card>
+          <CardContent className="pt-6">
+            <AssignStaff
+              bookingId={booking.id}
+              currentStaffId={booking.staff_id}
+              staff={(staff ?? []).filter((p) => p.active || p.id === booking.staff_id)}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       <BookingActions
         bookingId={booking.id}

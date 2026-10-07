@@ -156,3 +156,16 @@ Manual steps the platform owner needs to do. Kept up to date as new phases add n
 - **Staff (optional).** A business with no staff works as before: one calendar, one booking at a time. Once staff are added (`staff` table; dashboard screens come in Phase B), each person is their own calendar with their own hours (`availability_rules` rows with their `staff_id`, else the business's hours), time off (`time_off`) and capacity (`max_concurrent`: 1 for a chair, e.g. 12 for a class). Services can be limited to certain staff (`staff_services`; none linked = anyone). Bookings made before a business adds staff count against every staff member until reassigned, so nothing gets double-booked.
 - **Booking settings per business** (`agent_configs`, editable in Phase B): `booking_lead_time_minutes` (default **60**: customers can no longer book a slot starting within the hour), `booking_horizon_days` (default 60) and `slot_minutes` (15/30/60, default 15). The team can still book or move bookings at short notice from the dashboard.
 - **Service buffers** (`services.buffer_before_min` / `buffer_after_min`) keep time free around an appointment without lengthening it.
+
+## Widget suite, Phase B: business setup in the dashboard (2026-10-07)
+
+**Manual step:** none (no migration).
+
+**What owners can now do:**
+
+- **Staff** (`/dashboard/staff`, new in the nav): add people; set their role, photo link, how many bookings they take at once (1 for a chair, more for a class), the services they offer, their own working hours (several windows a day make a break) or "same as opening hours", and time off (whole days or part of a day). Reorder them with the arrows. Deactivating someone with upcoming bookings asks for a second click; those bookings stay with them until moved. Only people who never had a booking can be deleted.
+- **Services**: category, time kept free before/after (buffers), "show in the booking widgets", display order, and who offers each one ("Anyone on the team", or only chosen people). A service with bookings can't be deleted, only made inactive.
+- **Availability**: opening hours (Monday first), closures and special hours, and a new **Booking rules** card: minimum notice, how far ahead customers can book, slot size, and the chat change/cancel cutoff (moved here from Settings).
+- **Bookings**: a Staff column and filter once staff exist (including "Not assigned"), and on an upcoming booking a "Staff member" picker to give it to someone else at the same time. That person must be working and free then. The customer isn't messaged; the history records it.
+
+**Worth knowing:** a staff member's own hours *replace* the opening hours for them, so someone with Monday hours can be booked on a Monday even if the business is otherwise closed. Closures on the Availability page still close everyone.

@@ -12,7 +12,6 @@ const settingsSchema = z.object({
   greeting: z.string().min(1, "Greeting is required"),
   system_prompt_extra: z.string(),
   handoff_contact: z.string(),
-  booking_change_cutoff_minutes: z.coerce.number().int().min(0).max(10080),
   // Empty turns review requests off.
   google_review_url: z
     .string()
@@ -46,7 +45,6 @@ export async function updateSettingsAction(formData: FormData): Promise<{ error:
     greeting: formData.get("greeting"),
     system_prompt_extra: formData.get("system_prompt_extra") ?? "",
     handoff_contact: formData.get("handoff_contact") ?? "",
-    booking_change_cutoff_minutes: formData.get("booking_change_cutoff_minutes") ?? 120,
     google_review_url: formData.get("google_review_url") ?? "",
     // An unticked checkbox isn't submitted at all.
     daily_summary_enabled: formData.get("daily_summary_enabled") === "on",
@@ -64,7 +62,6 @@ export async function updateSettingsAction(formData: FormData): Promise<{ error:
       greeting: parsed.data.greeting,
       system_prompt_extra: parsed.data.system_prompt_extra,
       handoff_contact: parsed.data.handoff_contact,
-      booking_change_cutoff_minutes: parsed.data.booking_change_cutoff_minutes,
       google_review_url: parsed.data.google_review_url || null,
       daily_summary_enabled: parsed.data.daily_summary_enabled,
       updated_at: new Date().toISOString(),

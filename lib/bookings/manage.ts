@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { formatLocalDateTime, localToUtcDate } from "@/lib/time";
+import { formatLocalDateTime, formatLocalTime, localDateISO, localToUtcDate } from "@/lib/time";
 import { getAvailability } from "./availability";
 
 // Booking changes shared by the AI tools (service-role client, actor "ai") and
@@ -191,4 +191,58 @@ export async function rescheduleBooking(
   }
   // Postgres returns its own timestamp format; normalise to ISO.
   return { ok: true, from: new Date(result.from).toISOString(), to: new Date(result.to).toISOString() };
+}
+
+// Gives a booking to a different staff member at the same time, e.g. one
+// made before the business added staff. They must be working and free then;
+// reschedule_booking() re-checks capacity under the calendar lock.
+export async function assignStaff(
+  client: SupabaseClient,
+  a: Actor & { tenantId: string; bookingId: string; staffId: string },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { data: booking } = await client
+    .from("bookings")
+    .select("id, service_id, staff_id, starts_at, status")
+    .eq("id", a.bookingId)
+    .eq("tenant_id", a.tenantId)
+    .maybeSingle();
+  if (!booking || booking.status !== "confirmed") return { ok: false, error: "That booking isn't active any more." };
+  if (booking.staff_id === a.staffId) return { ok: true };
+
+  const date = localDateISO(new Date(booking.starts_at));
+  const time = formatLocalTime(booking.starts_at);
+  const availability = await getAvailability(client, a.tenantId, {
+    serviceId: booking.service_id,
+    staffId: a.staffId,
+    fromDate: date,
+    toDate: date,
+    excludeBookingId: booking.id,
+    forTeam: true,
+  });
+  const slot = availability?.days[0]?.slots.find((s) => s.time === time);
+  if (!slot?.staffIds.includes(a.staffId)) {
+    return {
+      ok: false,
+      error: "They aren't free then: check their hours, time off, other bookings and the services they offer.",
+    };
+  }
+
+  const { data, error } = await client.rpc("reschedule_booking", {
+    p_tenant_id: a.tenantId,
+    p_booking_id: booking.id,
+    p_staff_id: a.staffId,
+    p_starts_at: booking.starts_at,
+    p_actor: a.actor,
+    p_channel: a.channel,
+    p_created_by: a.createdBy ?? null,
+  });
+  if (error) {
+    console.error(`Assigning booking ${booking.id} failed:`, error);
+    return { ok: false, error: "The booking couldn't be reassigned due to a technical problem." };
+  }
+  const result = data as { ok: boolean; reason?: string };
+  if (!result.ok) {
+    return { ok: false, error: result.reason === "slot_taken" ? "They were just booked at that time." : "That booking isn't active any more." };
+  }
+  return { ok: true };
 }

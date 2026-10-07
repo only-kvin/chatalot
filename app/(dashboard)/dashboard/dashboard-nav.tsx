@@ -14,6 +14,7 @@ import {
   SettingsIcon,
   ShieldIcon,
   ContactRoundIcon,
+  UserRoundCogIcon,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "cn";
@@ -29,6 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard/knowledge", label: "Knowledge", icon: BookOpenIcon },
   { href: "/dashboard/bookings", label: "Bookings", icon: CalendarIcon },
   { href: "/dashboard/services", label: "Services", icon: BriefcaseIcon },
+  { href: "/dashboard/staff", label: "Staff", icon: UserRoundCogIcon },
   { href: "/dashboard/availability", label: "Availability", icon: ClockIcon },
   { href: "/dashboard/widget", label: "Widget", icon: MessageCircleIcon },
   { href: "/dashboard/settings", label: "Settings", icon: SettingsIcon },
