@@ -65,7 +65,7 @@ export default async function StaffMemberPage({ params }: { params: Promise<{ id
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
       <div>
-        <Link href="/dashboard/staff" className="mb-3 inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-foreground">
+        <Link href="/dashboard/staff" className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeftIcon className="size-4" /> Staff
         </Link>
         <div className="flex items-center gap-3">
@@ -75,7 +75,7 @@ export default async function StaffMemberPage({ params }: { params: Promise<{ id
               {person.name}
               {!person.active && <Badge variant="secondary">Inactive</Badge>}
             </h1>
-            {person.role && <p className="text-sm text-zinc-500">{person.role}</p>}
+            {person.role && <p className="text-sm text-muted-foreground">{person.role}</p>}
           </div>
         </div>
       </div>

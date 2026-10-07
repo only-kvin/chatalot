@@ -130,6 +130,13 @@ async function handleMessage(
     await saveMessage(admin, tenantId, conversation.id, "user", `[Customer sent ${nonTextLabel}]`);
     // In human mode the owner replies from the dashboard; no auto-reply.
     if (conversation.status === "human") return;
+    // Nor when the owner has paused WhatsApp AI.
+    const { data: config } = await admin
+      .from("agent_configs")
+      .select("whatsapp_ai_enabled")
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+    if (config?.whatsapp_ai_enabled === false) return;
     await saveMessage(admin, tenantId, conversation.id, "assistant", NON_TEXT_REPLY);
     await sendWhatsAppText(phoneNumberId, accessToken, customerPhone, NON_TEXT_REPLY);
     return;
@@ -159,7 +166,7 @@ async function handleMessage(
 
   const { data: agentConfig } = await admin
     .from("agent_configs")
-    .select("business_name, handoff_contact, google_review_url")
+    .select("business_name, handoff_contact, google_review_url, whatsapp_ai_enabled")
     .eq("tenant_id", tenantId)
     .single();
   const businessName = agentConfig?.business_name ?? "";
@@ -198,8 +205,8 @@ async function handleMessage(
     return;
   }
 
-  if (conversation.status === "human") {
-    // The owner is handling this one from the dashboard.
+  if (conversation.status === "human" || agentConfig?.whatsapp_ai_enabled === false) {
+    // The owner is handling this one (or all WhatsApp chats) from the dashboard.
     await saveMessage(admin, tenantId, conversation.id, "user", text);
     return;
   }

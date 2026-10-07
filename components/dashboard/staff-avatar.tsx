@@ -17,7 +17,7 @@ export function StaffAvatar({ name, url, className }: { name: string; url: strin
     <span
       aria-hidden
       className={cn(
-        "flex size-10 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-sm font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200",
+        "flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground",
         className,
       )}
     >

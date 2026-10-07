@@ -147,7 +147,7 @@ export function NotificationsBell() {
         aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="relative flex shrink-0 items-center justify-center rounded-lg p-2 text-zinc-500 transition-colors duration-150 hover:bg-muted/60 hover:text-foreground"
+        className="relative flex shrink-0 items-center justify-center rounded-lg p-2 text-muted-foreground transition-colors duration-150 hover:bg-muted/60 hover:text-foreground"
       >
         <BellIcon className="size-4" />
         {unread > 0 && (
@@ -164,12 +164,12 @@ export function NotificationsBell() {
           aria-label="Notifications"
           // Fixed, not absolute: the mobile nav strip scrolls horizontally and
           // would clip an absolutely positioned panel.
-          className="fixed top-14 right-4 left-4 z-50 flex max-h-[70vh] flex-col overflow-hidden rounded-xl border bg-white shadow-lg sm:left-auto sm:w-80 md:top-4 md:left-60 md:right-auto dark:bg-zinc-950"
+          className="fixed top-14 right-4 left-4 z-50 flex max-h-[70vh] flex-col overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-lg sm:left-auto sm:w-80 md:top-4 md:left-60 md:right-auto"
         >
           <div className="flex items-center justify-between border-b px-4 py-3">
             <span className="text-sm font-semibold">Notifications</span>
             {unread > 0 && (
-              <button type="button" onClick={markAllRead} className="text-xs text-zinc-500 hover:text-foreground">
+              <button type="button" onClick={markAllRead} className="text-xs text-muted-foreground hover:text-foreground">
                 Mark all read
               </button>
             )}
@@ -200,13 +200,13 @@ export function NotificationsBell() {
                     {!item.read && <span className="size-2 shrink-0 rounded-full bg-indigo-600" aria-hidden />}
                     {item.title}
                   </span>
-                  {item.body && <span className="line-clamp-2 text-xs text-zinc-500">{item.body}</span>}
-                  <span className="text-[11px] text-zinc-400">{timeAgo(item.createdAt)}</span>
+                  {item.body && <span className="line-clamp-2 text-xs text-muted-foreground">{item.body}</span>}
+                  <span className="text-[11px] text-muted-foreground">{timeAgo(item.createdAt)}</span>
                 </button>
               </li>
             ))}
             {items.length === 0 && (
-              <li className="px-4 py-8 text-center text-sm text-zinc-500">
+              <li className="px-4 py-8 text-center text-sm text-muted-foreground">
                 Nothing yet. You&apos;ll see handoffs, new leads and bookings here.
               </li>
             )}

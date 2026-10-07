@@ -64,7 +64,7 @@ export function MessageActions(props: {
           </Button>
         )}
       </div>
-      <p className="text-xs text-zinc-500">Replies go from your own email or phone. &ldquo;Reply by email&rdquo; marks it replied.</p>
+      <p className="text-xs text-muted-foreground">Replies go from your own email or phone. &ldquo;Reply by email&rdquo; marks it replied.</p>
       {error && <p className="text-sm text-red-600">{error}</p>}
     </div>
   );

@@ -2,86 +2,137 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboardIcon,
-  UsersIcon,
-  MessageSquareIcon,
-  BookOpenIcon,
-  CalendarIcon,
-  BriefcaseIcon,
-  ClockIcon,
-  MessageCircleIcon,
-  SettingsIcon,
-  ShieldIcon,
-  ContactRoundIcon,
-  InboxIcon,
-  UserRoundCogIcon,
-  type LucideIcon,
-} from "lucide-react";
+import { MessageCircleIcon } from "lucide-react";
 import { cn } from "cn";
+import { ThemeSwitcher } from "@/components/theme/theme-switcher";
+import type { Theme } from "@/components/theme/theme";
 import { NotificationsBell } from "./notifications-bell";
+import { JumpTo } from "./jump-to";
+import { ADMIN_ITEM, NAV_GROUPS, isActive, type NavItem } from "./nav-items";
 
-type NavItem = { href: string; label: string; icon: LucideIcon; exact?: boolean };
-
-const NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard", label: "Overview", icon: LayoutDashboardIcon, exact: true },
-  { href: "/dashboard/customers", label: "Customers", icon: ContactRoundIcon },
-  { href: "/dashboard/leads", label: "Leads", icon: UsersIcon },
-  { href: "/dashboard/conversations", label: "Conversations", icon: MessageSquareIcon },
-  { href: "/dashboard/messages", label: "Messages", icon: InboxIcon },
-  { href: "/dashboard/knowledge", label: "Knowledge", icon: BookOpenIcon },
-  { href: "/dashboard/bookings", label: "Bookings", icon: CalendarIcon },
-  { href: "/dashboard/services", label: "Services", icon: BriefcaseIcon },
-  { href: "/dashboard/staff", label: "Staff", icon: UserRoundCogIcon },
-  { href: "/dashboard/availability", label: "Availability", icon: ClockIcon },
-  { href: "/dashboard/widget", label: "Widgets", icon: MessageCircleIcon },
-  { href: "/dashboard/settings", label: "Settings", icon: SettingsIcon },
-];
-
-function isActive(pathname: string, href: string, exact?: boolean) {
-  return exact ? pathname === href : pathname === href || pathname.startsWith(href + "/");
-}
-
-// Platform admins also run the /admin area (tenants, WhatsApp numbers, usage),
-// which isn't otherwise linked from anywhere.
-const ADMIN_ITEM: NavItem = { href: "/admin", label: "Admin", icon: ShieldIcon };
-
-export function DashboardNav({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
+export function DashboardNav({
+  isPlatformAdmin,
+  businessName,
+  userEmail,
+  needsYou,
+  theme,
+}: {
+  isPlatformAdmin: boolean;
+  businessName: string;
+  userEmail: string;
+  // Conversations the team has taken over: shown as a count on Conversations.
+  needsYou: number;
+  theme: Theme;
+}) {
   const pathname = usePathname();
+  const groups = isPlatformAdmin
+    ? [...NAV_GROUPS, { label: "Platform", items: [ADMIN_ITEM] }]
+    : NAV_GROUPS;
+  const allItems = groups.flatMap((g) => g.items);
+
+  const link = (item: NavItem, compact = false) => {
+    const active = isActive(pathname, item);
+    const count = item.href === "/dashboard/conversations" && needsYou > 0 ? needsYou : null;
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        aria-current={active ? "page" : undefined}
+        className={cn(
+          "group/nav flex min-h-10 shrink-0 items-center gap-2.5 rounded-[10px] px-3 text-sm font-medium whitespace-nowrap transition-[background-color,color,box-shadow,transform] duration-200 active:scale-[.98]",
+          active
+            ? "bg-raised text-foreground shadow-raised"
+            : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
+          compact && "min-h-9",
+        )}
+      >
+        <item.icon
+          className={cn(
+            "size-[18px] shrink-0 transition-transform duration-200 ease-[cubic-bezier(.2,.8,.2,1)] group-hover/nav:translate-x-px group-hover/nav:scale-105",
+            active && "text-primary dark:text-[#a5b4fc]",
+          )}
+        />
+        <span className="flex-1">{item.label}</span>
+        {count !== null && (
+          <span
+            className="rounded-full bg-primary px-1.5 py-0.5 text-[11px] leading-none font-semibold text-white"
+            aria-label={`${count} need you`}
+          >
+            {count}
+          </span>
+        )}
+      </Link>
+    );
+  };
+
+  const initials = (businessName || userEmail).replace(/[^A-Za-z0-9 ]/g, "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 
   return (
-    <nav
-      aria-label="Dashboard"
-      className={cn(
-        // Horizontal scroll strip on mobile, fixed sidebar from md up.
-        "flex shrink-0 gap-1 overflow-x-auto border-b bg-white p-2 dark:bg-zinc-950",
-        "md:sticky md:top-0 md:h-screen md:w-56 md:flex-col md:overflow-visible md:border-b-0 md:border-r md:p-4",
-      )}
-    >
-      <div className="flex shrink-0 items-center md:justify-between md:pb-4 md:pl-2">
-        <span className="hidden text-sm font-semibold tracking-tight md:block">ChatAlot</span>
-        <NotificationsBell />
-      </div>
-      {(isPlatformAdmin ? [...NAV_ITEMS, ADMIN_ITEM] : NAV_ITEMS).map((item) => {
-        const active = isActive(pathname, item.href, item.exact);
-        const Icon = item.icon;
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            aria-current={active ? "page" : undefined}
-            className={cn(
-              "flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors duration-150",
-              active
-                ? "bg-muted text-foreground"
-                : "text-zinc-500 hover:bg-muted/60 hover:text-foreground",
+    <>
+      {/* Mobile: brand bar plus a horizontal strip of every page. */}
+      <nav aria-label="Dashboard" className="sticky top-0 z-30 border-b bg-sidebar backdrop-blur-xl md:hidden">
+        <div className="flex items-center justify-between px-4 pt-3">
+          <Brand businessName={businessName} />
+          <NotificationsBell />
+        </div>
+        <div className="flex gap-1 overflow-x-auto p-2 [scrollbar-width:none]">{allItems.map((item) => link(item, true))}</div>
+      </nav>
+
+      {/* Desktop sidebar. */}
+      <nav
+        aria-label="Dashboard"
+        className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col gap-5 overflow-y-auto border-r border-sidebar-border bg-sidebar px-3.5 py-5 backdrop-blur-xl md:flex"
+      >
+        <div className="flex items-center justify-between gap-2 pl-2">
+          <Brand businessName={businessName} />
+          <NotificationsBell />
+        </div>
+
+        <JumpTo items={allItems} />
+
+        {groups.map((group, i) => (
+          <div key={group.label ?? i} className="flex flex-col gap-0.5">
+            {group.label && (
+              <span className="px-3 pb-1.5 text-[11px] font-semibold tracking-[.08em] text-muted-foreground/90 uppercase">
+                {group.label}
+              </span>
             )}
-          >
-            <Icon className="size-4 shrink-0" />
-            {item.label}
-          </Link>
-        );
-      })}
-    </nav>
+            {group.items.map((item) => link(item))}
+          </div>
+        ))}
+
+        <div className="mt-auto flex flex-col gap-3">
+          <div className="flex flex-col gap-2">
+            <span className="px-1 text-[11px] font-semibold tracking-[.08em] text-muted-foreground/90 uppercase">
+              Appearance
+            </span>
+            <ThemeSwitcher serverTheme={theme} />
+          </div>
+          <div className="flex items-center gap-2.5 rounded-[14px] bg-white/70 p-2.5 shadow-[0_0_0_1px_var(--border)] dark:bg-white/[0.04]">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-linear-135 from-[#fbcfe8] to-[#c4b5fd] text-[13px] font-semibold text-[#3b0764]">
+              {initials || "?"}
+            </div>
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <span className="truncate text-[13px] font-semibold">{userEmail}</span>
+              <span className="text-xs text-muted-foreground">{isPlatformAdmin ? "Platform admin" : "Team"}</span>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </>
+  );
+}
+
+function Brand({ businessName }: { businessName: string }) {
+  return (
+    <Link href="/dashboard" className="flex min-w-0 items-center gap-2.5">
+      <span className="flex size-[34px] shrink-0 items-center justify-center rounded-[10px] bg-linear-145 from-[#6d67f5] to-[#3f35c4] shadow-[0_1px_0_rgb(255_255_255/0.35)_inset,0_6px_14px_-4px_rgb(67_56_202/0.55)]">
+        <MessageCircleIcon className="size-[18px] text-white" strokeWidth={2.2} />
+      </span>
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="text-[15px] leading-none font-bold tracking-[-0.01em]">ChatAlot</span>
+        <span className="truncate text-xs text-muted-foreground">{businessName}</span>
+      </span>
+    </Link>
   );
 }

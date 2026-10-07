@@ -51,7 +51,7 @@ export function AssignStaff({
           {pending ? "Saving…" : "Give to them"}
         </Button>
       </div>
-      <p className="text-xs text-zinc-500">Same time; they must be working and free then. The customer isn&apos;t messaged.</p>
+      <p className="text-xs text-muted-foreground">Same time; they must be working and free then. The customer isn&apos;t messaged.</p>
       {error && <p className="feedback-enter text-sm text-red-600">{error}</p>}
     </div>
   );

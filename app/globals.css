@@ -2,14 +2,25 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+/* Theme lives on <html data-theme="light|dark|system"> (see
+   components/theme/theme-script.tsx). "system" follows the OS setting. */
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where([data-theme="system"], [data-theme="system"] *) {
+      @slot;
+    }
+  }
+}
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-geist-sans), system-ui, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -39,6 +50,26 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-surface-2: var(--surface-2);
+  --color-raised: var(--raised);
+  --color-hover: var(--hover);
+  --color-track: var(--track);
+  --color-link: var(--link);
+  /* Status chips: New / Contacted / Booked / Needs you / Lost. */
+  --color-tone-new: var(--tone-new);
+  --color-tone-new-foreground: var(--tone-new-fg);
+  --color-tone-gray: var(--tone-gray);
+  --color-tone-gray-foreground: var(--tone-gray-fg);
+  --color-tone-ok: var(--tone-ok);
+  --color-tone-ok-foreground: var(--tone-ok-fg);
+  --color-tone-warn: var(--tone-warn);
+  --color-tone-warn-foreground: var(--tone-warn-fg);
+  --color-tone-bad: var(--tone-bad);
+  --color-tone-bad-foreground: var(--tone-bad-fg);
+  /* Soft layered card depth, and the lifted version on hover. */
+  --shadow-card: 0 1px 0 var(--hi) inset, 0 1px 2px rgb(17 17 26 / 0.04), 0 8px 24px -12px var(--shadow), 0 24px 48px -32px var(--glow);
+  --shadow-card-hover: 0 1px 0 var(--hi) inset, 0 2px 4px rgb(17 17 26 / 0.05), 0 18px 36px -14px var(--shadow-strong), 0 36px 64px -36px var(--glow-strong);
+  --shadow-raised: 0 1px 0 var(--hi) inset, 0 1px 2px rgb(17 17 26 / 0.06), 0 4px 12px -4px var(--shadow);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -50,72 +81,180 @@
 
 :root {
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --ease-lift: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --background: #eeeef2;
+  --glow-1: rgb(99 102 241 / 0.14);
+  --glow-2: rgb(52 199 89 / 0.08);
+  --foreground: #1d1d1f;
+  --card: #ffffff;
+  --surface-2: #fcfcfd;
+  --raised: #ffffff;
+  --hover: #f7f7fb;
+  --card-foreground: #1d1d1f;
+  --popover: #ffffff;
+  --popover-foreground: #1d1d1f;
+  --primary: #4f46e5;
+  --primary-foreground: #ffffff;
+  --secondary: #f0f0f4;
+  --secondary-foreground: #1d1d1f;
+  --muted: #f0f0f4;
+  --muted-foreground: #6b6b72;
+  --accent: #f4f3ff;
+  --accent-foreground: #312e81;
+  --destructive: #b42318;
+  --border: rgb(17 17 26 / 0.08);
+  --input: rgb(17 17 26 / 0.14);
+  --ring: #6366f1;
+  --link: #4338ca;
+  --track: #d9d9de;
+  --hi: rgb(255 255 255 / 1);
+  --shadow: rgb(17 17 26 / 0.12);
+  --shadow-strong: rgb(17 17 26 / 0.18);
+  --glow: rgb(79 70 229 / 0.18);
+  --glow-strong: rgb(79 70 229 / 0.32);
+  --tone-new: #eef2ff;
+  --tone-new-fg: #3730a3;
+  --tone-gray: #f3f4f6;
+  --tone-gray-fg: #374151;
+  --tone-ok: #ecfdf3;
+  --tone-ok-fg: #0b6b3a;
+  --tone-warn: #fff4e5;
+  --tone-warn-fg: #9a3412;
+  --tone-bad: #fef3f2;
+  --tone-bad-fg: #b42318;
+  --chart-1: #4f46e5;
+  --chart-2: #be185d;
+  --chart-3: #0f766e;
+  --chart-4: #c2410c;
+  --chart-5: #6b6b72;
+  --radius: 0.75rem;
+  --sidebar: rgb(255 255 255 / 0.55);
+  --sidebar-foreground: #1d1d1f;
+  --sidebar-primary: #4f46e5;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgb(79 70 229 / 0.07);
+  --sidebar-accent-foreground: #1d1d1f;
+  --sidebar-border: rgb(17 17 26 / 0.06);
+  --sidebar-ring: #6366f1;
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+/* Written twice (explicit dark, and "system" on a dark OS) because a media
+   query can't share a selector list. Keep the two blocks identical. */
+[data-theme="dark"] {
+  --background: #0a0a0d;
+  --glow-1: rgb(99 102 241 / 0.22);
+  --glow-2: rgb(52 199 89 / 0.07);
+  --foreground: #f5f5f7;
+  --card: #18181d;
+  --surface-2: #141418;
+  --raised: #24242b;
+  --hover: rgb(255 255 255 / 0.04);
+  --card-foreground: #f5f5f7;
+  --popover: #1b1b21;
+  --popover-foreground: #f5f5f7;
+  --primary: #6366f1;
+  --primary-foreground: #ffffff;
+  --secondary: #24242b;
+  --secondary-foreground: #f5f5f7;
+  --muted: #24242b;
+  --muted-foreground: #a1a1aa;
+  --accent: rgb(129 140 248 / 0.12);
+  --accent-foreground: #c7d2fe;
+  --destructive: #f97066;
+  --border: rgb(255 255 255 / 0.08);
+  --input: rgb(255 255 255 / 0.14);
+  --ring: #818cf8;
+  --link: #a5b4fc;
+  --track: #3a3a42;
+  --hi: rgb(255 255 255 / 0.06);
+  --shadow: rgb(0 0 0 / 0.5);
+  --shadow-strong: rgb(0 0 0 / 0.65);
+  --glow: rgb(99 102 241 / 0.16);
+  --glow-strong: rgb(99 102 241 / 0.34);
+  --tone-new: rgb(99 102 241 / 0.2);
+  --tone-new-fg: #c7d2fe;
+  --tone-gray: rgb(255 255 255 / 0.08);
+  --tone-gray-fg: #d4d4d8;
+  --tone-ok: rgb(52 199 89 / 0.16);
+  --tone-ok-fg: #86efac;
+  --tone-warn: rgb(251 146 60 / 0.16);
+  --tone-warn-fg: #fdba74;
+  --tone-bad: rgb(240 68 56 / 0.16);
+  --tone-bad-fg: #fda29b;
+  --chart-1: #a5b4fc;
+  --chart-2: #f9a8d4;
+  --chart-3: #5eead4;
+  --chart-4: #fdba74;
+  --chart-5: #a1a1aa;
+  --sidebar: rgb(20 20 25 / 0.7);
+  --sidebar-foreground: #f5f5f7;
+  --sidebar-primary: #818cf8;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgb(129 140 248 / 0.1);
+  --sidebar-accent-foreground: #f5f5f7;
+  --sidebar-border: rgb(255 255 255 / 0.07);
+  --sidebar-ring: #818cf8;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-theme="system"] {
+    --background: #0a0a0d;
+    --glow-1: rgb(99 102 241 / 0.22);
+    --glow-2: rgb(52 199 89 / 0.07);
+    --foreground: #f5f5f7;
+    --card: #18181d;
+    --surface-2: #141418;
+    --raised: #24242b;
+    --hover: rgb(255 255 255 / 0.04);
+    --card-foreground: #f5f5f7;
+    --popover: #1b1b21;
+    --popover-foreground: #f5f5f7;
+    --primary: #6366f1;
+    --primary-foreground: #ffffff;
+    --secondary: #24242b;
+    --secondary-foreground: #f5f5f7;
+    --muted: #24242b;
+    --muted-foreground: #a1a1aa;
+    --accent: rgb(129 140 248 / 0.12);
+    --accent-foreground: #c7d2fe;
+    --destructive: #f97066;
+    --border: rgb(255 255 255 / 0.08);
+    --input: rgb(255 255 255 / 0.14);
+    --ring: #818cf8;
+    --link: #a5b4fc;
+    --track: #3a3a42;
+    --hi: rgb(255 255 255 / 0.06);
+    --shadow: rgb(0 0 0 / 0.5);
+    --shadow-strong: rgb(0 0 0 / 0.65);
+    --glow: rgb(99 102 241 / 0.16);
+    --glow-strong: rgb(99 102 241 / 0.34);
+    --tone-new: rgb(99 102 241 / 0.2);
+    --tone-new-fg: #c7d2fe;
+    --tone-gray: rgb(255 255 255 / 0.08);
+    --tone-gray-fg: #d4d4d8;
+    --tone-ok: rgb(52 199 89 / 0.16);
+    --tone-ok-fg: #86efac;
+    --tone-warn: rgb(251 146 60 / 0.16);
+    --tone-warn-fg: #fdba74;
+    --tone-bad: rgb(240 68 56 / 0.16);
+    --tone-bad-fg: #fda29b;
+    --chart-1: #a5b4fc;
+    --chart-2: #f9a8d4;
+    --chart-3: #5eead4;
+    --chart-4: #fdba74;
+    --chart-5: #a1a1aa;
+    --sidebar: rgb(20 20 25 / 0.7);
+    --sidebar-foreground: #f5f5f7;
+    --sidebar-primary: #818cf8;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: rgb(129 140 248 / 0.1);
+    --sidebar-accent-foreground: #f5f5f7;
+    --sidebar-border: rgb(255 255 255 / 0.07);
+    --sidebar-ring: #818cf8;
+    color-scheme: dark;
+  }
 }
 
 @layer base {
@@ -171,10 +310,108 @@
   animation: feedback-enter 150ms var(--ease-out);
 }
 
+/* ---------------------------------------------------------------------------
+   Motion & states kit (Claude Design canvas "Chatalot Dashboard Redesign").
+   --------------------------------------------------------------------------- */
+
+/* The app backdrop: two soft colour glows over the base grey. */
+.app-backdrop {
+  background:
+    radial-gradient(1200px 600px at 85% -10%, var(--glow-1), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, var(--glow-2), transparent 60%),
+    var(--background);
+}
+
+/* Skeleton shimmer — see components/ui/skeleton.tsx. */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--muted);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, var(--hi), transparent);
+  opacity: 0.7;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+@keyframes shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* Staggered entrance for rows and cards; set --i on each item. */
+.fade-up {
+  animation: fade-up 500ms var(--ease-lift) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* "Live" pulse dot. */
+.live-dot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #34c759;
+}
+.live-dot::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 999px;
+  border: 2px solid #34c759;
+  opacity: 0;
+  animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes ping {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .page-enter,
   .feedback-enter {
     animation-name: fade-in;
     animation-duration: 120ms;
   }
+  .skeleton::after,
+  .live-dot::after {
+    animation: none;
+  }
+  .fade-up {
+    animation: fade-in 200ms ease both;
+  }
+  /* Hover lifts, sliding pills and springy knobs settle instantly. */
+  .motion-lift:hover,
+  .motion-lift:active {
+    transform: none !important;
+  }
+  .motion-snap,
+  .motion-snap * {
+    transition-duration: 0.01s !important;
+  }
+}
+
+/* Plain checkboxes (multi-select lists) pick up the brand colour. */
+input[type="checkbox"]:not([role="switch"]) {
+  accent-color: var(--primary);
 }

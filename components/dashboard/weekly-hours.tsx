@@ -87,13 +87,13 @@ export function WeeklyHours({
       {error && <p className="feedback-enter text-sm text-red-600">{error}</p>}
 
       {rules.length === 0 ? (
-        <p className="text-sm text-zinc-500">{emptyText}</p>
+        <p className="text-sm text-muted-foreground">{emptyText}</p>
       ) : (
         <ul className="divide-y rounded-lg border text-sm">
           {byDay.map(({ weekday, windows }) => (
             <li key={weekday} className="flex flex-wrap items-center gap-2 px-3 py-2">
               <span className="w-24 font-medium">{WEEKDAY_NAMES[weekday]}</span>
-              {windows.length === 0 && <span className="text-zinc-400">Closed</span>}
+              {windows.length === 0 && <span className="text-muted-foreground">Closed</span>}
               {windows.map((w) => (
                 <span key={w.id} className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5">
                   {hhmm(w.start_time)}–{hhmm(w.end_time)}
@@ -101,7 +101,7 @@ export function WeeklyHours({
                     type="button"
                     disabled={pending}
                     onClick={() => run(() => deleteAvailabilityRuleAction(w.id))}
-                    className="ml-1 text-zinc-400 hover:text-red-600"
+                    className="ml-1 text-muted-foreground hover:text-red-600"
                     aria-label={`Remove ${WEEKDAY_NAMES[weekday]} ${hhmm(w.start_time)}–${hhmm(w.end_time)}`}
                   >
                     ×

@@ -106,7 +106,7 @@ export async function POST(request: Request) {
 
   const [{ data: widgetSettings }, { data: agentConfig }] = await Promise.all([
     admin.from("widget_settings").select("whatsapp_link").eq("tenant_id", tenant.id).maybeSingle(),
-    admin.from("agent_configs").select("business_name, handoff_contact").eq("tenant_id", tenant.id).maybeSingle(),
+    admin.from("agent_configs").select("business_name, handoff_contact, web_ai_enabled").eq("tenant_id", tenant.id).maybeSingle(),
   ]);
   const whatsappUrl = whatsappContinueUrl(widgetSettings?.whatsapp_link);
   const handoff = { whatsapp: whatsappUrl !== null, handoffContact: agentConfig?.handoff_contact || null };
@@ -123,8 +123,8 @@ export async function POST(request: Request) {
   // Nobody can reply in the widget, so neither case below locks the visitor
   // out: their message is kept for the owner, and they get a fixed reply with
   // a way to reach a person (WhatsApp button, callback details).
-  if (conversation.status === "human") {
-    // The owner took over from the dashboard.
+  // Taken over from the dashboard, or the owner paused website AI altogether.
+  if (conversation.status === "human" || agentConfig?.web_ai_enabled === false) {
     const reply = webTakenOverMessage(handoff);
     await saveMessage("user", message);
     await saveMessage("assistant", reply);

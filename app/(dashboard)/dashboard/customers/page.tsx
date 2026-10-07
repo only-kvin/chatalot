@@ -102,7 +102,7 @@ export default async function CustomersPage({
           ))}
           {!customers?.length && (
             <TableRow>
-              <TableCell colSpan={7} className="text-center text-zinc-500">
+              <TableCell colSpan={7} className="text-center text-muted-foreground">
                 {q ? "No customers match that search." : "No customers yet."}
               </TableCell>
             </TableRow>

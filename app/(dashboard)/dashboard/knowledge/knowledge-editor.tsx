@@ -152,7 +152,7 @@ export function KnowledgeEditor({ initialItems }: { initialItems: KnowledgeItem[
                   <Badge variant="secondary">{item.type}</Badge>
                   <span className="font-medium">{item.title}</span>
                 </div>
-                <p className="text-sm text-zinc-600 dark:text-zinc-400">{item.content}</p>
+                <p className="text-sm text-muted-foreground">{item.content}</p>
               </div>
               <div className="flex shrink-0 gap-2">
                 <Button variant="outline" size="sm" onClick={() => setEditing(item)}>
@@ -171,7 +171,7 @@ export function KnowledgeEditor({ initialItems }: { initialItems: KnowledgeItem[
           </Card>
         ))}
         {items.length === 0 && (
-          <p className="text-center text-zinc-500">No knowledge items yet.</p>
+          <p className="text-center text-muted-foreground">No knowledge items yet.</p>
         )}
       </div>
     </div>

@@ -11,6 +11,7 @@ import { formatLocalDate } from "@/lib/time";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 type Exception = {
   id: string;
@@ -120,7 +121,7 @@ export function BookingRulesForm({ rules }: { rules: BookingRules }) {
             </option>
           ))}
         </select>
-        <p className="text-xs text-zinc-500">Counted from opening time, e.g. 09:00, 09:30, 10:00 for every 30 minutes.</p>
+        <p className="text-xs text-muted-foreground">Counted from opening time, e.g. 09:00, 09:30, 10:00 for every 30 minutes.</p>
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor="booking_change_cutoff_minutes">Customers can change or cancel bookings in chat up to</Label>
@@ -136,24 +137,22 @@ export function BookingRulesForm({ rules }: { rules: BookingRules }) {
             </option>
           ))}
         </select>
-        <p className="text-xs text-zinc-500">After that, the AI hands them over to you.</p>
+        <p className="text-xs text-muted-foreground">After that, the AI hands them over to you.</p>
       </div>
       <div className="flex flex-col gap-1">
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
+        <label className="flex items-center gap-3 text-sm">
+          <Switch
             name="bookings_need_approval"
             defaultChecked={rules.bookings_need_approval}
-            className="size-4"
           />
           I approve bookings before they&apos;re confirmed
         </label>
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs text-muted-foreground">
           Bookings from your website and the AI then wait under Bookings → To approve, holding their time, until you
           approve or decline them. Customers are told it&apos;s a request.
         </p>
       </div>
-      <p className="text-xs text-zinc-500">
+      <p className="text-xs text-muted-foreground">
         These apply to customers. You can still book and move bookings at short notice from the dashboard.
       </p>
       {error && <p className="feedback-enter text-sm text-red-600">{error}</p>}
@@ -198,14 +197,14 @@ export function ExceptionsEditor({ exceptions }: { exceptions: Exception[] }) {
       </form>
       {error && <p className="feedback-enter text-sm text-red-600">{error}</p>}
       {sorted.length === 0 ? (
-        <p className="text-sm text-zinc-500">No closures or special hours.</p>
+        <p className="text-sm text-muted-foreground">No closures or special hours.</p>
       ) : (
         <ul className="divide-y rounded-lg border text-sm">
           {sorted.map((exc) => (
             <li key={exc.id} className="flex items-center justify-between gap-2 px-3 py-2">
               <span>
                 <span className="font-medium">{formatLocalDate(exc.date)}</span>
-                <span className="ml-2 text-zinc-500">
+                <span className="ml-2 text-muted-foreground">
                   {exc.is_closed ? "Closed" : `${hhmm(exc.start_time!)}–${hhmm(exc.end_time!)}`}
                 </span>
               </span>

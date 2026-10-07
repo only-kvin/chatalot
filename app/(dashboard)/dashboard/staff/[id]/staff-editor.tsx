@@ -19,6 +19,7 @@ import { StaffAvatar } from "@/components/dashboard/staff-avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 type Result = { error: string | null };
 
@@ -95,7 +96,7 @@ export function StaffDetailsForm({
           defaultValue={staff.avatar_url ?? ""}
           placeholder="https://…/photo.jpg"
         />
-        <p className="text-xs text-zinc-500">Shown to customers choosing who to book with. Initials are used without one.</p>
+        <p className="text-xs text-muted-foreground">Shown to customers choosing who to book with. Initials are used without one.</p>
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor="max_concurrent">Bookings at the same time</Label>
@@ -109,10 +110,10 @@ export function StaffDetailsForm({
           defaultValue={staff.max_concurrent}
           className="w-28"
         />
-        <p className="text-xs text-zinc-500">1 for a chair or a treatment room; more for a class (e.g. 12).</p>
+        <p className="text-xs text-muted-foreground">1 for a chair or a treatment room; more for a class (e.g. 12).</p>
       </div>
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="active" defaultChecked={staff.active} className="size-4" />
+      <label className="flex items-center gap-3 text-sm">
+        <Switch name="active" defaultChecked={staff.active} />
         Active: customers can book {staff.name}
       </label>
 
@@ -146,7 +147,7 @@ export function StaffServices({
   const { pending, error, run } = useAction();
   if (services.length === 0) {
     return (
-      <p className="text-sm text-zinc-500">
+      <p className="text-sm text-muted-foreground">
         No services yet. Add them on the <Link href="/dashboard/services" className="underline">Services</Link> page.
       </p>
     );
@@ -165,7 +166,7 @@ export function StaffServices({
                 onChange={(e) => run(() => setStaffServiceAction(staffId, svc.id, e.target.checked))}
               />
               {svc.name}
-              {svc.anyone && <span className="text-xs text-zinc-400">(everyone)</span>}
+              {svc.anyone && <span className="text-xs text-muted-foreground">(everyone)</span>}
             </label>
           </li>
         ))}
@@ -184,14 +185,14 @@ export function HoursMode({ staffId, ownHours }: { staffId: string; ownHours: bo
           <Button variant="outline" size="sm" disabled={pending} onClick={() => run(() => switchToBusinessHoursAction(staffId))}>
             Use the opening hours instead
           </Button>
-          <p className="mt-1 text-xs text-zinc-500">Removes these hours.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Removes these hours.</p>
         </div>
       ) : (
         <div>
           <Button variant="outline" size="sm" disabled={pending} onClick={() => run(() => switchToOwnHoursAction(staffId))}>
             Set their own hours
           </Button>
-          <p className="mt-1 text-xs text-zinc-500">Starts from a copy of the opening hours.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Starts from a copy of the opening hours.</p>
         </div>
       )}
       <Feedback error={error} />
@@ -241,19 +242,19 @@ export function TimeOff({ staffId, upcoming, past }: { staffId: string; upcoming
             Add time off
           </Button>
         </div>
-        <p className="text-xs text-zinc-500">Leave the times empty for whole days.</p>
+        <p className="text-xs text-muted-foreground">Leave the times empty for whole days.</p>
       </form>
       <Feedback error={error} />
 
       {upcoming.length === 0 ? (
-        <p className="text-sm text-zinc-500">No time off coming up.</p>
+        <p className="text-sm text-muted-foreground">No time off coming up.</p>
       ) : (
         <ul className="divide-y rounded-lg border text-sm">
           {upcoming.map((t) => (
             <li key={t.id} className="flex items-center justify-between gap-2 px-3 py-2">
               <span>
                 <span className="font-medium">{describeTimeOff(t.starts_at, t.ends_at)}</span>
-                {t.reason && <span className="ml-2 text-zinc-500">{t.reason}</span>}
+                {t.reason && <span className="ml-2 text-muted-foreground">{t.reason}</span>}
               </span>
               <Button variant="outline" size="sm" disabled={pending} onClick={() => run(() => deleteTimeOffAction(t.id))}>
                 Remove
@@ -263,7 +264,7 @@ export function TimeOff({ staffId, upcoming, past }: { staffId: string; upcoming
         </ul>
       )}
       {past.length > 0 && (
-        <details className="text-sm text-zinc-500">
+        <details className="text-sm text-muted-foreground">
           <summary className="cursor-pointer">Recent ({past.length})</summary>
           <ul className="mt-2 flex flex-col gap-1">
             {past.map((t) => (
@@ -313,7 +314,7 @@ export function DeleteStaff({ staffId, name }: { staffId: string; name: string }
           <Button variant="ghost" size="sm" className="text-red-600" onClick={() => setSure(true)}>
             Delete {name}
           </Button>
-          <p className="text-xs text-zinc-500">Only possible while they have no bookings; after that, deactivate them.</p>
+          <p className="text-xs text-muted-foreground">Only possible while they have no bookings; after that, deactivate them.</p>
         </div>
       )}
       {error && <p className="feedback-enter text-sm text-red-600">{error}</p>}
@@ -345,7 +346,7 @@ export function StaffPhoto({ staffId, name, url }: { staffId: string; name: stri
           </Button>
         )}
       </form>
-      <p className="w-full text-xs text-zinc-500">JPEG, PNG or WebP, up to 2 MB. Square photos look best.</p>
+      <p className="w-full text-xs text-muted-foreground">JPEG, PNG or WebP, up to 2 MB. Square photos look best.</p>
       <Feedback error={error} saved={saved} />
     </div>
   );

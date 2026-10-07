@@ -41,7 +41,7 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
             aria-current={tab === t.id ? "page" : undefined}
             className={cn(
               "-mb-px border-b-2 px-3 py-2 text-sm font-medium",
-              tab === t.id ? "border-foreground text-foreground" : "border-transparent text-zinc-500 hover:text-foreground",
+              tab === t.id ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
             )}
           >
             {t.label}
@@ -64,25 +64,25 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
                 <Link href={`/dashboard/messages/${m.id}`} className={cn("hover:underline", m.status === "new" && "font-semibold")}>
                   {m.name}
                 </Link>
-                <div className="text-xs text-zinc-500">{m.email ?? m.phone}</div>
+                <div className="text-xs text-muted-foreground">{m.email ?? m.phone}</div>
               </TableCell>
               <TableCell className="max-w-md">
                 {m.subject && <span className="mr-2 font-medium">{m.subject}</span>}
-                <span className="text-zinc-600 dark:text-zinc-400">
+                <span className="text-muted-foreground">
                   {m.message.length > 90 ? `${m.message.slice(0, 87)}…` : m.message}
                 </span>
               </TableCell>
               <TableCell>
-                <Badge variant={m.status === "new" ? "default" : m.status === "replied" ? "secondary" : "outline"}>
+                <Badge variant={m.status === "new" ? "new" : m.status === "replied" ? "success" : "neutral"}>
                   {STATUS[m.status] ?? m.status}
                 </Badge>
               </TableCell>
-              <TableCell className="whitespace-nowrap text-sm text-zinc-500">{formatShortLocal(m.created_at)}</TableCell>
+              <TableCell className="whitespace-nowrap text-sm text-muted-foreground">{formatShortLocal(m.created_at)}</TableCell>
             </TableRow>
           ))}
           {!messages?.length && (
             <TableRow>
-              <TableCell colSpan={4} className="text-center text-zinc-500">
+              <TableCell colSpan={4} className="text-center text-muted-foreground">
                 {tab === "new" ? "No new messages." : "No messages yet. Add the contact widget from Widgets → Contact."}
               </TableCell>
             </TableRow>

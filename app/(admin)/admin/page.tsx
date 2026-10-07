@@ -31,7 +31,7 @@ export default async function AdminPage() {
     <div className="mx-auto flex max-w-3xl flex-col gap-8 p-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Tenants</h1>
-        <Link href="/admin/usage" className="text-sm text-zinc-500 hover:underline">
+        <Link href="/admin/usage" className="text-sm text-muted-foreground hover:underline">
           Usage →
         </Link>
       </div>
@@ -55,7 +55,7 @@ export default async function AdminPage() {
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="ownerEmail">
-                Owner email <span className="text-zinc-400">(optional)</span>
+                Owner email <span className="text-muted-foreground">(optional)</span>
               </Label>
               <Input
                 id="ownerEmail"
@@ -63,7 +63,7 @@ export default async function AdminPage() {
                 type="email"
                 placeholder="owner@example.com"
               />
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-muted-foreground">
                 Must have signed in via /login at least once already.
               </p>
             </div>
@@ -101,7 +101,7 @@ export default async function AdminPage() {
               ))}
               {!tenants?.length && (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center text-zinc-500">
+                  <TableCell colSpan={4} className="text-center text-muted-foreground">
                     No tenants yet.
                   </TableCell>
                 </TableRow>

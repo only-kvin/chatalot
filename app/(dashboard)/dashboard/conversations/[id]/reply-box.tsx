@@ -47,7 +47,7 @@ export function ReplyBox({
 
   if (!windowOpen) {
     return (
-      <p className="text-sm text-zinc-500">
+      <p className="text-sm text-muted-foreground">
         More than 24 hours have passed since this customer&apos;s last message, so WhatsApp won&apos;t
         let you reply until they message again.
       </p>
@@ -73,7 +73,7 @@ export function ReplyBox({
       />
       {error && <p className="feedback-enter text-sm text-red-600">{error}</p>}
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs text-muted-foreground">
           {isHuman
             ? "The AI is paused while you handle this conversation."
             : "Sending a reply takes over from the AI."}

@@ -36,7 +36,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
           aria-current={tab === t.id ? "page" : undefined}
           className={cn(
             "-mb-px border-b-2 px-3 py-2 text-sm font-medium",
-            tab === t.id ? "border-foreground text-foreground" : "border-transparent text-zinc-500 hover:text-foreground",
+            tab === t.id ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
           )}
         >
           {t.label}

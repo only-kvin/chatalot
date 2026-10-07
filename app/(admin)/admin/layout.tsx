@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/db/supabase-server";
+import { ThemeScript } from "@/components/theme/theme-script";
 
 export default async function AdminLayout({
   children,
@@ -23,5 +24,10 @@ export default async function AdminLayout({
 
   if (!adminRow) redirect("/dashboard");
 
-  return <div className="min-h-screen bg-zinc-50 dark:bg-black">{children}</div>;
+  return (
+    <div className="app-backdrop min-h-screen">
+      <ThemeScript />
+      {children}
+    </div>
+  );
 }

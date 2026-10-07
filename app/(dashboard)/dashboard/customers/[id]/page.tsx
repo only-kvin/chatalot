@@ -4,9 +4,11 @@ import { ArrowLeftIcon } from "lucide-react";
 import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
 import { formatPhone } from "@/lib/contacts/phone";
+import { CONVERSATION_LABEL, conversationTone, leadTone } from "@/lib/ui/status-tones";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CONSENT_LABEL, type ConsentKind } from "@/lib/contacts/consents";
+import { STATUS_LABEL, statusVariant, type BookingStatus } from "@/lib/bookings/labels";
 
 const CONSENT_SOURCE: Record<string, string> = {
   contact_widget: "website contact form",
@@ -73,12 +75,12 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       <div>
         <Link
           href="/dashboard/customers"
-          className="mb-3 inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-foreground"
+          className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeftIcon className="size-4" /> Customers
         </Link>
         <h1 className="text-2xl font-semibold">{displayName}</h1>
-        <p className="mt-1 text-sm text-zinc-500">
+        <p className="mt-1 text-sm text-muted-foreground">
           {formatPhone(customer.phone_e164) || "No phone number"}
           {customer.first_channel && <> · first came via {customer.first_channel}</>}
           {" · "}first seen {when(customer.first_seen_at)} · last seen {when(customer.last_seen_at)}
@@ -91,7 +93,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {customer.name && customer.name_source && (
-            <p className="text-xs text-zinc-500">Name {NAME_SOURCE_LABEL[customer.name_source]}.</p>
+            <p className="text-xs text-muted-foreground">Name {NAME_SOURCE_LABEL[customer.name_source]}.</p>
           )}
           {customer.opted_out_at && (
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200">
@@ -99,7 +101,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
               until they reply START. You can still answer when they message you.
             </p>
           )}
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-muted-foreground">
             {customer.consent_at
               ? `Agreed to their details being saved on ${when(customer.consent_at)}.`
               : "Hasn't been asked to save their details yet (known from their WhatsApp number)."}
@@ -107,10 +109,10 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           </p>
           {!!consentHistory?.length && (
             <details className="text-xs">
-              <summary className="cursor-pointer text-zinc-600 dark:text-zinc-400">
+              <summary className="cursor-pointer text-muted-foreground">
                 Consent history ({consentHistory.length})
               </summary>
-              <ul className="mt-2 flex flex-col gap-1 text-zinc-500">
+              <ul className="mt-2 flex flex-col gap-1 text-muted-foreground">
                 {consentHistory.map((c) => (
                   <li key={c.id}>
                     {when(c.created_at)}: {c.granted ? "said yes to" : "said no to"}{" "}
@@ -144,13 +146,13 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                 <Link href={`/dashboard/conversations/${c.id}`} className="hover:underline">
                   {c.channel === "whatsapp" ? "WhatsApp chat" : "Website chat"}
                 </Link>
-                <span className="flex items-center gap-2 text-zinc-500">
-                  <Badge variant={c.status === "human" ? "default" : "secondary"}>{c.status}</Badge>
+                <span className="flex items-center gap-2 text-muted-foreground">
+                  <Badge variant={conversationTone(c.status)}>{CONVERSATION_LABEL[c.status] ?? c.status}</Badge>
                   {when(c.last_message_at)}
                 </span>
               </li>
             ))}
-            {!conversations?.length && <li className="py-2 text-zinc-500">No conversations.</li>}
+            {!conversations?.length && <li className="py-2 text-muted-foreground">No conversations.</li>}
           </ul>
         </CardContent>
       </Card>
@@ -164,13 +166,13 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             {leads?.map((l) => (
               <li key={l.id} className="flex items-center justify-between gap-3 py-2">
                 <span>{l.interest || "Enquiry"}</span>
-                <span className="flex items-center gap-2 text-zinc-500">
-                  <Badge variant="secondary">{l.status}</Badge>
+                <span className="flex items-center gap-2 text-muted-foreground">
+                  <Badge variant={leadTone(l.status)}>{l.status}</Badge>
                   {when(l.created_at)}
                 </span>
               </li>
             ))}
-            {!leads?.length && <li className="py-2 text-zinc-500">No leads.</li>}
+            {!leads?.length && <li className="py-2 text-muted-foreground">No leads.</li>}
           </ul>
         </CardContent>
       </Card>
@@ -186,14 +188,14 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
               return (
                 <li key={b.id} className="flex items-center justify-between gap-3 py-2">
                   <span>{service?.name ?? "Booking"}</span>
-                  <span className="flex items-center gap-2 text-zinc-500">
-                    <Badge variant="secondary">{b.status}</Badge>
+                  <span className="flex items-center gap-2 text-muted-foreground">
+                    <Badge variant={statusVariant(b.status)}>{STATUS_LABEL[b.status as BookingStatus] ?? b.status}</Badge>
                     {when(b.starts_at)}
                   </span>
                 </li>
               );
             })}
-            {!bookings?.length && <li className="py-2 text-zinc-500">No bookings.</li>}
+            {!bookings?.length && <li className="py-2 text-muted-foreground">No bookings.</li>}
           </ul>
         </CardContent>
       </Card>

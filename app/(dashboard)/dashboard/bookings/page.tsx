@@ -108,7 +108,7 @@ export default async function BookingsPage({
             aria-current={tab === t.id ? "page" : undefined}
             className={cn(
               "-mb-px border-b-2 px-3 py-2 text-sm font-medium",
-              tab === t.id ? "border-foreground text-foreground" : "border-transparent text-zinc-500 hover:text-foreground",
+              tab === t.id ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
             )}
           >
             {t.label}
@@ -125,7 +125,7 @@ export default async function BookingsPage({
               aria-current={staffFilter === p.id ? "page" : undefined}
               className={cn(
                 "rounded-full border px-3 py-1",
-                staffFilter === p.id ? "border-foreground bg-foreground text-background" : "text-zinc-600 hover:border-foreground",
+                staffFilter === p.id ? "border-foreground bg-foreground text-background" : "text-muted-foreground hover:border-foreground",
               )}
             >
               {p.name}
@@ -165,7 +165,7 @@ export default async function BookingsPage({
                 </TableCell>
                 <TableCell>{service}</TableCell>
                 {staffNames.size > 0 && (
-                  <TableCell className={b.staff_id ? "" : "text-zinc-400"}>
+                  <TableCell className={b.staff_id ? "" : "text-muted-foreground"}>
                     {b.staff_id ? (staffNames.get(b.staff_id) ?? "—") : "Not assigned"}
                   </TableCell>
                 )}
@@ -186,15 +186,15 @@ export default async function BookingsPage({
                   )}
                   {b.review_rating && <Rating value={b.review_rating} className="ml-2" />}
                 </TableCell>
-                <TableCell className="whitespace-nowrap text-zinc-600 dark:text-zinc-400">
+                <TableCell className="whitespace-nowrap text-muted-foreground">
                   {SOURCE_LABEL[b.source] ?? b.source}
-                  <div className="text-xs text-zinc-400">{formatShortLocal(b.created_at)}</div>
+                  <div className="text-xs text-muted-foreground">{formatShortLocal(b.created_at)}</div>
                 </TableCell>
-                <TableCell className="text-sm text-zinc-600 dark:text-zinc-400">
+                <TableCell className="text-sm text-muted-foreground">
                   {last ? (
                     <>
                       {describeEvent(last, user?.id ?? null, staffNames)}
-                      <div className="text-xs text-zinc-400">{formatShortLocal(last.created_at)}</div>
+                      <div className="text-xs text-muted-foreground">{formatShortLocal(last.created_at)}</div>
                     </>
                   ) : (
                     "—"
@@ -205,7 +205,7 @@ export default async function BookingsPage({
           })}
           {!bookings?.length && (
             <TableRow>
-              <TableCell colSpan={staffNames.size > 0 ? 7 : 6} className="text-center text-zinc-500">
+              <TableCell colSpan={staffNames.size > 0 ? 7 : 6} className="text-center text-muted-foreground">
                 {
                   {
                     upcoming: "No upcoming bookings.",

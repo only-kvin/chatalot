@@ -79,7 +79,7 @@ export function WidgetEditor({
             <CardDescription>Paste this once into your website&apos;s HTML.</CardDescription>
           </CardHeader>
           <CardContent className="flex items-start justify-between gap-4">
-            <code className="block flex-1 overflow-x-auto rounded bg-zinc-100 p-3 text-xs dark:bg-zinc-800">
+            <code className="block flex-1 overflow-x-auto rounded bg-muted p-3 text-xs">
               {snippet}
             </code>
             <CopySnippetButton snippet={snippet} />
@@ -163,7 +163,7 @@ export function WidgetEditor({
                   defaultValue={initialSettings.whatsapp_link}
                   placeholder="https://wa.me/27..."
                 />
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-muted-foreground">
                   Shown as a &quot;Chat on WhatsApp&quot; button in the widget, and offered to visitors
                   who ask to speak to a person, since you can reply to them on WhatsApp from
                   Conversations.

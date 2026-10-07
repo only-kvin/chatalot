@@ -60,7 +60,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
       <div>
         <Link
           href="/dashboard/bookings"
-          className="mb-3 inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-foreground"
+          className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeftIcon className="size-4" /> Bookings
         </Link>
@@ -71,7 +71,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
           </Badge>
           {booking.review_rating && <Rating value={booking.review_rating} />}
         </div>
-        <p className="mt-1 text-sm text-zinc-500">
+        <p className="mt-1 text-sm text-muted-foreground">
           {formatLocalDateTime(booking.starts_at)} – {formatLocalDateTime(booking.ends_at).split(" at ")[1]}
           {staffName && ` · with ${staffName}`}
         </p>
@@ -93,7 +93,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
           </p>
           <p>{formatPhone(canonicalPhone(booking.phone)) || booking.phone}</p>
           {booking.email && <p>{booking.email}</p>}
-          <p className="text-zinc-500">
+          <p className="text-muted-foreground">
             Booked via {SOURCE_LABEL[booking.source] ?? booking.source} on {formatShortLocal(booking.created_at)}
             {booking.conversation_id && (
               <>
@@ -115,12 +115,12 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
           <ol className="flex flex-col gap-3 border-l pl-4 text-sm">
             {events?.map((e, i) => (
               <li key={i} className="relative">
-                <span className="absolute top-1.5 -left-[21px] size-2 rounded-full bg-zinc-400" aria-hidden />
+                <span className="absolute top-1.5 -left-[21px] size-2 rounded-full bg-muted-foreground/60" aria-hidden />
                 <p>{describeEvent(e, user?.id ?? null, staffNames)}</p>
-                <p className="text-xs text-zinc-500">{formatShortLocal(e.created_at)}</p>
+                <p className="text-xs text-muted-foreground">{formatShortLocal(e.created_at)}</p>
               </li>
             ))}
-            {!events?.length && <li className="text-zinc-500">No history recorded.</li>}
+            {!events?.length && <li className="text-muted-foreground">No history recorded.</li>}
           </ol>
         </CardContent>
       </Card>

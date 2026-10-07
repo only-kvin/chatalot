@@ -64,7 +64,7 @@ function FieldRow({
             ))}
           </select>
         ) : (
-          <span className="text-xs text-zinc-500">{TYPE_LABEL[field.type]}</span>
+          <span className="text-xs text-muted-foreground">{TYPE_LABEL[field.type]}</span>
         )}
         <label className="flex items-center gap-1 text-sm">
           <input
@@ -98,7 +98,7 @@ function FieldRow({
           }
         />
       )}
-      {locked && <p className="text-xs text-zinc-500">Always asked.</p>}
+      {locked && <p className="text-xs text-muted-foreground">Always asked.</p>}
     </li>
   );
 }
@@ -160,7 +160,7 @@ export function FormFieldsEditor({
         ))}
       </div>
       {consentNote && (
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs text-muted-foreground">
           Customers also tick a box agreeing to you saving their details for the booking (POPIA).
         </p>
       )}

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 
 type Settings = {
   business_name: string;
@@ -92,7 +93,7 @@ export function SettingsForm({ initialSettings, hostedBookingUrl }: { initialSet
               defaultValue={initialSettings.handoff_contact}
               placeholder="021 555 0134"
             />
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-muted-foreground">
               Given to visitors, and used in the fallback reply, when a human needs to step in.
             </p>
           </div>
@@ -120,7 +121,7 @@ export function SettingsForm({ initialSettings, hostedBookingUrl }: { initialSet
             defaultValue={initialSettings.booking_page_url}
             placeholder="https://yourbusiness.co.za/book"
           />
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-muted-foreground">
             Only if that page has your appointment widget on it (Widgets → Appointment). Leave empty to use the page above.
           </p>
         </CardContent>
@@ -143,7 +144,7 @@ export function SettingsForm({ initialSettings, hostedBookingUrl }: { initialSet
             defaultValue={initialSettings.google_review_url}
             placeholder="https://g.page/r/…/review"
           />
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-muted-foreground">
             Find it in your Google Business Profile under &ldquo;Ask for reviews&rdquo;. Leave empty to turn review
             requests off. Every customer gets the link, whatever their score, as Google requires.
           </p>
@@ -159,12 +160,10 @@ export function SettingsForm({ initialSettings, hostedBookingUrl }: { initialSet
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
+          <label className="flex items-center gap-3 text-sm">
+            <Switch
               name="daily_summary_enabled"
               defaultChecked={initialSettings.daily_summary_enabled}
-              className="size-4"
             />
             Email me a daily summary
           </label>

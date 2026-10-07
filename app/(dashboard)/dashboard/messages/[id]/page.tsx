@@ -32,11 +32,11 @@ export default async function MessagePage({ params }: { params: Promise<{ id: st
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
       <div>
-        <Link href="/dashboard/messages" className="mb-3 inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-foreground">
+        <Link href="/dashboard/messages" className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeftIcon className="size-4" /> Messages
         </Link>
         <h1 className="text-2xl font-semibold">{m.subject ?? `Message from ${m.name}`}</h1>
-        <p className="mt-1 text-sm text-zinc-500">Received {formatShortLocal(m.created_at)}</p>
+        <p className="mt-1 text-sm text-muted-foreground">Received {formatShortLocal(m.created_at)}</p>
       </div>
 
       <Card>
@@ -48,19 +48,19 @@ export default async function MessagePage({ params }: { params: Promise<{ id: st
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
             {m.email && (
               <>
-                <dt className="text-zinc-500">Email</dt>
+                <dt className="text-muted-foreground">Email</dt>
                 <dd>{m.email}</dd>
               </>
             )}
             {m.phone && (
               <>
-                <dt className="text-zinc-500">Phone</dt>
+                <dt className="text-muted-foreground">Phone</dt>
                 <dd>{m.phone}</dd>
               </>
             )}
             {details.map(([key, value]) => (
               <div key={key} className="contents">
-                <dt className="text-zinc-500">{labels.get(key) ?? key.replace(/^custom_/, "").replace(/_/g, " ")}</dt>
+                <dt className="text-muted-foreground">{labels.get(key) ?? key.replace(/^custom_/, "").replace(/_/g, " ")}</dt>
                 <dd>{value === true ? "Yes" : value === false ? "No" : value}</dd>
               </div>
             ))}

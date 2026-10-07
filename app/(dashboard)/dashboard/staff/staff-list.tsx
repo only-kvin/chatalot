@@ -73,7 +73,7 @@ export function StaffList({ staff }: { staff: StaffRow[] }) {
       {error && <p className="feedback-enter text-sm text-red-600">{error}</p>}
 
       {staff.length === 0 ? (
-        <p className="text-center text-sm text-zinc-500">
+        <p className="text-center text-sm text-muted-foreground">
           No staff yet. Customers book the business as a whole, one booking at a time.
         </p>
       ) : (
@@ -88,13 +88,13 @@ export function StaffList({ staff }: { staff: StaffRow[] }) {
                       <Link href={`/dashboard/staff/${p.id}`} className="font-medium hover:underline">
                         {p.name}
                       </Link>
-                      {p.role && <span className="text-sm text-zinc-500">{p.role}</span>}
+                      {p.role && <span className="text-sm text-muted-foreground">{p.role}</span>}
                       {!p.active && <Badge variant="secondary">Inactive</Badge>}
                     </div>
-                    <p className="truncate text-sm text-zinc-500">
+                    <p className="truncate text-sm text-muted-foreground">
                       {p.services.length ? p.services.join(", ") : "No services"}
                     </p>
-                    <p className="text-xs text-zinc-400">
+                    <p className="text-xs text-muted-foreground">
                       {p.ownHours ? "Own hours" : "Opening hours"}
                       {p.max_concurrent > 1 && ` · up to ${p.max_concurrent} bookings at a time`}
                     </p>

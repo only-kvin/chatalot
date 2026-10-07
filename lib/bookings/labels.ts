@@ -14,11 +14,12 @@ export const STATUS_LABEL: Record<BookingStatus, string> = {
   no_show: "No-show",
 };
 
-export function statusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
-  if (status === "cancelled" || status === "no_show") return "destructive";
-  if (status === "completed") return "secondary";
-  if (status === "pending") return "outline";
-  return "default";
+// Badge colours (the status chips in components/ui/badge.tsx).
+export function statusVariant(status: string): "success" | "neutral" | "danger" | "warning" {
+  if (status === "cancelled" || status === "no_show") return "danger";
+  if (status === "completed") return "neutral";
+  if (status === "pending") return "warning";
+  return "success";
 }
 
 export const SOURCE_LABEL: Record<string, string> = {

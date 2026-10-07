@@ -5,6 +5,7 @@ import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
 import { toggleTakeOverAction } from "../actions";
 import { Button } from "@/components/ui/button";
+import { CONVERSATION_LABEL, conversationTone } from "@/lib/ui/status-tones";
 import { Badge } from "@/components/ui/badge";
 import { isWithinServiceWindow } from "@/lib/channels/whatsapp";
 import { ReplyBox } from "./reply-box";
@@ -57,8 +58,8 @@ export default async function ConversationPage({
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Conversation</h1>
-          <p className="text-sm text-zinc-500">
-            {conversation.channel} · <Badge variant="secondary">{conversation.status}</Badge>
+          <p className="text-sm text-muted-foreground">
+            {conversation.channel} · <Badge variant={conversationTone(conversation.status)}>{CONVERSATION_LABEL[conversation.status] ?? conversation.status}</Badge>
             {customer && (
               <>
                 {" · "}
@@ -83,13 +84,13 @@ export default async function ConversationPage({
           m.role === "user" ? (
             <div
               key={m.id}
-              className="max-w-[80%] self-start rounded-lg bg-zinc-100 px-4 py-2 text-sm dark:bg-zinc-800"
+              className="max-w-[80%] self-start rounded-lg bg-muted px-4 py-2 text-sm"
             >
               {m.content}
             </div>
           ) : (
             <div key={m.id} className="flex max-w-[80%] flex-col items-end gap-1 self-end">
-              <span className="text-xs text-zinc-500">{senderLabel(m.sent_by)}</span>
+              <span className="text-xs text-muted-foreground">{senderLabel(m.sent_by)}</span>
               <div
                 className={`rounded-lg px-4 py-2 text-sm text-white ${
                   m.sent_by ? "bg-emerald-600" : "bg-indigo-600"
@@ -101,7 +102,7 @@ export default async function ConversationPage({
           ),
         )}
         {!messages?.length && (
-          <p className="text-center text-zinc-500">No messages yet.</p>
+          <p className="text-center text-muted-foreground">No messages yet.</p>
         )}
       </div>
 
@@ -113,7 +114,7 @@ export default async function ConversationPage({
             windowOpen={isWithinServiceWindow(conversation.last_inbound_at)}
           />
         ) : (
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-muted-foreground">
             Replying from the dashboard isn&apos;t available for website chats yet.
           </p>
         )}

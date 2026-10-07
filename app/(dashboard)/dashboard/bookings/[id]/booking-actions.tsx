@@ -101,7 +101,7 @@ export function BookingActions({
                 Decline
               </Button>
             </div>
-            <p className="text-xs text-zinc-500">The customer is emailed either way, if they gave an email address.</p>
+            <p className="text-xs text-muted-foreground">The customer is emailed either way, if they gave an email address.</p>
           </div>
         )}
 
@@ -154,7 +154,7 @@ export function BookingActions({
               <Label htmlFor="new-date">New date</Label>
               <Input id="new-date" type="date" value={date} onChange={(e) => loadSlots(e.target.value)} className="w-48" />
             </div>
-            {slots && slots.length === 0 && <p className="text-sm text-zinc-500">No open times that day.</p>}
+            {slots && slots.length === 0 && <p className="text-sm text-muted-foreground">No open times that day.</p>}
             {slots && slots.length > 0 && (
               <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Available times">
                 {slots.map((s) => (
@@ -220,7 +220,7 @@ export function BookingActions({
 
         {started && status !== "pending" && (
           <div className="flex flex-col gap-2">
-            <p className="text-sm text-zinc-500">Did the customer come in?</p>
+            <p className="text-sm text-muted-foreground">Did the customer come in?</p>
             <div className="flex flex-wrap gap-2">
               <Button
                 variant={status === "completed" ? "default" : "outline"}

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
+import { CONVERSATION_LABEL, conversationTone } from "@/lib/ui/status-tones";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/dashboard/page-header";
 import {
@@ -45,12 +46,12 @@ export default async function ConversationsPage() {
                   {c.channel}
                 </Link>
               </TableCell>
-              <TableCell className="font-mono text-xs text-zinc-500">
+              <TableCell className="font-mono text-xs text-muted-foreground">
                 {c.external_id.slice(0, 12)}…
               </TableCell>
               <TableCell>
-                <Badge variant={c.status === "human" ? "default" : "secondary"}>
-                  {c.status}
+                <Badge variant={conversationTone(c.status)}>
+                  {CONVERSATION_LABEL[c.status] ?? c.status}
                 </Badge>
               </TableCell>
               <TableCell>{formatShortLocal(c.last_message_at)}</TableCell>
@@ -58,7 +59,7 @@ export default async function ConversationsPage() {
           ))}
           {!conversations?.length && (
             <TableRow>
-              <TableCell colSpan={4} className="text-center text-zinc-500">
+              <TableCell colSpan={4} className="text-center text-muted-foreground">
                 No conversations yet.
               </TableCell>
             </TableRow>

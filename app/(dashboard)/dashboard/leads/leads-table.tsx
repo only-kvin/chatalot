@@ -121,7 +121,7 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
           ))}
           {leads.length === 0 && (
             <TableRow>
-              <TableCell colSpan={5} className="text-center text-zinc-500">
+              <TableCell colSpan={5} className="text-center text-muted-foreground">
                 No leads yet.
               </TableCell>
             </TableRow>

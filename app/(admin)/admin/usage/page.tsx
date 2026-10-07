@@ -56,7 +56,7 @@ export default async function UsagePage() {
   return (
     <div className="mx-auto max-w-3xl p-8">
       <h1 className="mb-2 text-2xl font-semibold">Usage — this month</h1>
-      <p className="mb-6 text-sm text-zinc-500">
+      <p className="mb-6 text-sm text-muted-foreground">
         Estimated cost assumes Claude Haiku pricing ($1 in / $5 out per million
         tokens), regardless of which model is currently live for a tenant.
       </p>
@@ -82,7 +82,7 @@ export default async function UsagePage() {
           ))}
           {rows.length === 0 && (
             <TableRow>
-              <TableCell colSpan={5} className="text-center text-zinc-500">
+              <TableCell colSpan={5} className="text-center text-muted-foreground">
                 No usage this month yet.
               </TableCell>
             </TableRow>

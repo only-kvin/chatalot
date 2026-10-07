@@ -49,7 +49,7 @@ export function DeleteCustomer({
   return (
     <div className="rounded-xl border border-red-200 p-4 dark:border-red-900">
       <p className="text-sm font-medium">Delete customer and their data</p>
-      <p className="mt-1 text-sm text-zinc-500">
+      <p className="mt-1 text-sm text-muted-foreground">
         Use this when someone asks you to delete their information. It can&apos;t be undone.
       </p>
       <Button variant="destructive" className="mt-3" onClick={() => setOpen(true)}>

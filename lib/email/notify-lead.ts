@@ -17,6 +17,14 @@ export async function notifyOwnerOfLead(
     conversationId,
   });
 
+  // The bell entry above always happens; the email is the owner's choice.
+  const { data: config } = await admin
+    .from("agent_configs")
+    .select("lead_email_enabled")
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  if (config?.lead_email_enabled === false) return;
+
   await sendOwnerEmail(admin, tenantId, {
     subject: `New lead: ${lead.name} (${businessName})`,
     intro: "Your AI receptionist just captured a new lead.",

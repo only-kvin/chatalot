@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 
 const selectClass = "h-9 rounded-lg border bg-transparent px-3 text-sm";
 
@@ -194,8 +195,8 @@ export function BookingWidgetForm({
 
   return (
     <form action={() => save(() => saveBookingWidgetAction(type, { active, copy, settings, fields }), onSaved)} className="flex flex-col gap-6">
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" className="size-4" checked={active} onChange={(e) => setActive(e.target.checked)} />
+      <label className="flex items-center gap-3 text-sm">
+        <Switch checked={active} onChange={(e) => setActive(e.target.checked)} />
         {ui.name} is on
       </label>
 
@@ -210,10 +211,8 @@ export function BookingWidgetForm({
       </fieldset>
 
       {ui.toggles.map(([key, label]) => (
-        <label key={key} className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="size-4"
+        <label key={key} className="flex items-center gap-3 text-sm">
+          <Switch
             checked={settings[key] ?? false}
             onChange={(e) => setSettings({ ...settings, [key]: e.target.checked })}
           />
@@ -297,7 +296,7 @@ export function BookingWidgetTab({
           title={`${ui.name} preview`}
           className="h-[720px] w-full rounded-lg border bg-white"
         />
-        <p className="text-xs text-zinc-500">Real bookings made here are real: cancel them from Bookings.</p>
+        <p className="text-xs text-muted-foreground">Real bookings made here are real: cancel them from Bookings.</p>
       </div>
     </div>
   );
