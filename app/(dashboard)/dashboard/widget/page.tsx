@@ -6,9 +6,8 @@ import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
 import { loadScheduleWidget, loadWidgetTheme } from "@/lib/widgets/config";
 import { PageHeader } from "@/components/dashboard/page-header";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { WidgetEditor } from "./widget-editor";
-import { ScheduleForm, ScheduleSnippet, ThemeForm } from "./schedule-editor";
+import { ScheduleSnippet, ScheduleTab } from "./schedule-editor";
 
 const TABS = [
   { id: "chat", label: "Chat" },
@@ -45,32 +44,12 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
   if (tab === "schedule") {
     const [theme, schedule] = await Promise.all([loadWidgetTheme(supabase, tenantId), loadScheduleWidget(supabase, tenantId)]);
     return (
-      <div className="mx-auto max-w-3xl p-8">
+      <div className="mx-auto max-w-6xl p-8">
         <PageHeader title="Widgets" description="What customers see on your website." />
         {nav}
         <div className="flex flex-col gap-8">
           <ScheduleSnippet snippet={`<div data-chatalot="schedule"></div>\n${script}`} />
-          <Card>
-            <CardHeader>
-              <CardTitle>Look</CardTitle>
-              <CardDescription>Shared by all your booking widgets, so they match your website.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ThemeForm theme={theme} />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Schedule widget</CardTitle>
-              <CardDescription>
-                Customers pick a day and time, then fill in this form. Times come from your services, staff and
-                availability.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ScheduleForm initial={schedule} />
-            </CardContent>
-          </Card>
+          <ScheduleTab theme={theme} schedule={schedule} />
         </div>
       </div>
     );

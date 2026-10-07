@@ -187,8 +187,10 @@ function FieldRow({
 
 export function ScheduleForm({
   initial,
+  onSaved,
 }: {
   initial: { active: boolean; copy: ScheduleCopy; settings: ScheduleSettings; fields: Field[] };
+  onSaved?: () => void;
 }) {
   const { pending, error, saved, save } = useSave();
   const [active, setActive] = useState(initial.active);
@@ -215,7 +217,7 @@ export function ScheduleForm({
 
   return (
     <form
-      action={() => save(() => saveScheduleWidgetAction({ active, copy, settings, fields }))}
+      action={() => save(() => saveScheduleWidgetAction({ active, copy, settings, fields }), onSaved)}
       className="flex flex-col gap-6"
     >
       <label className="flex items-center gap-2 text-sm">
@@ -311,5 +313,61 @@ export function ScheduleSnippet({ snippet }: { snippet: string }) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// The real widget bundle against the saved settings, reloaded after each save.
+export function SchedulePreview({ reloadKey }: { reloadKey: number }) {
+  return (
+    <iframe
+      key={reloadKey}
+      src="/dashboard/widget/preview?widget=schedule"
+      title="Schedule widget preview"
+      className="h-[720px] w-full rounded-lg border bg-white"
+    />
+  );
+}
+
+// Look, schedule settings and the preview, sharing the preview's reload.
+export function ScheduleTab({
+  theme,
+  schedule,
+}: {
+  theme: WidgetTheme;
+  schedule: { active: boolean; copy: ScheduleCopy; settings: ScheduleSettings; fields: Field[] };
+}) {
+  const [reloadKey, setReloadKey] = useState(0);
+  const reload = () => setReloadKey((k) => k + 1);
+  return (
+    <div className="grid gap-8 xl:grid-cols-[1fr_440px]">
+      <div className="flex flex-col gap-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Look</CardTitle>
+            <CardDescription>Shared by all your booking widgets, so they match your website.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ThemeForm theme={theme} onSaved={reload} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Schedule widget</CardTitle>
+            <CardDescription>
+              Customers pick a day and time, then fill in this form. Times come from your services, staff and
+              availability.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ScheduleForm initial={schedule} onSaved={reload} />
+          </CardContent>
+        </Card>
+      </div>
+      <div className="flex flex-col gap-2 xl:sticky xl:top-8 xl:self-start">
+        <Label>Live preview</Label>
+        <SchedulePreview reloadKey={reloadKey} />
+        <p className="text-xs text-zinc-500">Real bookings made here are real: cancel them from Bookings.</p>
+      </div>
+    </div>
   );
 }

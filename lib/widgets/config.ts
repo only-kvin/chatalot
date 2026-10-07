@@ -37,7 +37,7 @@ export const DEFAULT_SCHEDULE_COPY: ScheduleCopy = {
   title: "Book an appointment",
   confirmButton: "Confirm booking",
   successTitle: "You're booked!",
-  successMessage: "We've sent the details to your email.",
+  successMessage: "See you soon!",
   requestedTitle: "Request received",
   requestedMessage: "We'll confirm your booking shortly. The time is held for you until then.",
 };

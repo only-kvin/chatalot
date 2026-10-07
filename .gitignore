@@ -49,5 +49,6 @@ skills-lock.json
 # personal Claude Code permission overrides for this project, not team-shared
 /.claude/settings.local.json
 
-# generated widget bundle — rebuilt by scripts/build-widget.mjs as part of `pnpm build`
+# generated widget bundles — rebuilt by scripts/build-widget.mjs as part of `pnpm build`
 /public/widget.js
+/public/widgets/

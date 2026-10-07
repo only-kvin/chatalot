@@ -6,7 +6,8 @@ import { getCurrentTenantId } from "@/lib/db/current-tenant";
 // bundle against the tenant's real config (via the same public /api/widget/config
 // endpoint a real client site would hit) — not a mockup — so the preview reflects
 // live saved settings exactly.
-export default async function WidgetPreviewPage() {
+export default async function WidgetPreviewPage({ searchParams }: { searchParams: Promise<{ widget?: string }> }) {
+  const schedule = (await searchParams).widget === "schedule";
   const tenantId = await getCurrentTenantId();
   if (!tenantId) redirect("/");
 
@@ -23,7 +24,16 @@ export default async function WidgetPreviewPage() {
       <div style={{ padding: 24, color: "#71717a", fontSize: 13 }}>
         Preview host page — the widget below is the real bundle, live from your saved settings.
       </div>
-      <script src="/widget.js" data-key={tenant.public_widget_key} async />
+      {schedule ? (
+        <>
+          <div style={{ maxWidth: 560, margin: "0 auto", padding: "0 16px 24px" }}>
+            <div data-chatalot="schedule" />
+          </div>
+          <script src="/widget.js" data-key={tenant.public_widget_key} data-chat="off" async />
+        </>
+      ) : (
+        <script src="/widget.js" data-key={tenant.public_widget_key} async />
+      )}
     </div>
   );
 }

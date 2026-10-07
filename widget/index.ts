@@ -1,10 +1,20 @@
 import { createWidget, type WidgetApi } from "./panel";
+import { registeredWidget } from "./shared/loader-contract";
+
+// widget.js: the one script a business adds to its site. It starts the chat
+// (unless data-chat="off") and mounts every inline widget on the page,
+// <div data-chatalot="schedule">, loading each widget's own bundle only
+// when the page has one.
 
 declare global {
   interface Window {
     AIReceptionist?: WidgetApi;
+    // For sites that add widget <div>s after the page loads.
+    ChatAlot?: { scan: () => void };
   }
 }
+
+const WIDGETS = ["schedule"];
 
 function getScriptTag(): HTMLScriptElement | null {
   const current = document.currentScript as HTMLScriptElement | null;
@@ -14,16 +24,10 @@ function getScriptTag(): HTMLScriptElement | null {
   return document.querySelector("script[data-key]");
 }
 
-async function init() {
-  const script = getScriptTag();
-  const key = script?.getAttribute("data-key");
-  if (!key) {
-    console.error("[ChatAlot] widget.js: missing data-key attribute on script tag");
-    return;
-  }
+// Captured now: currentScript is only set while this file first runs.
+const script = getScriptTag();
 
-  const apiOrigin = new URL(script!.src).origin;
-
+async function startChat(key: string, apiOrigin: string) {
   try {
     const res = await fetch(`${apiOrigin}/api/widget/config?key=${encodeURIComponent(key)}`);
     if (!res.ok) {
@@ -35,6 +39,54 @@ async function init() {
   } catch (err) {
     console.error("[ChatAlot] widget.js: failed to initialize", err);
   }
+}
+
+const loading = new Map<string, Promise<void>>();
+
+// Loads a widget's bundle once, however many of its <div>s the page has.
+function loadBundle(name: string, apiOrigin: string): Promise<void> {
+  let promise = loading.get(name);
+  if (!promise) {
+    promise = new Promise((resolve, reject) => {
+      const tag = document.createElement("script");
+      tag.src = `${apiOrigin}/widgets/${name}.js`;
+      tag.async = true;
+      tag.onload = () => resolve();
+      tag.onerror = () => reject(new Error(`failed to load ${name}`));
+      document.head.appendChild(tag);
+    });
+    loading.set(name, promise);
+  }
+  return promise;
+}
+
+function scan(key: string, apiOrigin: string) {
+  const els = document.querySelectorAll<HTMLElement>("[data-chatalot]:not([data-chatalot-mounted])");
+  for (const el of els) {
+    const name = el.dataset.chatalot ?? "";
+    if (!WIDGETS.includes(name)) {
+      console.error(`[ChatAlot] unknown widget "${name}"`);
+      continue;
+    }
+    el.dataset.chatalotMounted = "";
+    const mode = el.dataset.mode === "float" ? "float" : "inline";
+    loadBundle(name, apiOrigin)
+      .then(() => registeredWidget(name)?.(el, { key, apiOrigin, mode }))
+      .catch((err) => console.error("[ChatAlot]", err));
+  }
+}
+
+function init() {
+  const key = script?.getAttribute("data-key");
+  if (!key) {
+    console.error("[ChatAlot] widget.js: missing data-key attribute on script tag");
+    return;
+  }
+  const apiOrigin = new URL(script!.src).origin;
+
+  if (script!.getAttribute("data-chat") !== "off") startChat(key, apiOrigin);
+  scan(key, apiOrigin);
+  window.ChatAlot = { scan: () => scan(key, apiOrigin) };
 }
 
 if (document.readyState === "loading") {

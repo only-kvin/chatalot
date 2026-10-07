@@ -4,6 +4,10 @@
 
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 
+// Work sent to the background with waitUntil, awaited by settle().
+const background: Promise<unknown>[] = [];
+vi.mock("@vercel/functions", () => ({ waitUntil: (p: Promise<unknown>) => background.push(p) }));
+const settle = () => Promise.all(background.splice(0));
 const customerEmails = vi.fn();
 const ownerAlerts = vi.fn();
 vi.mock("../lib/email/customer-booking", async (orig) => ({
@@ -91,6 +95,7 @@ describe("widget booking", { timeout: 30_000 }, () => {
       booking_events: [{ type: "created", actor: "customer" }],
     });
     expect(booking?.contact_id).toBeTruthy();
+    await settle();
     const { data: lead } = await admin.from("leads").select("source").eq("id", booking!.lead_id).single();
     expect(lead?.source).toBe("schedule_widget");
     expect(ownerAlerts).toHaveBeenCalledWith(expect.anything(), tenantId, expect.any(String), expect.objectContaining({ viaWidget: true, pending: false }));
@@ -102,6 +107,7 @@ describe("widget booking", { timeout: 30_000 }, () => {
     const requested = await book("10:00", 2);
     if (!requested.ok) throw new Error(requested.reason);
     expect(requested.status).toBe("pending");
+    await settle();
     expect(customerEmails).toHaveBeenLastCalledWith(expect.anything(), tenantId, requested.bookingId, "requested");
 
     // Someone else can't take the held time.

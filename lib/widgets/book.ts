@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { waitUntil } from "@vercel/functions";
 import { createBooking, type BookingFailure, type CreatedBooking } from "@/lib/bookings/create";
 import { upsertContact } from "@/lib/contacts/upsert";
 import { emailCustomerAboutBooking } from "@/lib/email/customer-booking";
@@ -55,6 +56,18 @@ export async function bookFromWidget(
   });
   if (!booked.ok || booked.repeat) return booked;
 
+  // The customer sees their confirmation now; the alert and emails go out
+  // after the response (they took ~5s inline).
+  waitUntil(notify(admin, b, booked));
+  return booked;
+}
+
+async function notify(
+  admin: SupabaseClient,
+  b: { tenantId: string; answers: Answers },
+  booked: CreatedBooking,
+): Promise<void> {
+  const { answers } = b;
   const [{ data: config }, { data: staff }] = await Promise.all([
     admin.from("agent_configs").select("business_name").eq("tenant_id", b.tenantId).maybeSingle(),
     booked.staffId
@@ -76,5 +89,4 @@ export async function bookFromWidget(
     }),
     emailCustomerAboutBooking(admin, b.tenantId, booked.bookingId, pending ? "requested" : "confirmed"),
   ]);
-  return booked;
 }

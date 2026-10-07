@@ -18,3 +18,14 @@ export function isOriginAllowed(origin: string | null, allowedDomains: string[])
 
   return allowedDomains.includes(hostname);
 }
+
+// A request made by ChatAlot's own pages (the dashboard's widget previews).
+// Browsers omit Origin on same-origin GETs but always send Sec-Fetch-Site,
+// which page scripts can't set; POSTs carry our own origin. Nothing here is
+// a credential — non-browser clients can send any header — it only decides
+// which websites may embed a business's widgets.
+export function isOwnAppRequest(request: Request): boolean {
+  if (request.headers.get("sec-fetch-site") === "same-origin") return true;
+  const origin = request.headers.get("origin");
+  return origin !== null && origin === new URL(request.url).origin;
+}

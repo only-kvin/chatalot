@@ -183,3 +183,15 @@ Manual steps the platform owner needs to do. Kept up to date as new phases add n
 - **Booking approval** (Availability → Booking rules → "I approve bookings before they're confirmed"): bookings from the website and the AI arrive as *Awaiting approval*, holding their time; the owner gets a "Booking to approve" alert, and approves or declines on the booking (Bookings → To approve). The customer is emailed either way. The daily summary lists them.
 - **Customer emails** (`lib/email/customer-booking.ts`) with the reference, an attached calendar file (`.ics`) and a **manage link** (`/b/<signed token>`, signed with a key derived from `ENCRYPTION_KEY`, valid until a month after the appointment) where the customer can cancel, within the business's change cutoff.
 - **Dashboard → Widgets → Schedule**: the shared look (colours, roundness, font, light/dark), the schedule widget's wording, "let customers choose staff", the booking-form builder (name and mobile always; email, notes and custom questions optional) and the install snippet. The widget itself arrives in Phase C2.
+
+## Widget suite, Phase C2: the schedule widget (2026-10-07)
+
+**Manual step:** none. Businesses add the widget from Dashboard → Widgets → Schedule (copy the snippet).
+
+**How it's put together:**
+
+- `widget.js` is now a small **loader**: it starts the chat (unless the script tag has `data-chat="off"`) and mounts every `<div data-chatalot="schedule">` on the page, fetching that widget's own bundle (`/widgets/schedule.js`) only when the page has one. Existing installs keep working unchanged. `window.ChatAlot.scan()` mounts boxes added after the page loads (single-page sites). `data-mode="float"` on the box shows it as a launcher bubble instead.
+- Both bundles are built by `scripts/build-widget.mjs` (part of `pnpm build`), which prints their gzipped sizes and **fails the build over 60 KB in total** (12.7 KB today).
+- The widget (`widget/schedule/`) reuses the server's own pure code where it can (SA dates from `lib/time.ts`, phone checks, the `.ics` builder), takes all colours/roundness/font from the business's look via `--ca-*` CSS variables, and emits `chatalot:event` (`view`, `step`, `submitted`) as a DOM event and a window message for analytics.
+- The dashboard's preview pages call the widget API from ChatAlot's own domain; `isOwnAppRequest()` (`lib/security/origin-check.ts`) lets those through without the business adding `chatalot.vercel.app` to its allowed domains.
+- A booking's owner alert and customer email are sent after the response (`waitUntil`), so customers see their confirmation in about a second instead of six.

@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/db/supabase-admin";
-import { isOriginAllowed } from "@/lib/security/origin-check";
+import { isOriginAllowed, isOwnAppRequest } from "@/lib/security/origin-check";
 
 // Shared front door for the public widget API. Resolves the business from
 // its public widget key server-side, refuses suspended businesses and
@@ -43,7 +43,7 @@ export async function resolvePublicTenant(
     .eq("public_widget_key", key)
     .maybeSingle();
   if (!tenant || tenant.status !== "active") return Response.json({ error: "Not found" }, { status: 404 });
-  if (!isOriginAllowed(origin, tenant.allowed_domains)) {
+  if (!isOwnAppRequest(request) && !isOriginAllowed(origin, tenant.allowed_domains)) {
     return Response.json({ error: "Origin not allowed" }, { status: 403 });
   }
   return { tenantId: tenant.id, origin, headers: corsHeaders(origin) };
