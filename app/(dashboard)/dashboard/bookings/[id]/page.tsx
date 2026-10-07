@@ -56,7 +56,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
   const started = new Date(booking.starts_at) <= new Date();
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
+    <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-6 sm:p-8">
       <div>
         <Link
           href="/dashboard/bookings"

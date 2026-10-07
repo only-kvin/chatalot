@@ -16,7 +16,7 @@ export default async function KnowledgePage() {
     .order("updated_at", { ascending: false });
 
   return (
-    <div className="mx-auto max-w-2xl p-8">
+    <div className="mx-auto max-w-2xl px-4 py-6 sm:p-8">
       <PageHeader
         title="Knowledge base"
         description="FAQs, services, prices and policies your AI receptionist answers from."

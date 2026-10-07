@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
 type Settings = {
@@ -159,13 +160,8 @@ export function SettingsForm({ initialSettings, hostedBookingUrl }: { initialSet
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              name="daily_summary_enabled"
-              defaultChecked={initialSettings.daily_summary_enabled}
-              className="size-4"
-            />
+          <label className="flex items-center gap-3 text-sm">
+            <Switch name="daily_summary_enabled" defaultChecked={initialSettings.daily_summary_enabled} />
             Email me a daily summary
           </label>
         </CardContent>

@@ -37,7 +37,7 @@ export default async function TenantDetailPage({
     .maybeSingle();
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-8 p-8">
+    <div className="mx-auto flex max-w-2xl flex-col gap-8 px-4 py-6 sm:p-8">
       <div>
         <h1 className="text-2xl font-semibold">{tenant.name}</h1>
         <p className="text-sm text-zinc-500">/{tenant.slug}</p>

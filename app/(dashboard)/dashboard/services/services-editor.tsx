@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 
 type Service = {
   id: string;
@@ -161,12 +162,12 @@ function ServiceForm({
       )}
 
       <div className="flex flex-col gap-2">
-        <label className="flex items-center gap-2 text-sm">
-          <input name="active" type="checkbox" defaultChecked={values.active} className="size-4" />
+        <label className="flex items-center gap-3 text-sm">
+          <Switch name="active" defaultChecked={values.active} />
           Active: can be booked
         </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input name="online_bookable" type="checkbox" defaultChecked={values.online_bookable} className="size-4" />
+        <label className="flex items-center gap-3 text-sm">
+          <Switch name="online_bookable" defaultChecked={values.online_bookable} />
           Show in the booking widgets on your website
         </label>
       </div>

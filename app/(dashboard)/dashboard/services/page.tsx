@@ -23,7 +23,7 @@ export default async function ServicesPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-2xl p-8">
+    <div className="mx-auto max-w-2xl px-4 py-6 sm:p-8">
       <PageHeader title="Services" description="What customers can book, how long it takes and who does it." />
       <ServicesEditor
         initialServices={(services ?? []).map((svc) => ({

@@ -18,6 +18,7 @@ import { describeTimeOff } from "@/lib/bookings/hours";
 import { StaffAvatar } from "@/components/dashboard/staff-avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
 type Result = { error: string | null };
@@ -111,8 +112,8 @@ export function StaffDetailsForm({
         />
         <p className="text-xs text-zinc-500">1 for a chair or a treatment room; more for a class (e.g. 12).</p>
       </div>
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="active" defaultChecked={staff.active} className="size-4" />
+      <label className="flex items-center gap-3 text-sm">
+        <Switch name="active" defaultChecked={staff.active} />
         Active: customers can book {staff.name}
       </label>
 

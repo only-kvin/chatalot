@@ -26,7 +26,7 @@ export default async function ConversationsPage() {
     .order("last_message_at", { ascending: false });
 
   return (
-    <div className="mx-auto max-w-4xl p-8">
+    <div className="mx-auto max-w-4xl px-4 py-6 sm:p-8">
       <PageHeader title="Conversations" />
       <Table>
         <TableHeader>

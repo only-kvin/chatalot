@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/db/supabase-server";
+import { ThemeSwitcher, ThemeSync } from "@/components/dashboard/theme-switcher";
 
 export default async function AdminLayout({
   children,
@@ -23,5 +24,13 @@ export default async function AdminLayout({
 
   if (!adminRow) redirect("/dashboard");
 
-  return <div className="min-h-screen bg-zinc-50 dark:bg-black">{children}</div>;
+  return (
+    <div className="app-backdrop relative min-h-screen">
+      <ThemeSync />
+      <div className="absolute top-4 right-4 z-10">
+        <ThemeSwitcher compact />
+      </div>
+      {children}
+    </div>
+  );
 }

@@ -54,7 +54,7 @@ export default async function UsagePage() {
     .sort((a, b) => b.messages - a.messages);
 
   return (
-    <div className="mx-auto max-w-3xl p-8">
+    <div className="mx-auto max-w-3xl px-4 py-6 sm:p-8">
       <h1 className="mb-2 text-2xl font-semibold">Usage — this month</h1>
       <p className="mb-6 text-sm text-zinc-500">
         Estimated cost assumes Claude Haiku pricing ($1 in / $5 out per million

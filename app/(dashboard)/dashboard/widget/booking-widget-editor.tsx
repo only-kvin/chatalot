@@ -10,6 +10,7 @@ import { FormFieldsEditor } from "@/components/dashboard/form-fields-editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const selectClass = "h-9 rounded-lg border bg-transparent px-3 text-sm";
@@ -194,8 +195,8 @@ export function BookingWidgetForm({
 
   return (
     <form action={() => save(() => saveBookingWidgetAction(type, { active, copy, settings, fields }), onSaved)} className="flex flex-col gap-6">
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" className="size-4" checked={active} onChange={(e) => setActive(e.target.checked)} />
+      <label className="flex items-center gap-3 text-sm font-medium">
+        <Switch checked={active} onChange={(e) => setActive(e.target.checked)} />
         {ui.name} is on
       </label>
 
@@ -210,10 +211,8 @@ export function BookingWidgetForm({
       </fieldset>
 
       {ui.toggles.map(([key, label]) => (
-        <label key={key} className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="size-4"
+        <label key={key} className="flex items-center gap-3 text-sm">
+          <Switch
             checked={settings[key] ?? false}
             onChange={(e) => setSettings({ ...settings, [key]: e.target.checked })}
           />

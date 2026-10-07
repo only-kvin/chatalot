@@ -147,7 +147,7 @@ export function NotificationsBell() {
         aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="relative flex shrink-0 items-center justify-center rounded-lg p-2 text-zinc-500 transition-colors duration-150 hover:bg-muted/60 hover:text-foreground"
+        className="relative flex size-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-[background-color,color,transform] duration-150 hover:bg-primary/[0.07] hover:text-foreground active:scale-95"
       >
         <BellIcon className="size-4" />
         {unread > 0 && (
@@ -164,7 +164,7 @@ export function NotificationsBell() {
           aria-label="Notifications"
           // Fixed, not absolute: the mobile nav strip scrolls horizontally and
           // would clip an absolutely positioned panel.
-          className="fixed top-14 right-4 left-4 z-50 flex max-h-[70vh] flex-col overflow-hidden rounded-xl border bg-white shadow-lg sm:left-auto sm:w-80 md:top-4 md:left-60 md:right-auto dark:bg-zinc-950"
+          className="surface feedback-enter fixed top-16 right-4 left-4 z-50 flex max-h-[70vh] flex-col overflow-hidden rounded-2xl bg-popover sm:left-auto sm:w-80 md:top-4 md:left-[16.5rem] md:right-auto"
         >
           <div className="flex items-center justify-between border-b px-4 py-3">
             <span className="text-sm font-semibold">Notifications</span>
