@@ -330,6 +330,10 @@ export function mountAppointment(host: HTMLElement, ctx: MountContext): void {
       }
       render();
       emit(host, { widget: "appointment", action: "view" });
+      // A link from the AI (or a page) can open on one service:
+      // data-service on the box, or ?ca_service= in the page address.
+      const preset = host.dataset.service || new URLSearchParams(location.search).get("ca_service");
+      if (preset && services.some((s) => s.id === preset)) chooseService(preset);
     } catch {
       fatal = "Online booking isn't available right now. Please contact the business directly.";
       render();

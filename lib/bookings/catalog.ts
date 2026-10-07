@@ -56,3 +56,43 @@ export async function listActiveServiceNames(
     .eq("active", true);
   return (data ?? []).map((s) => s.name);
 }
+
+// ---------------------------------------------------------------------------
+// Staff, for the AI: who works here and what they offer.
+// ---------------------------------------------------------------------------
+
+export type StaffSummary = {
+  id: string;
+  name: string;
+  role: string;
+  // Service names they offer (a service nobody is linked to: everyone).
+  services: string[];
+};
+
+export async function listActiveStaff(supabase: SupabaseClient, tenantId: string): Promise<StaffSummary[]> {
+  const [{ data: staff }, { data: services }, { data: links }] = await Promise.all([
+    supabase.from("staff").select("id, name, role").eq("tenant_id", tenantId).eq("active", true).order("sort_order").order("name"),
+    supabase.from("services").select("id, name").eq("tenant_id", tenantId).eq("active", true).order("name"),
+    supabase.from("staff_services").select("staff_id, service_id").eq("tenant_id", tenantId),
+  ]);
+  const linked = new Set((links ?? []).map((l) => l.service_id));
+  return (staff ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    role: p.role,
+    services: (services ?? [])
+      .filter((s) => !linked.has(s.id) || (links ?? []).some((l) => l.staff_id === p.id && l.service_id === s.id))
+      .map((s) => s.name),
+  }));
+}
+
+// The person the visitor named, or null if unknown or ambiguous. A full
+// name wins; otherwise a first name that only one person has.
+export function matchStaff<T extends { name: string }>(staff: T[], query: string): T | null {
+  const q = normalizeServiceName(query);
+  if (!q) return null;
+  const exact = staff.filter((p) => normalizeServiceName(p.name) === q);
+  if (exact.length === 1) return exact[0];
+  const byFirst = staff.filter((p) => normalizeServiceName(p.name).split(" ")[0] === q);
+  return byFirst.length === 1 ? byFirst[0] : null;
+}

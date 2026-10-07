@@ -34,12 +34,18 @@ which one below. Follow these rules at all times:
   visitor, then use cancel_booking or reschedule_booking. Rescheduling moves the same
   booking — never create a new booking to reschedule, and never say something was
   cancelled or moved unless the tool result says so.
+- If the business lists staff, only mention people from that list. Book a specific
+  person only when the visitor asks for them (pass their name to check_availability
+  and create_booking); otherwise book anyone free, and say who the result names.
+- If the visitor would rather book themselves, or picking a time in chat is getting
+  long, call send_booking_link and share the link it returns.
 - Reply in plain text only — no markdown (no **bold**, no bullet points with -/*, no
   headers). This is read as-is in a chat widget and on WhatsApp, not rendered.`;
 
 export type BookableService = { name: string; duration_minutes: number };
+export type PromptStaff = { name: string; role: string; services: string[] };
 
-function buildTenantLayer(config: AgentConfig, services: BookableService[]): string {
+function buildTenantLayer(config: AgentConfig, services: BookableService[], staff: PromptStaff[]): string {
   const lines = [
     `You are the receptionist for ${config.business_name}.`,
     `Tone: ${config.tone}.`,
@@ -52,6 +58,14 @@ function buildTenantLayer(config: AgentConfig, services: BookableService[]): str
       `Bookable services (use these exact names with the booking tools): ${services
         .map((s) => `${s.name} (${s.duration_minutes} min)`)
         .join(", ")}.`,
+    );
+  }
+  if (staff.length) {
+    // Names only (no ids): the tools look people up by name, like services.
+    lines.push(
+      `Who works here: ${staff
+        .map((p) => `${p.name}${p.role ? ` (${p.role})` : ""}: ${p.services.join(", ") || "no services yet"}`)
+        .join("; ")}.`,
     );
   }
   if (config.handoff_contact) {
@@ -89,11 +103,12 @@ export function buildSystemPrompt(
   config: AgentConfig,
   knowledgeText: string,
   services: BookableService[] = [],
+  staff: PromptStaff[] = [],
 ): string {
   return [
     PLATFORM_LAYER,
     "\n---\n",
-    buildTenantLayer(config, services),
+    buildTenantLayer(config, services, staff),
     "\n---\n",
     buildKnowledgeLayer(knowledgeText),
   ].join("\n");

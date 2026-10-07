@@ -64,6 +64,10 @@ export const AGENT_TOOLS: ToolDef[] = [
           description: "The exact name of one service from the bookable services list, e.g. \"Men's Cut\"",
         },
         date: { type: "string", description: "Date to check, as YYYY-MM-DD" },
+        staff: {
+          type: ["string", "null"],
+          description: "A staff member's name from the 'Who works here' list, only if the visitor asked for that person; otherwise null (anyone free)",
+        },
       },
       required: ["service", "date"],
     },
@@ -86,6 +90,10 @@ export const AGENT_TOOLS: ToolDef[] = [
         email: {
           type: ["string", "null"],
           description: "The visitor's email, if given, otherwise null",
+        },
+        staff: {
+          type: ["string", "null"],
+          description: "A staff member's name from the 'Who works here' list, only if the visitor asked for that person; otherwise null (anyone free)",
         },
       },
       required: ["service", "date", "time", "name", "phone"],
@@ -124,6 +132,21 @@ export const AGENT_TOOLS: ToolDef[] = [
       required: ["booking_ref", "date", "time"],
     },
   },
+  {
+    name: "send_booking_link",
+    description:
+      "Get a link where the visitor can book online themselves (pick a service, person and time). Use it when they'd rather click than chat, or when choosing a time in chat is getting long. Share the returned link as-is.",
+    parameters: {
+      type: "object",
+      properties: {
+        service: {
+          type: ["string", "null"],
+          description: "The exact name of a service to open the page on, if one is clear; otherwise null",
+        },
+      },
+      required: [],
+    },
+  },
 ];
 
 // `input` is whatever the model produced — untrusted until parseToolInput accepts it.
@@ -152,7 +175,7 @@ export const TOOL_INPUT_SCHEMAS = {
     summary: requiredText,
   }),
   request_human: z.object({ reason: requiredText }),
-  check_availability: z.object({ service: requiredText, date: dateText }),
+  check_availability: z.object({ service: requiredText, date: dateText, staff: optionalText }),
   create_booking: z.object({
     service: requiredText,
     date: dateText,
@@ -160,10 +183,12 @@ export const TOOL_INPUT_SCHEMAS = {
     name: requiredText,
     phone: requiredText,
     email: optionalText,
+    staff: optionalText,
   }),
   my_bookings: z.object({}).passthrough(),
   cancel_booking: z.object({ booking_ref: requiredText, reason: optionalText }),
   reschedule_booking: z.object({ booking_ref: requiredText, date: dateText, time: timeText }),
+  send_booking_link: z.object({ service: optionalText }),
 };
 
 export type ToolName = keyof typeof TOOL_INPUT_SCHEMAS;

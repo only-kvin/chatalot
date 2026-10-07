@@ -13,6 +13,11 @@ const settingsSchema = z.object({
   system_prompt_extra: z.string(),
   handoff_contact: z.string(),
   // Empty turns review requests off.
+  // Empty = ChatAlot's hosted page.
+  booking_page_url: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || /^https:\/\/\S+$/.test(v), "The booking page link must start with https://"),
   google_review_url: z
     .string()
     .trim()
@@ -46,6 +51,7 @@ export async function updateSettingsAction(formData: FormData): Promise<{ error:
     system_prompt_extra: formData.get("system_prompt_extra") ?? "",
     handoff_contact: formData.get("handoff_contact") ?? "",
     google_review_url: formData.get("google_review_url") ?? "",
+    booking_page_url: formData.get("booking_page_url") ?? "",
     // An unticked checkbox isn't submitted at all.
     daily_summary_enabled: formData.get("daily_summary_enabled") === "on",
     allowed_domains: formData.get("allowed_domains") ?? "",
@@ -63,6 +69,7 @@ export async function updateSettingsAction(formData: FormData): Promise<{ error:
       system_prompt_extra: parsed.data.system_prompt_extra,
       handoff_contact: parsed.data.handoff_contact,
       google_review_url: parsed.data.google_review_url || null,
+      booking_page_url: parsed.data.booking_page_url || null,
       daily_summary_enabled: parsed.data.daily_summary_enabled,
       updated_at: new Date().toISOString(),
     })

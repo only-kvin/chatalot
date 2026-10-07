@@ -3,7 +3,8 @@ import { buildSystemPrompt, type AgentConfig } from "./prompt";
 import { runAgentTurn, type ChatMessage } from "./model";
 import { AGENT_TOOLS, parseToolInput, type ToolCall } from "./tools";
 import { getRelevantKnowledge } from "./retrieval";
-import { findServiceByName, listActiveServiceNames, listActiveServices } from "@/lib/bookings/catalog";
+import { findServiceByName, listActiveServiceNames, listActiveServices, listActiveStaff, matchStaff } from "@/lib/bookings/catalog";
+import { bookingLinkFor } from "@/lib/widgets/booking-link";
 import { getOpenSlots } from "@/lib/bookings/availability";
 import { createBooking } from "@/lib/bookings/create";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/time";
@@ -58,6 +59,36 @@ async function resolveService(
     : "This business hasn't set up any bookable services yet.";
 }
 
+// The staff member the visitor asked for, if they offer this service;
+// otherwise a message for the model naming who does.
+async function resolveStaff(
+  admin: AdminClient,
+  tenantId: string,
+  name: string,
+  serviceName: string,
+): Promise<{ id: string; name: string } | string> {
+  const staff = await listActiveStaff(admin, tenantId);
+  if (!staff.length) return "This business doesn't list staff: book with whoever is free (leave staff empty).";
+  const person = matchStaff(staff, name);
+  if (!person) return `No staff member called "${name}". Staff: ${staff.map((p) => p.name).join(", ")}.`;
+  if (!person.services.includes(serviceName)) {
+    const who = staff.filter((p) => p.services.includes(serviceName)).map((p) => p.name);
+    return `${person.name} doesn't do ${serviceName}.${who.length ? ` ${who.join(", ")} ${who.length === 1 ? "does" : "do"}.` : ""}`;
+  }
+  return { id: person.id, name: person.name };
+}
+
+// Who offers a service, for the model to mention when it helps.
+async function staffFor(admin: AdminClient, tenantId: string, serviceName: string): Promise<string[]> {
+  return (await listActiveStaff(admin, tenantId)).filter((p) => p.services.includes(serviceName)).map((p) => p.name);
+}
+
+async function staffName(admin: AdminClient, tenantId: string, staffId: string | null): Promise<string | null> {
+  if (!staffId) return null;
+  const { data } = await admin.from("staff").select("name").eq("tenant_id", tenantId).eq("id", staffId).maybeSingle();
+  return data?.name ?? null;
+}
+
 // Generic tool failure text for the model. The real error is logged, never
 // passed back — the model could otherwise repeat DB internals to a customer.
 const TOOL_FAILED =
@@ -71,7 +102,7 @@ function toolFailed(tool: string, err: unknown): string {
 // Returns a short text result fed back to the model as the tool's outcome.
 export type Channel = "web" | "whatsapp";
 
-type ToolContext = {
+export type ToolContext = {
   tenantId: string;
   businessName: string;
   conversationId: string;
@@ -122,7 +153,8 @@ async function rememberCustomer(
   }
 }
 
-async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall: ToolCall): Promise<string> {
+// Exported for tests, which drive the real tool runner without the model.
+export async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall: ToolCall): Promise<string> {
   const { tenantId, businessName, conversationId } = ctx;
   const parsed = parseToolInput(rawCall);
   if (!parsed.ok) return parsed.error;
@@ -168,12 +200,25 @@ async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall: ToolCa
     const resolved = await resolveService(admin, tenantId, call.input.service);
     if (typeof resolved === "string") return resolved;
 
-    const result = await getOpenSlots(admin, tenantId, resolved.id, date);
-    const day = formatLocalDate(date);
-    if (!result || result.slots.length === 0) {
-      return `No availability on ${day} (${date}) for ${resolved.name}.`;
+    let person: { id: string; name: string } | null = null;
+    if (call.input.staff) {
+      const found = await resolveStaff(admin, tenantId, call.input.staff, resolved.name);
+      if (typeof found === "string") return found;
+      person = found;
     }
-    return `Available times on ${day} (${date}) for ${resolved.name}: ${result.slots.join(", ")}.`;
+    const result = await getOpenSlots(admin, tenantId, resolved.id, date, { staffId: person?.id });
+    const day = formatLocalDate(date);
+    const forWhom = person ? ` with ${person.name}` : "";
+    if (!result || result.slots.length === 0) {
+      return `No availability on ${day} (${date}) for ${resolved.name}${forWhom}.`;
+    }
+    // With many open times the model tends to say "lots of slots" and offer
+    // none; ask it to name a few, spread across the day.
+    const offer = result.slots.length > 4 ? " Offer the visitor 3 or 4 of these, spread across the day, and ask which suits." : "";
+    const times = `Available times on ${day} (${date}) for ${resolved.name}${forWhom}: ${result.slots.join(", ")}.${offer}`;
+    if (person) return times;
+    const who = await staffFor(admin, tenantId, resolved.name);
+    return who.length > 1 ? `${times} (Anyone free. Staff who do it: ${who.join(", ")}; only ask if the visitor has a preference.)` : times;
   }
 
   if (call.name === "my_bookings") {
@@ -227,13 +272,33 @@ async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall: ToolCa
       },
       conversationId,
     );
-    return `Moved: ${booking.serviceName} from ${formatLocalDateTime(moved.from)} to ${formatLocalDateTime(moved.to)} (same booking, nothing else changed). Tell the visitor exactly this.`;
+    const { data: after } = await admin.from("bookings").select("staff_id").eq("tenant_id", tenantId).eq("id", booking.id).maybeSingle();
+    const movedWith = await staffName(admin, tenantId, after?.staff_id ?? null);
+    return `Moved: ${booking.serviceName} from ${formatLocalDateTime(moved.from)} to ${formatLocalDateTime(moved.to)}${movedWith ? ` with ${movedWith}` : ""} (same booking). Tell the visitor exactly this.`;
+  }
+
+  if (call.name === "send_booking_link") {
+    let serviceId: string | null = null;
+    if (call.input.service) {
+      const resolved = await resolveService(admin, tenantId, call.input.service);
+      if (typeof resolved !== "string") serviceId = resolved.id;
+    }
+    const link = await bookingLinkFor(admin, tenantId, serviceId);
+    return link
+      ? `Online booking link: ${link} (share it exactly as written; they pick the time and fill in their details there).`
+      : "This business doesn't take online bookings by link. Keep helping them book here in the chat.";
   }
 
   // create_booking
   const { date, time, name, phone, email } = call.input;
   const resolved = await resolveService(admin, tenantId, call.input.service);
   if (typeof resolved === "string") return resolved;
+  let person: { id: string; name: string } | null = null;
+  if (call.input.staff) {
+    const found = await resolveStaff(admin, tenantId, call.input.staff, resolved.name);
+    if (typeof found === "string") return found;
+    person = found;
+  }
 
   const contactId = await rememberCustomer(admin, ctx, { name, phone, email });
   // createBooking re-checks the time against the live calendar, so a stale
@@ -241,6 +306,7 @@ async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall: ToolCa
   const booked = await createBooking(admin, {
     tenantId,
     serviceId: resolved.id,
+    staffId: person?.id,
     date,
     time,
     customer: { name, phone, email, contactId },
@@ -259,6 +325,9 @@ async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall: ToolCa
   }
   const when = formatLocalDateTime(booked.startsAt);
   const pending = booked.status === "pending";
+  // Who it's with: the person asked for, or whoever "anyone" went to.
+  const withWhom = await staffName(admin, tenantId, booked.staffId);
+  const withText = withWhom ? ` with ${withWhom}` : "";
   await notifyOwnerOfBooking(
     admin,
     tenantId,
@@ -269,9 +338,9 @@ async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall: ToolCa
   if (!booked.repeat) await emailCustomerAboutBooking(admin, tenantId, booked.bookingId, pending ? "requested" : "confirmed");
 
   if (pending) {
-    return `Booking requested (not yet confirmed): ${resolved.name} on ${when} (reference ${booked.ref}). The business approves bookings first and will confirm soon; the time is held meanwhile. Tell the visitor exactly this, and don't call it confirmed.`;
+    return `Booking requested (not yet confirmed): ${resolved.name} on ${when}${withText} (reference ${booked.ref}). The business approves bookings first and will confirm soon; the time is held meanwhile. Tell the visitor exactly this, and don't call it confirmed.`;
   }
-  return `Booking confirmed: ${resolved.name} on ${when} (reference ${booked.ref}). Tell the visitor exactly this date and time.`;
+  return `Booking confirmed: ${resolved.name} on ${when}${withText} (reference ${booked.ref}). Tell the visitor exactly this date, time and person.`;
 }
 
 function formatNotice(minutes: number): string {
@@ -344,8 +413,11 @@ export async function* runAgent(params: {
     // to just the tenant layer of the prompt.
   }
 
-  const services = await listActiveServices(admin, params.tenantId);
-  const system = buildSystemPrompt(agentConfig as AgentConfig, knowledgeText, services);
+  const [services, staff] = await Promise.all([
+    listActiveServices(admin, params.tenantId),
+    listActiveStaff(admin, params.tenantId),
+  ]);
+  const system = buildSystemPrompt(agentConfig as AgentConfig, knowledgeText, services, staff);
 
   let fullText = "";
   let tokensIn = 0;

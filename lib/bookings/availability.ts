@@ -277,7 +277,7 @@ export async function getOpenSlots(
   tenantId: string,
   serviceId: string,
   dateISO: string,
-  options: { excludeBookingId?: string; forTeam?: boolean } = {},
+  options: { excludeBookingId?: string; forTeam?: boolean; staffId?: string } = {},
 ): Promise<{ durationMinutes: number; slots: string[] } | null> {
   const availability = await getAvailability(client, tenantId, {
     serviceId,

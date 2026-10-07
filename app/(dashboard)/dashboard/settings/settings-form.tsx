@@ -15,11 +15,12 @@ type Settings = {
   system_prompt_extra: string;
   handoff_contact: string;
   google_review_url: string;
+  booking_page_url: string;
   daily_summary_enabled: boolean;
   allowed_domains: string[];
 };
 
-export function SettingsForm({ initialSettings }: { initialSettings: Settings }) {
+export function SettingsForm({ initialSettings, hostedBookingUrl }: { initialSettings: Settings; hostedBookingUrl: string }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -95,6 +96,33 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
               Given to visitors, and used in the fallback reply, when a human needs to step in.
             </p>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Online booking page</CardTitle>
+          <CardDescription>
+            Where the AI sends customers who&apos;d rather book by clicking. By default it&apos;s your page on
+            ChatAlot, with your appointment widget: {" "}
+            <a href={hostedBookingUrl} target="_blank" rel="noreferrer" className="underline">
+              {hostedBookingUrl}
+            </a>
+            .
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2">
+          <Label htmlFor="booking_page_url">Use my own page instead (optional)</Label>
+          <Input
+            id="booking_page_url"
+            name="booking_page_url"
+            type="url"
+            defaultValue={initialSettings.booking_page_url}
+            placeholder="https://yourbusiness.co.za/book"
+          />
+          <p className="text-xs text-zinc-500">
+            Only if that page has your appointment widget on it (Widgets → Appointment). Leave empty to use the page above.
+          </p>
         </CardContent>
       </Card>
 
