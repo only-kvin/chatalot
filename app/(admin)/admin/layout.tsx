@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/db/supabase-server";
+import { getSessionUser } from "@/lib/db/auth";
 import { ThemeScript } from "@/components/theme/theme-script";
 
 export default async function AdminLayout({
@@ -7,12 +8,10 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser();
   if (!user) redirect("/login");
+
+  const supabase = await createClient();
 
   // RLS on platform_admins only ever returns the caller's own row, so this
   // is exactly the admin check — no service-role client needed here.

@@ -28,10 +28,11 @@ export async function proxy(request: NextRequest) {
     },
   );
 
-  // Triggers a token refresh if the current one is expired.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Triggers a token refresh if the current one is expired. getClaims()
+  // verifies the JWT locally against the project's cached signing keys, so
+  // (unlike getUser()) it doesn't cost a round trip to Supabase per request.
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims?.sub ?? null;
 
   // Signed-out visits to the dashboard or admin go to login, remembering the
   // page — e.g. a conversation link from a notification email — so sign-in

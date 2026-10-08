@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeftIcon } from "lucide-react";
 import { createClient } from "@/lib/db/supabase-server";
+import { getSessionUser } from "@/lib/db/auth";
 import { requireFeaturePage } from "@/lib/dashboard-features";
 import { formatLocalDateTime, localDateISO } from "@/lib/time";
 import { canonicalPhone, formatPhone } from "@/lib/contacts/phone";
@@ -24,9 +25,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
   const tenantId = await requireFeaturePage("bookings");
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser();
 
   const { data: booking } = await supabase
     .from("bookings")

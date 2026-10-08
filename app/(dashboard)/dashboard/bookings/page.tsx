@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/db/supabase-server";
+import { getSessionUser } from "@/lib/db/auth";
 import { requireFeaturePage } from "@/lib/dashboard-features";
 import { formatLocalDateTime } from "@/lib/time";
 import {
@@ -43,9 +44,7 @@ export default async function BookingsPage({
   const tab: Tab = TABS.some((t) => t.id === params.tab) ? (params.tab as Tab) : "upcoming";
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser();
   const now = new Date().toISOString();
 
   const { data: staff } = await supabase

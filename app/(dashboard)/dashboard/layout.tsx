@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/db/supabase-server";
+import { getSessionUser } from "@/lib/db/auth";
 import { currentTenantFeatures } from "@/lib/dashboard-features";
 import { ThemeScript } from "@/components/theme/theme-script";
 import { parseTheme, THEME_COOKIE } from "@/components/theme/theme";
@@ -12,20 +13,21 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser();
   if (!user) redirect("/login");
 
-  const current = await currentTenantFeatures();
+  const supabase = await createClient();
+  // RLS on platform_admins only returns the caller's own row, so this is the
+  // same check the /admin layout makes. It doesn't need the tenant, so it
+  // runs alongside the tenant lookup.
+  const [current, { data: adminRow }] = await Promise.all([
+    currentTenantFeatures(),
+    supabase.from("platform_admins").select("user_id").eq("user_id", user.id).maybeSingle(),
+  ]);
   if (!current) redirect("/");
   const { tenantId, features } = current;
 
-  // RLS on platform_admins only returns the caller's own row, so this is the
-  // same check the /admin layout makes.
-  const [{ data: adminRow }, { data: config }, { count: needsYou }] = await Promise.all([
-    supabase.from("platform_admins").select("user_id").eq("user_id", user.id).maybeSingle(),
+  const [{ data: config }, { count: needsYou }] = await Promise.all([
     supabase.from("agent_configs").select("business_name").eq("tenant_id", tenantId).maybeSingle(),
     supabase
       .from("conversations")
