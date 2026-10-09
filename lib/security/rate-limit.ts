@@ -86,3 +86,15 @@ export async function checkWidgetBookingLimit(ip: string, publicKey: string): Pr
   ]);
   return ipResult.success && keyResult.success;
 }
+
+// The marketing site's "Get a demo" form. Each request emails the platform
+// admins, so a person gets a few tries and a script gets nowhere.
+const demoRequestLimiter = new Ratelimit({
+  redis,
+  prefix: "ratelimit:demo-request",
+  limiter: Ratelimit.slidingWindow(3, "10 m"),
+});
+
+export async function checkDemoRequestLimit(ip: string): Promise<boolean> {
+  return (await demoRequestLimiter.limit(ip)).success;
+}

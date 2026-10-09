@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { BRAND_URL } from "@/lib/brand";
 
 // Public pages only. Add each marketing page here as it's built.
-const PATHS = ["/", "/login", "/terms", "/privacy", "/data-deletion"];
+const PATHS = ["/", "/demo", "/login", "/terms", "/privacy", "/data-deletion"];
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return PATHS.map((path) => ({

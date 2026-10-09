@@ -440,3 +440,146 @@ input[type="checkbox"]:not([role="switch"]) {
     animation: none;
   }
 }
+
+/* Hero demo: the new booking card drops into its empty slot with a spring. */
+.snap-in {
+  animation: snap-in 600ms var(--ease-spring) both;
+}
+@keyframes snap-in {
+  from {
+    opacity: 0;
+    transform: translateY(-28px) scale(0.92) rotate(-2deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Scroll reveals (components/marketing/reveal.tsx). Content is only hidden
+   once the observer is running, so it's always visible without JS. Each
+   [data-reveal] fades and rises once; --i staggers siblings by 40ms. */
+html[data-reveal-ready] [data-reveal]:not([data-revealed]) {
+  opacity: 0;
+  translate: 0 14px;
+}
+html[data-reveal-ready] [data-reveal] {
+  transition:
+    opacity 600ms var(--ease-lift),
+    translate 600ms var(--ease-lift);
+  transition-delay: calc(var(--i, 0) * 40ms);
+}
+
+/* Small looping product moments in the problem and feature sections. Each
+   has an 8s cycle; with reduced motion they hold their final frame. */
+.loop-in {
+  animation: loop-in 8s var(--ease-lift) infinite both;
+  animation-delay: calc(var(--d, 0) * 1ms);
+}
+@keyframes loop-in {
+  0%,
+  6% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  14%,
+  88% {
+    opacity: 1;
+    transform: none;
+  }
+  96%,
+  100% {
+    opacity: 0;
+    transform: none;
+  }
+}
+.loop-pop {
+  animation: loop-pop 8s var(--ease-spring) infinite both;
+  animation-delay: calc(var(--d, 0) * 1ms);
+}
+@keyframes loop-pop {
+  0%,
+  10% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  18%,
+  88% {
+    opacity: 1;
+    transform: none;
+  }
+  96%,
+  100% {
+    opacity: 0;
+  }
+}
+/* A tap: a ring that pulses on a button, then the button changes state. */
+.loop-tap {
+  animation: loop-tap 8s ease-out infinite both;
+}
+@keyframes loop-tap {
+  0%,
+  30% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  36% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  46%,
+  100% {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+.loop-swap-a {
+  animation: loop-swap-a 8s steps(1) infinite both;
+}
+.loop-swap-b {
+  animation: loop-swap-b 8s steps(1) infinite both;
+}
+@keyframes loop-swap-a {
+  0%,
+  38% {
+    visibility: visible;
+  }
+  39%,
+  100% {
+    visibility: hidden;
+  }
+}
+@keyframes loop-swap-b {
+  0%,
+  38% {
+    visibility: hidden;
+  }
+  39%,
+  100% {
+    visibility: visible;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .snap-in,
+  .loop-in,
+  .loop-pop {
+    animation: none;
+  }
+  .loop-tap,
+  .loop-swap-a {
+    animation: none;
+    visibility: hidden;
+  }
+  .loop-swap-b {
+    animation: none;
+    visibility: visible;
+  }
+  html[data-reveal-ready] [data-reveal]:not([data-revealed]) {
+    opacity: 1;
+    translate: none;
+  }
+  html[data-reveal-ready] [data-reveal] {
+    transition: none;
+  }
+}

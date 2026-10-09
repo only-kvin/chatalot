@@ -1,45 +1,425 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import {
+  ArrowRightIcon,
+  DatabaseIcon,
+  DumbbellIcon,
+  HandIcon,
+  LeafIcon,
+  ScissorsIcon,
+  ShieldCheckIcon,
+  StethoscopeIcon,
+  WrenchIcon,
+} from "lucide-react";
 import { cn } from "cn";
 import { buttonVariants } from "@/components/ui/button";
-import { Placeholder } from "@/components/marketing/placeholder";
-import { BRAND_DESCRIPTION, BRAND_NAME, BRAND_TAGLINE } from "@/lib/brand";
+import { Card } from "@/components/ui/card";
+import { Film } from "@/components/marketing/film";
+import { HeroDemo } from "@/components/marketing/hero-demo";
+import {
+  GrowMoment,
+  InstallMoment,
+  LostInChats,
+  MissedAfterHours,
+  NoShow,
+  ReminderMoment,
+  TakeOverMoment,
+} from "@/components/marketing/moments";
+import { RevealObserver } from "@/components/marketing/reveal";
+import { Section } from "@/components/marketing/section";
+import { BRAND_DESCRIPTION, BRAND_NAME } from "@/lib/brand";
+import { BUSINESS_GROUPS, type BusinessGroupSlug } from "@/lib/marketing/business-types";
+import { DEFAULT_DEMO_CHAT } from "@/lib/marketing/demo-chat";
+import { FAQ } from "@/lib/marketing/faq";
+import { FEATURE_GROUPS } from "@/lib/marketing/nav";
+import { FEATURE_PITCH, MARKETING_WIDGET_KEY, SIGNUP_OPEN } from "@/lib/marketing/site";
+import { FEATURES, PLAN_LABEL, planIncludes } from "@/lib/plans";
+import { priceLabel } from "@/lib/pricing";
+
+const HEADLINE = "Turn every enquiry into a booking.";
 
 export const metadata: Metadata = {
-  // The home page uses the plain name plus tagline, not the "· Brand" template.
-  title: { absolute: `${BRAND_NAME}: ${BRAND_TAGLINE.replace(/\.$/, "")}` },
+  title: { absolute: `${BRAND_NAME}: ${HEADLINE.replace(/\.$/, "")}` },
   description: BRAND_DESCRIPTION,
   alternates: { canonical: "/" },
 };
 
-// Phase 1 shell: a minimal hero so "/" works for visitors. The full home page
-// (hero animation, feature tour, film, chatbot) replaces this in phase 2.
-// The headline is never faded in: it is the LCP element, and animating its
-// opacity from 0 delays LCP.
+const stagger = (i: number) => ({ "--i": i }) as React.CSSProperties;
+
 export default function HomePage() {
+  return (
+    <>
+      <RevealObserver />
+      <Hero />
+      <Problem />
+      <FeatureTour />
+      <FilmSection />
+      <BusinessTypes />
+      <HowItWorks />
+      <PricingTeaser />
+      <Trust />
+      <Faq />
+      <ClosingCta />
+    </>
+  );
+}
+
+const onDark = "text-white hover:bg-white/10 hover:text-white";
+
+function Hero() {
   return (
     <section className="relative overflow-hidden bg-[#0b0b14] text-white">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_480px_at_80%_-10%,rgb(99_102_241/0.45),transparent_60%),radial-gradient(700px_420px_at_0%_110%,rgb(52_199_89/0.16),transparent_60%)]"
       />
-      <div className="relative mx-auto flex max-w-7xl flex-col items-start gap-6 px-4 py-24 md:px-6 md:py-32">
-        <h1 className="max-w-3xl text-4xl leading-[1.05] font-semibold tracking-[-0.03em] text-balance md:text-6xl">
-          {BRAND_TAGLINE}
-          <Placeholder label="HERO HEADLINE: PICK 1 OF 3" />
-        </h1>
-        <p className="max-w-xl text-lg text-white/70">{BRAND_DESCRIPTION}</p>
-        <div className="fade-up flex flex-wrap gap-3">
-          <Link href="/demo" className={buttonVariants({ size: "lg" })}>
-            Get a demo
-          </Link>
-          <Link
-            href="/features"
-            className={cn(buttonVariants({ size: "lg", variant: "ghost" }), "text-white hover:bg-white/10 hover:text-white")}
-          >
-            See the features
-          </Link>
+      <div className="relative mx-auto grid max-w-7xl items-center gap-14 px-4 pt-16 pb-20 md:px-6 md:pt-24 md:pb-28 lg:grid-cols-[1fr_1.05fr]">
+        <div className="flex flex-col items-start gap-6">
+          {/* Not faded in: the headline is the LCP element. */}
+          <h1 className="max-w-xl text-[42px] leading-[1.02] font-semibold tracking-[-0.035em] text-balance md:text-6xl lg:text-[68px]">
+            {HEADLINE}
+          </h1>
+          <p className="max-w-lg text-lg text-pretty text-white/70">
+            An AI receptionist that answers your customers on your website and WhatsApp, day and night, then books
+            them in or takes their details for you.
+          </p>
+          <div className="fade-up flex flex-wrap gap-3">
+            <Link href="/demo" className={buttonVariants({ size: "lg" })}>
+              Get a demo
+            </Link>
+            {SIGNUP_OPEN ? (
+              <Link href="/signup" className={cn(buttonVariants({ size: "lg", variant: "ghost" }), onDark)}>
+                Start free trial
+              </Link>
+            ) : (
+              <a href="#film" className={cn(buttonVariants({ size: "lg", variant: "ghost" }), onDark)}>
+                Watch the 45s film
+              </a>
+            )}
+          </div>
+          <p className="text-sm text-white/50">Made for small service businesses in South Africa.</p>
         </div>
+        <HeroDemo chat={DEFAULT_DEMO_CHAT} />
+      </div>
+    </section>
+  );
+}
+
+function Problem() {
+  const moments = [
+    {
+      visual: <MissedAfterHours />,
+      title: "Messages that arrive after hours",
+      text: "Customers ask at night and on Sundays. By the time you reply in the morning, many have booked somewhere that answered.",
+    },
+    {
+      visual: <NoShow />,
+      title: "Bookings that don't show up",
+      text: "A forgotten appointment is an hour you can't sell again. Without a reminder, people simply forget.",
+    },
+    {
+      visual: <LostInChats />,
+      title: "Leads buried in WhatsApp",
+      text: "A quote request slides down your chat list under family groups and suppliers, and never gets an answer.",
+    },
+  ];
+  return (
+    <Section id="problem" eyebrow="The problem" title="You can't answer every message. Your customers won't wait.">
+      <div className="grid gap-8 md:grid-cols-3 md:gap-6">
+        {moments.map((m, i) => (
+          <div key={m.title} data-reveal style={stagger(i)} className="flex flex-col gap-4">
+            {m.visual}
+            <div>
+              <h3 className="text-lg font-semibold tracking-[-0.01em]">{m.title}</h3>
+              <p className="mt-1 text-muted-foreground">{m.text}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+const FEATURE_TOUR = [
+  {
+    visual: <TakeOverMoment />,
+    blurb:
+      "Your AI receptionist answers questions from your own information, on your website and on WhatsApp, at any hour. When it matters, you step in.",
+  },
+  {
+    visual: <ReminderMoment />,
+    blurb:
+      "Customers pick a real free time with the right person, or the AI sends them your booking link. Reminders go out before every appointment.",
+  },
+  {
+    visual: <GrowMoment />,
+    blurb:
+      "Every enquiry becomes a lead in your dashboard, with an email to you. After a visit, customers are asked for a review, and low scores come to you first.",
+  },
+  {
+    visual: <InstallMoment />,
+    blurb:
+      "Add booking, contact and registration widgets in your colours, or use your hosted booking page. Installing takes one line of code.",
+  },
+];
+
+function FeatureTour() {
+  return (
+    <Section id="features" eyebrow="What it does" title="A receptionist that never clocks off" className="bg-surface-2">
+      <div className="flex flex-col gap-16 md:gap-24">
+        {FEATURE_GROUPS.map((g, i) => (
+          <div key={g.title} data-reveal className="grid items-center gap-8 md:grid-cols-2 md:gap-16">
+            <div className={cn(i % 2 === 1 && "md:order-2")}>{FEATURE_TOUR[i].visual}</div>
+            <div>
+              <h3 className="text-2xl font-semibold tracking-[-0.02em] md:text-3xl">{g.title}</h3>
+              <p className="mt-3 text-muted-foreground">{FEATURE_TOUR[i].blurb}</p>
+              <ul className="mt-5 flex flex-col gap-2">
+                {g.links.map((l) => (
+                  <li key={l.label} className="flex gap-2.5 text-[15px]">
+                    <span className="mt-2 size-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
+                    {l.label}
+                  </li>
+                ))}
+              </ul>
+              {g.href && (
+                <Link href={g.href} className="mt-6 inline-flex items-center gap-1 font-semibold text-link hover:underline">
+                  More about {g.title.toLowerCase()}
+                  <ArrowRightIcon className="size-4" aria-hidden />
+                </Link>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+function FilmSection() {
+  return (
+    <Section
+      id="film"
+      dark
+      eyebrow="See it in 45 seconds"
+      title="From a missed message to a booked appointment"
+      intro={`Watch ${BRAND_NAME} answer a customer, book them in and send the reminder.`}
+    >
+      <div data-reveal className="mx-auto max-w-5xl">
+        <Film title={`${BRAND_NAME} in 45 seconds`} />
+      </div>
+    </Section>
+  );
+}
+
+const GROUP_ICON: Record<BusinessGroupSlug, React.ComponentType<{ className?: string }>> = {
+  beauty: ScissorsIcon,
+  wellness: LeafIcon,
+  fitness: DumbbellIcon,
+  trades: WrenchIcon,
+  clinics: StethoscopeIcon,
+};
+
+function BusinessTypes() {
+  return (
+    <Section
+      id="business-types"
+      eyebrow="Who it's for"
+      title="Made for businesses that run on appointments and callouts"
+      intro="Salons, studios, practices and tradespeople: anyone whose phone buzzes while their hands are busy."
+    >
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        {BUSINESS_GROUPS.map((g, i) => {
+          const Icon = GROUP_ICON[g.slug];
+          return (
+            <Link
+              key={g.slug}
+              href={`/for/${g.slug}`}
+              data-reveal
+              style={stagger(i)}
+              className="group rounded-[20px] outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <Card lift className="h-full px-5">
+                <span className="flex size-10 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+                  <Icon className="size-5" />
+                </span>
+                <div>
+                  <h3 className="font-semibold tracking-[-0.01em]">{g.name}</h3>
+                  <p className="mt-1 text-[13px] text-muted-foreground">
+                    {g.types
+                      .slice(0, 4)
+                      .map((t) => t.name)
+                      .join(", ")}
+                    {g.types.length > 4 ? " and more" : ""}
+                  </p>
+                </div>
+                <span className="mt-auto inline-flex items-center gap-1 text-[13px] font-semibold text-link">
+                  See how it works
+                  <ArrowRightIcon className="size-3.5 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden />
+                </span>
+              </Card>
+            </Link>
+          );
+        })}
+      </div>
+    </Section>
+  );
+}
+
+function HowItWorks() {
+  const steps = [
+    {
+      title: "Tell it about your business",
+      text: "Your services, prices, hours and policies, in plain language. We set this up with you.",
+    },
+    { title: "Add one line to your website", text: "Paste the snippet into your site and the chat appears, in your colours." },
+    {
+      title: "Connect WhatsApp",
+      text: "Link your WhatsApp Business number, and the same receptionist answers there too.",
+    },
+  ];
+  return (
+    <Section id="how-it-works" eyebrow="How it works" title="Up and running in an afternoon" className="bg-surface-2">
+      <ol className="grid gap-6 md:grid-cols-3">
+        {steps.map((s, i) => (
+          <li key={s.title} data-reveal style={stagger(i)}>
+            <Card className="h-full px-6">
+              <span className="flex size-9 items-center justify-center rounded-full bg-linear-to-b from-[#5b53f0] to-[#4338ca] text-sm font-semibold text-white shadow-[0_6px_14px_-6px_rgb(67_56_202/0.6)]">
+                {i + 1}
+              </span>
+              <h3 className="text-lg font-semibold tracking-[-0.01em]">{s.title}</h3>
+              <p className="text-[15px] text-muted-foreground">{s.text}</p>
+            </Card>
+          </li>
+        ))}
+      </ol>
+    </Section>
+  );
+}
+
+function PricingTeaser() {
+  const plans = ["starter", "growth", "pro"] as const;
+  return (
+    <Section
+      id="pricing"
+      eyebrow="Pricing"
+      title="Pick the plan that fits how you work"
+      intro="Every plan includes leads, your knowledge base, conversations and customer records."
+    >
+      <div className="grid gap-6 md:grid-cols-3">
+        {plans.map((plan, i) => (
+          <Card
+            key={plan}
+            data-reveal
+            style={stagger(i)}
+            className={cn("px-6", plan === "growth" && "shadow-[0_0_0_2px_var(--primary),var(--shadow-card)]")}
+          >
+            <div>
+              <h3 className="text-lg font-semibold">{PLAN_LABEL[plan]}</h3>
+              <p className="mt-1 text-2xl font-semibold tracking-[-0.02em]">{priceLabel(plan)}</p>
+            </div>
+            <ul className="flex flex-col gap-2">
+              {FEATURES.filter((f) => planIncludes(plan, f)).map((f) => (
+                <li key={f} className="flex gap-2 text-[15px]">
+                  <span className="mt-2 size-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
+                  {FEATURE_PITCH[f]}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        ))}
+      </div>
+      <div data-reveal className="mt-10 text-center">
+        <Link href="/pricing" className={buttonVariants({ variant: "outline", size: "lg" })}>
+          Compare plans
+        </Link>
+      </div>
+    </Section>
+  );
+}
+
+function Trust() {
+  const points = [
+    {
+      icon: ShieldCheckIcon,
+      title: "Consent, on record",
+      text: "The AI asks before saving anyone's details. Each customer record keeps a history of what they agreed to and when, for POPIA.",
+    },
+    {
+      icon: DatabaseIcon,
+      title: "Your data stays yours",
+      text: "Your customers and leads belong to your business. Export your leads at any time, and delete a customer's data when they ask.",
+    },
+    {
+      icon: HandIcon,
+      title: "A person is one tap away",
+      text: "Take over any conversation yourself. When a customer asks for a person, you're alerted straight away.",
+    },
+  ];
+  return (
+    <Section id="trust" eyebrow="Trust" title="Careful with your customers" className="bg-surface-2">
+      <div className="grid gap-8 md:grid-cols-3 md:gap-6">
+        {points.map((p, i) => (
+          <div key={p.title} data-reveal style={stagger(i)} className="flex flex-col gap-3">
+            <span className="flex size-10 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+              <p.icon className="size-5" aria-hidden />
+            </span>
+            <h3 className="text-lg font-semibold tracking-[-0.01em]">{p.title}</h3>
+            <p className="text-muted-foreground">{p.text}</p>
+          </div>
+        ))}
+      </div>
+      <p data-reveal className="mt-10 text-center text-sm text-muted-foreground">
+        Read our{" "}
+        <Link href="/privacy" className="font-medium text-link hover:underline">
+          privacy policy
+        </Link>
+        .
+      </p>
+    </Section>
+  );
+}
+
+function Faq() {
+  return (
+    <Section id="faq" eyebrow="FAQ" title="Questions, answered">
+      <div className="mx-auto flex max-w-3xl flex-col divide-y divide-border rounded-[20px] border border-border bg-white shadow-card">
+        {FAQ.map((item) => (
+          <details key={item.q} className="group px-6 [&_summary::-webkit-details-marker]:hidden">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 text-left font-semibold outline-none focus-visible:text-link">
+              {item.q}
+              <span
+                aria-hidden
+                className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-lg leading-none transition-transform duration-200 group-open:rotate-45 motion-snap"
+              >
+                +
+              </span>
+            </summary>
+            <p className="pb-5 text-muted-foreground">{item.a}</p>
+          </details>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+function ClosingCta() {
+  return (
+    <section className="relative overflow-hidden bg-[#0b0b14] text-white">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(700px_360px_at_50%_120%,rgb(99_102_241/0.45),transparent_65%)]"
+      />
+      <div data-reveal className="relative mx-auto flex max-w-3xl flex-col items-center gap-6 px-4 py-24 text-center">
+        <h2 className="text-3xl leading-tight font-semibold tracking-[-0.025em] text-balance md:text-5xl">
+          Stop missing customers.
+        </h2>
+        <p className="max-w-xl text-lg text-white/70">
+          See {BRAND_NAME} working with your own services in a 30-minute call.
+          {MARKETING_WIDGET_KEY && ` Or ask the chat in the corner anything: that's ${BRAND_NAME} answering.`}
+        </p>
+        <Link href="/demo" className={buttonVariants({ size: "lg" })}>
+          Get a demo
+        </Link>
       </div>
     </section>
   );

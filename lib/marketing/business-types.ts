@@ -81,3 +81,9 @@ export const BUSINESS_GROUPS: BusinessGroup[] = [
     ],
   },
 ];
+
+// Choices for "Type of business" on the demo form.
+export const BUSINESS_TYPE_OPTIONS: { value: string; label: string }[] = [
+  ...BUSINESS_GROUPS.map((g) => ({ value: g.slug, label: g.name })),
+  { value: "other", label: "Something else" },
+];

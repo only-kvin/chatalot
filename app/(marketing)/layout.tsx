@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { StructuredData } from "@/components/marketing/structured-data";
 import { BRAND_NAME } from "@/lib/brand";
+import { MARKETING_WIDGET_KEY } from "@/lib/marketing/site";
 
 export const metadata: Metadata = {
   title: { default: BRAND_NAME, template: `%s · ${BRAND_NAME}` },
@@ -28,6 +30,10 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
       </main>
       <SiteFooter />
       <StructuredData />
+      {/* Our own AI receptionist, installed exactly as a customer would.
+          lazyOnload: it waits until the page is idle, so it never slows the
+          first view. */}
+      {MARKETING_WIDGET_KEY && <Script src="/widget.js" data-key={MARKETING_WIDGET_KEY} strategy="lazyOnload" />}
     </div>
   );
 }

@@ -239,3 +239,20 @@ Manual steps the platform owner needs to do. Kept up to date as new phases add n
 - **Staff in chat.** The AI's prompt lists who works here and what each person does (only when a business has staff). `check_availability` and `create_booking` take an optional staff name (full name, or a first name only one person has; ambiguous or unknown names are refused with the real list, never guessed). A person who doesn't offer the service is refused with who does. Booking results say who the booking is with, including who "anyone" went to; reschedule results too. With many open times, the AI is asked to offer 3 or 4 spread across the day.
 - **Booking links.** New AI tool `send_booking_link` returns where a customer can book themselves, opening on a service when one is clear (`?ca_service=`): by default ChatAlot's hosted page **`/book/<business slug>`** (the business's appointment widget in its own look, with its name and phone; works for businesses without a website), or the business's own page if set in **Settings → Online booking page**. When the appointment widget is switched off, there's no link and the AI keeps booking in chat.
 - Checked against the real model (Groq): it refused a person who doesn't do the service and offered who does, booked with the person asked for, and sent the link. The free Groq tier allows 8,000 tokens a minute, so several quick back-to-back turns hit its limit (the visitor then gets the fallback reply); a paid tier or the planned move to Claude Haiku removes that.
+
+## Landing site, phase 2: home page, film, our own chatbot, /demo (2026-10-09)
+
+The marketing site runs ChatAlot's own AI receptionist, set up exactly like a customer's. One-time steps:
+
+1. **Create the ChatAlot tenant.** Run `pnpm seed-chatalot you+chatalot@gmail.com`. It creates (or refreshes) the tenant `chatalot` on the Pro plan with: product knowledge, a 30-minute **Demo call** service, Monday to Friday 09:00–17:00 hours, and `chatalot.vercel.app` as its allowed domain. The email becomes its owner, so its leads and alerts reach you. Use an address that isn't in another business yet (one sign-in sees one business for now); a Gmail `+chatalot` alias lands in your normal inbox. Re-running is safe: it replaces the knowledge and hours and updates the Demo call service in place.
+2. **Embed its knowledge:** `pnpm reembed-tenant chatalot`.
+3. **Set the widget key.** The seed prints `NEXT_PUBLIC_MARKETING_WIDGET_KEY=pk_…`. Add it to `.env.local` and to the Vercel project's environment variables (Production and Preview), then redeploy. Without it the site works, just with no chat, and `/demo` requests are only emailed.
+4. **Custom domain later:** when the site moves to its own domain, update `lib/brand.ts` and add the new host to the tenant's allowed domains (Admin → Tenants → ChatAlot).
+
+**What's new:**
+
+- **Home page** (`app/(marketing)/page.tsx`): hero with the headline, a hero animation (a website chat in the chat widget's real styles, and the booking landing in the owner's day), the problem, a feature tour with small looping product moments, the 45-second film, business types, how it works, a pricing teaser, trust, FAQ and a closing call to action. Sections reveal once on scroll; with reduced motion everything is still.
+- **Film:** `public/video/ad-45-landscape.mp4` and `ad-45-portrait.mp4` (copied from `../chatalot-ad/out/`) with poster stills from 0:15. Nothing loads until the visitor scrolls near it, and the video only when they press play. Re-export a film: copy the new file over, then `npx remotion ffmpeg -ss 15 -i <film> -frames:v 1 -q:v 4 <poster>.jpg` from the `chatalot-ad` folder.
+- **`/demo` form:** saved as a lead (source `demo_form`) in the ChatAlot tenant, with a bell alert, and emailed to the platform admins. Zod validation, a POPIA consent tick, a honeypot, a 3-second minimum and 3 requests per 10 minutes per IP (Upstash).
+- **Prices:** `lib/pricing.ts`. Every plan says "Contact us" until you fill in amounts.
+- **"Start free trial"** buttons stay hidden until self-serve sign-up exists (`SIGNUP_OPEN` in `lib/marketing/site.ts`).
