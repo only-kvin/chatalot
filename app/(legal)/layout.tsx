@@ -10,7 +10,8 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
         <footer className="mt-8 border-t pt-4 text-xs text-zinc-500">
           {LEGAL.operator} · Last updated {LEGAL.lastUpdated} ·{" "}
           <Link href="/privacy">Privacy policy</Link> ·{" "}
-          <Link href="/data-deletion">Delete your data</Link>
+          <Link href="/data-deletion">Delete your data</Link> ·{" "}
+          <Link href="/terms">Terms of service</Link>
         </footer>
       </article>
     </div>

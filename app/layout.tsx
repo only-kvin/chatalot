@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { THEME_BOOT } from "@/components/theme/theme";
+import { BRAND_DESCRIPTION, BRAND_NAME, BRAND_URL } from "@/lib/brand";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -11,11 +12,17 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  // Only a few dashboard spots use it; not preloading keeps it off the
+  // public pages' critical path (it loads when first used).
+  preload: false,
 });
 
 export const metadata: Metadata = {
-  title: "ChatAlot",
-  description: "AI receptionist for South African service businesses.",
+  metadataBase: new URL(BRAND_URL),
+  // No title template here: customer-facing pages like /book/<slug> belong to
+  // the business, not us. The marketing layout adds "· Brand" to its pages.
+  title: BRAND_NAME,
+  description: BRAND_DESCRIPTION,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

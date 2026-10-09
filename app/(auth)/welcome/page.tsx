@@ -1,8 +1,14 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/db/auth";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
 
-export default async function Home() {
+export const metadata: Metadata = { robots: { index: false } };
+
+// Where proxy.ts sends signed-in visitors to "/" (the URL stays "/"): staff
+// go on to their dashboard; anyone not linked to a business yet sees why.
+// Dashboard pages send tenant-less users back to "/", which lands here too.
+export default async function Welcome() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
 

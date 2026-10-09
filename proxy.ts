@@ -45,11 +45,23 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(login);
   }
 
+  // "/" is the static marketing page for visitors. Signed-in users get
+  // /welcome instead (same URL), which sends staff on to their dashboard.
+  // Deciding here keeps the landing page free of cookies, so it stays static.
+  if (user && pathname === "/") {
+    const welcome = request.nextUrl.clone();
+    welcome.pathname = "/welcome";
+    const rewrite = NextResponse.rewrite(welcome, { request });
+    // Keep any refreshed session cookies from above.
+    response.cookies.getAll().forEach((c) => rewrite.cookies.set(c));
+    return rewrite;
+  }
+
   return response;
 }
 
 export const config = {
   matcher: [
-    "/((?!api/chat|api/widget|api/whatsapp|_next/static|_next/image|favicon.ico).*)",
+    "/((?!api/chat|api/widget|api/whatsapp|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|opengraph-image|video/).*)",
   ],
 };

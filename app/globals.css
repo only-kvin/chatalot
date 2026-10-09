@@ -415,3 +415,28 @@
 input[type="checkbox"]:not([role="switch"]) {
   accent-color: var(--primary);
 }
+
+/* ---------------------------------------------------------------------------
+   Marketing site (app/(marketing)).
+   --------------------------------------------------------------------------- */
+
+/* Mega menu panels and the mobile menu: a quick drop-in from just above. */
+.menu-enter {
+  animation: menu-enter 180ms var(--ease-out);
+}
+@keyframes menu-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-enter {
+    animation: none;
+  }
+}
