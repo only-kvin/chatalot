@@ -256,3 +256,13 @@ The marketing site runs ChatAlot's own AI receptionist, set up exactly like a cu
 - **`/demo` form:** saved as a lead (source `demo_form`) in the ChatAlot tenant, with a bell alert, and emailed to the platform admins. Zod validation, a POPIA consent tick, a honeypot, a 3-second minimum and 3 requests per 10 minutes per IP (Upstash).
 - **Prices:** `lib/pricing.ts`. Every plan says "Contact us" until you fill in amounts.
 - **"Start free trial"** buttons stay hidden until self-serve sign-up exists (`SIGNUP_OPEN` in `lib/marketing/site.ts`).
+
+## Landing site, phase 3: feature, business-type, pricing and resources pages (2026-10-09)
+
+No manual steps. All 41 new pages are built at deploy time from data files, so editing copy is a change to one file:
+
+- **Features** (`/features`, `/features/<group>`): `lib/marketing/features.ts`. The Features menu, the home page tour and these pages all read it; menu links jump to each section's anchor.
+- **Business types** (`/for/<group>` and `/for/<type>`, 34 pages): names and slugs in `lib/marketing/business-types.ts` (menus, demo form); headlines, problems, highlights and each type's sample chat in `lib/marketing/business-pages.ts`. Trades pages show callout leads instead of bookings. `tests/marketing-content.test.ts` fails if the two files drift apart, a booking chat doesn't offer its own time, or any menu link points at a page that doesn't exist.
+- **Pricing** (`/pricing`): plan contents from `lib/plans.ts`, amounts from `lib/pricing.ts` ("Contact us" while `null`).
+- **Resources** (`/resources`, `/resources/<guide>`): guides in `lib/marketing/guides.ts`; FAQ in `lib/marketing/faq.ts`. Guides name real dashboard pages and buttons; update them when the dashboard changes.
+- `sitemap.xml` lists every page from the same data (`lib/marketing/paths.ts`).

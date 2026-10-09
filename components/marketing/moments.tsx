@@ -1,6 +1,7 @@
 import { CheckIcon, MessageCircleIcon, StarIcon } from "lucide-react";
 import { cn } from "cn";
 import { BRAND_DOMAIN } from "@/lib/brand";
+import type { FeatureVisual as Visual } from "@/lib/marketing/features";
 
 // Small looping product moments (HTML and CSS, no media files) for the
 // problem and feature sections. Loops are defined in globals.css; --d
@@ -178,7 +179,7 @@ export function GrowMoment() {
 export function InstallMoment() {
   return (
     <Stage>
-      <pre className="overflow-hidden rounded-xl bg-[#0f0f1a] p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-indigo-100">
+      <pre className="overflow-hidden rounded-xl bg-[#0f0f1a] p-3 font-mono text-[11px] leading-relaxed break-all whitespace-pre-wrap text-indigo-100">
         {`<script src="https://${BRAND_DOMAIN}/widget.js"\n  data-key="pk_…" async></script>`}
       </pre>
       <span
@@ -189,4 +190,12 @@ export function InstallMoment() {
       </span>
     </Stage>
   );
+}
+
+// The moment that illustrates each feature group.
+export function FeatureVisual({ visual }: { visual: Visual }) {
+  if (visual === "takeover") return <TakeOverMoment />;
+  if (visual === "reminder") return <ReminderMoment />;
+  if (visual === "grow") return <GrowMoment />;
+  return <InstallMoment />;
 }

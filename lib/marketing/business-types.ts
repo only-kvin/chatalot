@@ -1,6 +1,6 @@
-// Business types the marketing site speaks to. Drives the "Business type" menu
-// now; each type's headline, problems, sample chat and feature list are added
-// with the /for/[type] pages.
+// The business types the marketing site speaks to: names and slugs only,
+// for the menus and the demo form. Each one's page content (headline,
+// problems, sample chat) lives in business-pages.ts.
 
 export type BusinessGroupSlug = "beauty" | "wellness" | "fitness" | "trades" | "clinics";
 

@@ -16,5 +16,5 @@ export const FEATURE_PITCH: Record<Feature, string> = {
   whatsapp: "AI replies on WhatsApp",
   bookings: "Online booking, booking links and reminders",
   reviews: "Review requests and low-score alerts",
-  registration: "Registration widget for classes and events",
+  registration: "Customer registration widget",
 };

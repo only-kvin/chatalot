@@ -183,9 +183,9 @@ function BrowserWindow({ chat, frame }: { chat: DemoChat; frame: Frame }) {
 }
 
 function OwnerPhone({ chat, showResult }: { chat: DemoChat; showResult: boolean }) {
-  // The new entry slots into the day in time order.
+  // The new entry slots into the day in time order; a lead ("Now") goes on top.
   const rows = [...chat.day.filter((d) => d.time !== chat.result.time), { ...chat.result, isNew: true }].sort((a, b) =>
-    a.time.localeCompare(b.time),
+    a.time === "Now" ? -1 : b.time === "Now" ? 1 : a.time.localeCompare(b.time),
   );
 
   return (
@@ -193,7 +193,7 @@ function OwnerPhone({ chat, showResult }: { chat: DemoChat; showResult: boolean 
       <div className="relative overflow-hidden rounded-[28px] bg-[#f5f5f8] px-3 pt-7 pb-4">
         <span className="absolute top-2 left-1/2 h-4 w-16 -translate-x-1/2 rounded-full bg-[#111117]" aria-hidden />
         <p className="text-[10px] font-semibold tracking-wide text-zinc-600 uppercase">{chat.dayTitle}</p>
-        <p className="text-[15px] font-semibold tracking-[-0.01em] text-zinc-900">Your day</p>
+        <p className="text-[15px] font-semibold tracking-[-0.01em] text-zinc-900">{chat.dayHeading}</p>
         <ul className="mt-3 flex flex-col gap-1.5">
           {rows.map((r) =>
             "isNew" in r ? (

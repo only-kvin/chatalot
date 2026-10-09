@@ -16,23 +16,16 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Film } from "@/components/marketing/film";
 import { HeroDemo } from "@/components/marketing/hero-demo";
-import {
-  GrowMoment,
-  InstallMoment,
-  LostInChats,
-  MissedAfterHours,
-  NoShow,
-  ReminderMoment,
-  TakeOverMoment,
-} from "@/components/marketing/moments";
+import { FeatureVisual, LostInChats, MissedAfterHours, NoShow } from "@/components/marketing/moments";
+import { CtaBand, FaqList, stagger } from "@/components/marketing/page-parts";
 import { RevealObserver } from "@/components/marketing/reveal";
 import { Section } from "@/components/marketing/section";
 import { BRAND_DESCRIPTION, BRAND_NAME } from "@/lib/brand";
 import { BUSINESS_GROUPS, type BusinessGroupSlug } from "@/lib/marketing/business-types";
 import { DEFAULT_DEMO_CHAT } from "@/lib/marketing/demo-chat";
 import { FAQ } from "@/lib/marketing/faq";
-import { FEATURE_GROUPS } from "@/lib/marketing/nav";
-import { FEATURE_PITCH, MARKETING_WIDGET_KEY, SIGNUP_OPEN } from "@/lib/marketing/site";
+import { FEATURE_PAGES } from "@/lib/marketing/features";
+import { FEATURE_PITCH, SIGNUP_OPEN } from "@/lib/marketing/site";
 import { FEATURES, PLAN_LABEL, planIncludes } from "@/lib/plans";
 import { priceLabel } from "@/lib/pricing";
 
@@ -43,8 +36,6 @@ export const metadata: Metadata = {
   description: BRAND_DESCRIPTION,
   alternates: { canonical: "/" },
 };
-
-const stagger = (i: number) => ({ "--i": i }) as React.CSSProperties;
 
 export default function HomePage() {
   return (
@@ -59,7 +50,7 @@ export default function HomePage() {
       <PricingTeaser />
       <Trust />
       <Faq />
-      <ClosingCta />
+      <CtaBand />
     </>
   );
 }
@@ -140,53 +131,30 @@ function Problem() {
   );
 }
 
-const FEATURE_TOUR = [
-  {
-    visual: <TakeOverMoment />,
-    blurb:
-      "Your AI receptionist answers questions from your own information, on your website and on WhatsApp, at any hour. When it matters, you step in.",
-  },
-  {
-    visual: <ReminderMoment />,
-    blurb:
-      "Customers pick a real free time with the right person, or the AI sends them your booking link. Reminders go out before every appointment.",
-  },
-  {
-    visual: <GrowMoment />,
-    blurb:
-      "Every enquiry becomes a lead in your dashboard, with an email to you. After a visit, customers are asked for a review, and low scores come to you first.",
-  },
-  {
-    visual: <InstallMoment />,
-    blurb:
-      "Add booking, contact and registration widgets in your colours, or use your hosted booking page. Installing takes one line of code.",
-  },
-];
-
 function FeatureTour() {
   return (
     <Section id="features" eyebrow="What it does" title="A receptionist that never clocks off" className="bg-surface-2">
       <div className="flex flex-col gap-16 md:gap-24">
-        {FEATURE_GROUPS.map((g, i) => (
-          <div key={g.title} data-reveal className="grid items-center gap-8 md:grid-cols-2 md:gap-16">
-            <div className={cn(i % 2 === 1 && "md:order-2")}>{FEATURE_TOUR[i].visual}</div>
+        {FEATURE_PAGES.map((p, i) => (
+          <div key={p.slug} data-reveal className="grid items-center gap-8 md:grid-cols-2 md:gap-16">
+            <div className={cn(i % 2 === 1 && "md:order-2")}>
+              <FeatureVisual visual={p.visual} />
+            </div>
             <div>
-              <h3 className="text-2xl font-semibold tracking-[-0.02em] md:text-3xl">{g.title}</h3>
-              <p className="mt-3 text-muted-foreground">{FEATURE_TOUR[i].blurb}</p>
+              <h3 className="text-2xl font-semibold tracking-[-0.02em] md:text-3xl">{p.title}</h3>
+              <p className="mt-3 text-muted-foreground">{p.blurb}</p>
               <ul className="mt-5 flex flex-col gap-2">
-                {g.links.map((l) => (
-                  <li key={l.label} className="flex gap-2.5 text-[15px]">
+                {p.sections.map((sec) => (
+                  <li key={sec.id} className="flex gap-2.5 text-[15px]">
                     <span className="mt-2 size-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
-                    {l.label}
+                    {sec.label}
                   </li>
                 ))}
               </ul>
-              {g.href && (
-                <Link href={g.href} className="mt-6 inline-flex items-center gap-1 font-semibold text-link hover:underline">
-                  More about {g.title.toLowerCase()}
-                  <ArrowRightIcon className="size-4" aria-hidden />
-                </Link>
-              )}
+              <Link href={`/features/${p.slug}`} className="mt-6 inline-flex items-center gap-1 font-semibold text-link hover:underline">
+                More about {p.title.toLowerCase()}
+                <ArrowRightIcon className="size-4" aria-hidden />
+              </Link>
             </div>
           </div>
         ))}
@@ -382,45 +350,7 @@ function Trust() {
 function Faq() {
   return (
     <Section id="faq" eyebrow="FAQ" title="Questions, answered">
-      <div className="mx-auto flex max-w-3xl flex-col divide-y divide-border rounded-[20px] border border-border bg-white shadow-card">
-        {FAQ.map((item) => (
-          <details key={item.q} className="group px-6 [&_summary::-webkit-details-marker]:hidden">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 text-left font-semibold outline-none focus-visible:text-link">
-              {item.q}
-              <span
-                aria-hidden
-                className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-lg leading-none transition-transform duration-200 group-open:rotate-45 motion-snap"
-              >
-                +
-              </span>
-            </summary>
-            <p className="pb-5 text-muted-foreground">{item.a}</p>
-          </details>
-        ))}
-      </div>
+      <FaqList items={FAQ} />
     </Section>
-  );
-}
-
-function ClosingCta() {
-  return (
-    <section className="relative overflow-hidden bg-[#0b0b14] text-white">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(700px_360px_at_50%_120%,rgb(99_102_241/0.45),transparent_65%)]"
-      />
-      <div data-reveal className="relative mx-auto flex max-w-3xl flex-col items-center gap-6 px-4 py-24 text-center">
-        <h2 className="text-3xl leading-tight font-semibold tracking-[-0.025em] text-balance md:text-5xl">
-          Stop missing customers.
-        </h2>
-        <p className="max-w-xl text-lg text-white/70">
-          See {BRAND_NAME} working with your own services in a 30-minute call.
-          {MARKETING_WIDGET_KEY && ` Or ask the chat in the corner anything: that's ${BRAND_NAME} answering.`}
-        </p>
-        <Link href="/demo" className={buttonVariants({ size: "lg" })}>
-          Get a demo
-        </Link>
-      </div>
-    </section>
   );
 }
