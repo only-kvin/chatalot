@@ -6,6 +6,10 @@ import { createClient } from "@/lib/db/supabase-server";
 import { createAdminClient } from "@/lib/db/supabase-admin";
 import { encrypt } from "@/lib/security/crypto";
 import { overridesSchema, PLANS } from "@/lib/plans";
+import { waitUntil } from "@vercel/functions";
+import { ImportRefusedError, importWebsite, removeWebsiteKnowledge, runWebsiteImport } from "@/lib/website/import";
+import { BUSINESS_CONSENT_KINDS, hasConsent, recordConsent } from "@/lib/consent/business-consent";
+import { withdrawWebsiteContent } from "@/lib/site-brief/generate";
 
 const connectSchema = z.object({
   tenantId: z.string().uuid(),
@@ -136,4 +140,121 @@ export async function markUpgradeHandledAction(formData: FormData) {
     .eq("tenant_id", tenantId);
   revalidatePath(`/admin/tenants/${tenantId}`);
   revalidatePath("/admin");
+}
+
+// Imports a client's website into their knowledge base, for onboarding by
+// hand. Same rules as the owner's button: the site must be in the tenant's
+// allowed domains.
+export async function importWebsiteAdminAction(tenantId: string, startUrl: string): Promise<{ error: string | null }> {
+  try {
+    await requirePlatformAdmin();
+  } catch {
+    return { error: "Not authorized." };
+  }
+  if (!z.uuid().safeParse(tenantId).success || typeof startUrl !== "string" || !startUrl.trim()) {
+    return { error: "Enter the website's address." };
+  }
+  const admin = createAdminClient();
+  try {
+    const importId = await importWebsite(admin, tenantId, startUrl);
+    waitUntil(runWebsiteImport(admin, importId).catch((err) => console.error("Website import failed:", err)));
+  } catch (err) {
+    if (err instanceof ImportRefusedError) return { error: err.message };
+    console.error("Starting a website import failed:", err);
+    return { error: "Couldn't start the import." };
+  }
+  revalidatePath(`/admin/tenants/${tenantId}`);
+  return { error: null };
+}
+
+// Consent a business gave by email or phone, recorded by a platform admin
+// (a note saying how is required).
+export async function recordConsentAdminAction(input: {
+  tenantId: string;
+  kind: string;
+  granted: boolean;
+  note: string;
+}): Promise<{ error: string | null }> {
+  try {
+    await requirePlatformAdmin();
+  } catch {
+    return { error: "Not authorized." };
+  }
+  const parsed = z
+    .object({
+      tenantId: z.uuid(),
+      kind: z.enum(BUSINESS_CONSENT_KINDS),
+      granted: z.boolean(),
+      note: z.string().trim().min(3, "Add a note saying how and when they agreed.").max(500),
+    })
+    .safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  const { tenantId, kind, granted, note } = parsed.data;
+  const admin = createAdminClient();
+  try {
+    if (kind === "website_content" && !granted) {
+      await withdrawWebsiteContent(admin, tenantId, { userId: null, source: "admin", note });
+    } else {
+      await recordConsent(admin, { tenantId, kind, granted, source: "admin", grantedBy: null, note });
+    }
+  } catch (err) {
+    console.error("Recording consent failed:", err);
+    return { error: "Couldn't record the consent." };
+  }
+  revalidatePath(`/admin/tenants/${tenantId}`);
+  return { error: null };
+}
+
+// "Replace website": the business's new site is live. Adds its domain to the
+// allowed list, removes the old site's imported knowledge, imports the new
+// site, and marks the latest brief live on that domain.
+export async function replaceWebsiteAdminAction(input: { tenantId: string; domain: string }): Promise<{ error: string | null }> {
+  try {
+    await requirePlatformAdmin();
+  } catch {
+    return { error: "Not authorized." };
+  }
+  const parsed = z
+    .object({ tenantId: z.uuid(), domain: z.string().trim().toLowerCase().regex(/^[a-z0-9-]+(\.[a-z0-9-]+)+$/, "Enter a domain like example.co.za") })
+    .safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  const { tenantId, domain } = parsed.data;
+  const admin = createAdminClient();
+
+  // Checked before anything is removed, so a refusal changes nothing.
+  if (!(await hasConsent(admin, tenantId, "website_content"))) {
+    return { error: "They haven't agreed to their website's content being used. Record their consent first." };
+  }
+  const { data: tenant } = await admin.from("tenants").select("allowed_domains").eq("id", tenantId).single();
+  const domains = new Set<string>(tenant?.allowed_domains ?? []);
+  domains.add(domain);
+  const { error: domainError } = await admin.from("tenants").update({ allowed_domains: [...domains] }).eq("id", tenantId);
+  if (domainError) return { error: "Couldn't add the domain." };
+
+  try {
+    await removeWebsiteKnowledge(admin, tenantId);
+    const importId = await importWebsite(admin, tenantId, `https://${domain}`);
+    waitUntil(runWebsiteImport(admin, importId).catch((err) => console.error("Website import failed:", err)));
+  } catch (err) {
+    if (err instanceof ImportRefusedError) return { error: err.message };
+    console.error("Replacing the website failed:", err);
+    return { error: "Couldn't start importing the new site." };
+  }
+
+  const { data: latest } = await admin
+    .from("site_briefs")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (latest) {
+    await admin
+      .from("site_briefs")
+      .update({ status: "live", live_domain: domain, updated_at: new Date().toISOString() })
+      .eq("id", latest.id)
+      .eq("tenant_id", tenantId);
+  }
+  revalidatePath(`/admin/tenants/${tenantId}`);
+  return { error: null };
 }

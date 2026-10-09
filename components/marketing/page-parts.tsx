@@ -3,7 +3,7 @@ import { ChevronRightIcon } from "lucide-react";
 import { cn } from "cn";
 import { buttonVariants } from "@/components/ui/button";
 import { BRAND_NAME } from "@/lib/brand";
-import { MARKETING_WIDGET_KEY } from "@/lib/marketing/site";
+import { MARKETING_WIDGET_KEY, SIGNUP_OPEN } from "@/lib/marketing/site";
 
 // Shared pieces for the marketing pages: the dark page hero, the closing
 // call to action and the FAQ accordion.
@@ -90,9 +90,19 @@ export function CtaBand({ title = "Stop missing customers." }: { title?: string 
           See {BRAND_NAME} working with your own services in a 30-minute call.
           {MARKETING_WIDGET_KEY && ` Or ask the chat in the corner anything: that's ${BRAND_NAME} answering.`}
         </p>
-        <Link href="/demo" className={buttonVariants({ size: "lg" })}>
-          Get a demo
-        </Link>
+        <div className="flex flex-wrap justify-center gap-3">
+          <Link href="/demo" className={buttonVariants({ size: "lg" })}>
+            Get a demo
+          </Link>
+          {SIGNUP_OPEN && (
+            <Link
+              href="/signup"
+              className={cn(buttonVariants({ size: "lg", variant: "ghost" }), "text-white hover:bg-white/10 hover:text-white")}
+            >
+              Start free trial
+            </Link>
+          )}
+        </div>
       </div>
     </section>
   );

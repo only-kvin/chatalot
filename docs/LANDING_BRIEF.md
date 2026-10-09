@@ -109,6 +109,7 @@ Use the dashboard's existing motion language (spring easing, lift on hover, stag
   - A short onboarding checklist on the dashboard Overview: add knowledge, set hours, install the widget, test a chat.
   - Rate limiting and bot protection on sign-up. One trial per email.
   - The platform admins get an email for each new sign-up.
+  - Just before the trial starts, ask the two website consents (website content, and website images): separate, unticked checkboxes. They're stored in `tenant_consents` as described in `docs/WEBSITE_IMPORT_BRIEF.md`, Phase 2.
   - Tests: sign-up creates exactly one tenant and membership, RLS still isolates it, and a second sign-up with the same email is refused.
 
 ## Phases (stop after each)

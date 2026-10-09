@@ -3,6 +3,11 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/db/supabase-server";
 import { connectWhatsAppChannelAction, disconnectWhatsAppChannelAction, markUpgradeHandledAction } from "./actions";
 import { PlanEditor } from "./plan-editor";
+import { ImportWebsiteForm } from "./import-website";
+import { GenerateBriefButton, RecordConsentForm, ReplaceWebsiteForm } from "./website-admin";
+import { currentConsents, type ConsentState } from "@/lib/consent/business-consent";
+import Link from "next/link";
+import { importableHosts } from "@/lib/website/urls";
 import { FEATURE_INFO, FEATURES, overridesSchema, parsePlan, type Feature } from "@/lib/plans";
 import { formatShortLocal } from "@/lib/time";
 import { Button } from "@/components/ui/button";
@@ -27,7 +32,7 @@ export default async function TenantDetailPage({
 
   const { data: tenant } = await supabase
     .from("tenants")
-    .select("id, name, slug, public_widget_key, plan, feature_overrides")
+    .select("id, name, slug, public_widget_key, plan, feature_overrides, allowed_domains")
     .eq("id", id)
     .single();
   if (!tenant) notFound();
@@ -39,6 +44,12 @@ export default async function TenantDetailPage({
     .is("handled_at", null)
     .order("created_at");
   const overrides = overridesSchema.safeParse(tenant.feature_overrides);
+
+  const [consents, { data: latestBrief }, { data: websiteRequest }] = await Promise.all([
+    currentConsents(supabase, id),
+    supabase.from("site_briefs").select("id, version, status").eq("tenant_id", id).order("version", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("website_requests").select("id").eq("tenant_id", id).is("handled_at", null).maybeSingle(),
+  ]);
 
   const { data: channel } = await supabase
     .from("channels")
@@ -151,6 +162,54 @@ export default async function TenantDetailPage({
 
       <Card>
         <CardHeader>
+          <CardTitle>Website consent</CardTitle>
+          <CardDescription>
+            Content: {describeConsent(consents.website_content)} · Images: {describeConsent(consents.website_images)}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RecordConsentForm tenantId={tenant.id} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Site brief</CardTitle>
+          <CardDescription>
+            {latestBrief ? (
+              <>
+                Latest: version {latestBrief.version}, {latestBrief.status}.{" "}
+                <Link href={`/admin/site-briefs/${latestBrief.id}`} className="underline">
+                  Open
+                </Link>
+              </>
+            ) : (
+              "No brief yet."
+            )}
+            {websiteRequest && " They've asked for a new website."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-6">
+          <GenerateBriefButton tenantId={tenant.id} />
+          <ReplaceWebsiteForm tenantId={tenant.id} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Import website</CardTitle>
+          <CardDescription>
+            Reads their website into their knowledge base. The site must be in their allowed domains (
+            {importableHosts(tenant.allowed_domains ?? []).join(", ") || "none yet"}).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ImportWebsiteForm tenantId={tenant.id} domains={importableHosts(tenant.allowed_domains ?? [])} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Website widget</CardTitle>
         </CardHeader>
         <CardContent>
@@ -161,4 +220,9 @@ export default async function TenantDetailPage({
       </Card>
     </div>
   );
+}
+
+function describeConsent(c: ConsentState | null): string {
+  if (!c) return "not asked";
+  return `${c.granted ? "agreed" : "not agreed"} (${c.source}${c.note ? `: ${c.note}` : ""}, ${formatShortLocal(c.createdAt)})`;
 }

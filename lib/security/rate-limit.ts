@@ -98,3 +98,21 @@ const demoRequestLimiter = new Ratelimit({
 export async function checkDemoRequestLimit(ip: string): Promise<boolean> {
   return (await demoRequestLimiter.limit(ip)).success;
 }
+
+// Self-serve sign-up. Each attempt can send a confirmation email and, once
+// confirmed, creates a business, so it's limited per IP and per address.
+const signupIpLimiter = new Ratelimit({
+  redis,
+  prefix: "ratelimit:signup-ip",
+  limiter: Ratelimit.slidingWindow(5, "1 h"),
+});
+const signupEmailLimiter = new Ratelimit({
+  redis,
+  prefix: "ratelimit:signup-email",
+  limiter: Ratelimit.slidingWindow(3, "1 h"),
+});
+
+export async function checkSignupLimit(ip: string, email: string): Promise<boolean> {
+  const [ipResult, emailResult] = await Promise.all([signupIpLimiter.limit(ip), signupEmailLimiter.limit(email)]);
+  return ipResult.success && emailResult.success;
+}

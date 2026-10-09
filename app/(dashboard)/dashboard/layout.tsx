@@ -7,6 +7,7 @@ import { ThemeScript } from "@/components/theme/theme-script";
 import { parseTheme, THEME_COOKIE } from "@/components/theme/theme";
 import { DashboardNav } from "./dashboard-nav";
 import { PageTransition } from "./page-transition";
+import { DeclinedNotice, PendingBanner } from "./approval-status";
 
 export default async function DashboardLayout({
   children,
@@ -27,15 +28,19 @@ export default async function DashboardLayout({
   if (!current) redirect("/");
   const { tenantId, features } = current;
 
-  const [{ data: config }, { count: needsYou }] = await Promise.all([
+  const [{ data: config }, { count: needsYou }, { data: tenant }] = await Promise.all([
     supabase.from("agent_configs").select("business_name").eq("tenant_id", tenantId).maybeSingle(),
     supabase
       .from("conversations")
       .select("id", { count: "exact", head: true })
       .eq("tenant_id", tenantId)
       .eq("status", "human"),
+    supabase.from("tenants").select("status").eq("id", tenantId).maybeSingle(),
   ]);
   const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
+
+  // A self-serve sign-up the platform admin turned down: nothing to manage.
+  if (tenant?.status === "declined") return <DeclinedNotice />;
 
   return (
     <div className="app-backdrop flex min-h-screen flex-col md:flex-row">
@@ -48,7 +53,10 @@ export default async function DashboardLayout({
         theme={theme}
         features={features}
       />
-      <PageTransition>{children}</PageTransition>
+      <PageTransition>
+        {tenant?.status === "pending" && <PendingBanner />}
+        {children}
+      </PageTransition>
     </div>
   );
 }

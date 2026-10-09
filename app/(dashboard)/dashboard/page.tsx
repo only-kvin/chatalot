@@ -11,6 +11,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { ThemeFlipButton } from "@/components/theme/theme-switcher";
 import { parseTheme, THEME_COOKIE } from "@/components/theme/theme";
 import { AiPanel, Kpis, LiveConversations, NewLeads, TodaysBookings } from "./_overview/sections";
+import { OnboardingChecklist } from "./_overview/onboarding";
 import { KpisSkeleton, PeopleSkeleton, RowsSkeleton, TableSkeleton } from "./_overview/skeletons";
 
 const TODAY = new Intl.DateTimeFormat("en-GB", {
@@ -59,6 +60,11 @@ export default async function OverviewPage() {
           </Link>
         </div>
       </header>
+
+      {/* Hidden once every step is done, so no skeleton: it just appears. */}
+      <Suspense fallback={null}>
+        <OnboardingChecklist tenantId={tenantId} bookings={bookingsOn} />
+      </Suspense>
 
       <section aria-label="Key numbers" className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
         <Suspense fallback={<KpisSkeleton />}>

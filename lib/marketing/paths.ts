@@ -14,6 +14,8 @@ export function publicPaths(): string[] {
     "/resources",
     ...GUIDES.map((g) => `/resources/${g.slug}`),
     "/demo",
+    "/signup",
+    "/bot",
     "/login",
     "/terms",
     "/privacy",

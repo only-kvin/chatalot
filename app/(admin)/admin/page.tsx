@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/db/supabase-server";
+import { createAdminClient } from "@/lib/db/supabase-admin";
+import { formatLocalDateTime } from "@/lib/time";
+import { SignupDecision } from "./pending-signups";
 import { createTenantAction } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,9 +29,15 @@ export default async function AdminPage() {
   const supabase = await createClient();
   const { data: tenants } = await supabase
     .from("tenants")
-    .select("id, name, slug, status, plan, public_widget_key, created_at")
+    .select("id, name, slug, status, plan, public_widget_key, created_at, business_type")
     .order("created_at", { ascending: false });
   const { data: requests } = await supabase.from("upgrade_requests").select("tenant_id").is("handled_at", null);
+  const waiting = (tenants ?? []).filter((t) => t.status === "pending");
+  // Who signed up for each waiting business (sign-ups are service-role only).
+  const { data: signups } = waiting.length
+    ? await createAdminClient().from("signups").select("tenant_id, email").in("tenant_id", waiting.map((t) => t.id))
+    : { data: [] };
+  const signupEmail = new Map((signups ?? []).map((s) => [s.tenant_id as string, s.email as string]));
   const openRequests = new Map<string, number>();
   for (const r of requests ?? []) openRequests.set(r.tenant_id, (openRequests.get(r.tenant_id) ?? 0) + 1);
 
@@ -36,10 +45,42 @@ export default async function AdminPage() {
     <div className="mx-auto flex max-w-3xl flex-col gap-8 p-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Tenants</h1>
-        <Link href="/admin/usage" className="text-sm text-muted-foreground hover:underline">
-          Usage →
-        </Link>
+        <div className="flex gap-4">
+          <Link href="/admin/site-briefs" className="text-sm text-muted-foreground hover:underline">
+            Site briefs →
+          </Link>
+          <Link href="/admin/usage" className="text-sm text-muted-foreground hover:underline">
+            Usage →
+          </Link>
+        </div>
       </div>
+
+      {waiting.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Waiting for approval</CardTitle>
+            <CardDescription>
+              Self-serve trials. They can set up their dashboard now; their widgets and chat stay off for the public
+              until you approve. Approving emails the owner.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col divide-y">
+            {waiting.map((t) => (
+              <div key={t.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                <div className="min-w-0">
+                  <Link href={`/admin/tenants/${t.id}`} className="font-medium hover:underline">
+                    {t.name}
+                  </Link>
+                  <p className="text-xs text-muted-foreground">
+                    {[signupEmail.get(t.id), t.business_type, formatLocalDateTime(t.created_at)].filter(Boolean).join(" · ")}
+                  </p>
+                </div>
+                <SignupDecision tenantId={t.id} />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

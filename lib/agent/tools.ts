@@ -4,12 +4,22 @@ import { z } from "zod";
 // shape the active model provider expects (currently Groq's OpenAI-compatible
 // function-calling format; Anthropic's tool-use format later).
 
+// A JSON Schema property: plain fields for the receptionist's tools, nested
+// objects and arrays for structured extraction (lib/site-brief/extract.ts).
+export type ToolProperty = {
+  type: string | string[];
+  description?: string;
+  items?: ToolProperty;
+  properties?: Record<string, ToolProperty>;
+  required?: string[];
+};
+
 export type ToolDef = {
   name: string;
   description: string;
   parameters: {
     type: "object";
-    properties: Record<string, { type: string | string[]; description: string }>;
+    properties: Record<string, ToolProperty>;
     required: string[];
   };
 };

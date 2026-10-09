@@ -4,6 +4,7 @@ import { REVIEW_LOOKBACK_DAYS, sendReviewRequest } from "@/lib/bookings/review-r
 import { tenantWhatsAppLookup, type TenantWhatsApp } from "@/lib/bookings/whatsapp-channel";
 import { sendDailySummary } from "@/lib/email/send-daily-summary";
 import { tenantFeaturesLookup } from "@/lib/features";
+import { runScheduledImports } from "@/lib/website/import";
 import type { Features } from "@/lib/plans";
 
 // The daily jobs: booking reminders and review requests on WhatsApp, then the
@@ -18,6 +19,10 @@ import type { Features } from "@/lib/plans";
 // (or a missed/delayed cron trigger) still gets retried the next day instead
 // of silently never firing.
 const REMINDER_LOOKAHEAD_HOURS = 48;
+// The function may run for up to 300s; website crawling stops in time to
+// answer before that.
+export const maxDuration = 300;
+const WEBSITE_DEADLINE_MS = 270_000;
 const HOUR_MS = 60 * 60 * 1000;
 
 type Admin = ReturnType<typeof createAdminClient>;
@@ -126,6 +131,7 @@ export async function GET(request: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
+  const startedAt = Date.now();
   const admin = createAdminClient();
   // One WhatsApp number and settings lookup per tenant, shared by both jobs.
   const channelFor = tenantWhatsAppLookup(admin);
@@ -142,13 +148,20 @@ export async function GET(request: Request) {
   // After the WhatsApp jobs, so today's "reminder not sent" is already known.
   const [summaries] = await Promise.allSettled([sendSummaries(admin)]);
   if (summaries.status === "rejected") console.error("Daily summaries failed:", summaries.reason);
-  const ok = [reminders, reviews, summaries].every((r) => r.status === "fulfilled");
+  // Last, with the time that's left: website imports that stalled, and the
+  // weekly re-crawl of a few businesses' websites.
+  const [websites] = await Promise.allSettled([
+    runScheduledImports(admin, { budgetMs: Math.max(0, startedAt + WEBSITE_DEADLINE_MS - Date.now()) }),
+  ]);
+  if (websites.status === "rejected") console.error("Website imports failed:", websites.reason);
+  const ok = [reminders, reviews, summaries, websites].every((r) => r.status === "fulfilled");
 
   return Response.json(
     {
       reminders: reminders.status === "fulfilled" ? reminders.value : "failed",
       reviews: reviews.status === "fulfilled" ? reviews.value : "failed",
       summaries: summaries.status === "fulfilled" ? summaries.value : "failed",
+      websites: websites.status === "fulfilled" ? websites.value : "failed",
     },
     { status: ok ? 200 : 500 },
   );

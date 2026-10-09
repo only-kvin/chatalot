@@ -46,11 +46,16 @@ export async function resolvePublicTenant(
     .select("id, status, allowed_domains, plan, feature_overrides")
     .eq("public_widget_key", key)
     .maybeSingle();
-  if (!tenant || tenant.status !== "active") return Response.json({ error: "Not found" }, { status: 404 });
+  // A business waiting for approval can still preview its widgets in its own
+  // dashboard (requests from our own pages); every other site gets a 404.
+  const ownApp = isOwnAppRequest(request);
+  if (!tenant || !(tenant.status === "active" || (tenant.status === "pending" && ownApp))) {
+    return Response.json({ error: "Not found" }, { status: 404 });
+  }
   if (resolveFeatures(parsePlan(tenant.plan), tenant.feature_overrides)[feature] !== "on") {
     return Response.json({ error: "Not found" }, { status: 404 });
   }
-  if (!isOwnAppRequest(request) && !isOriginAllowed(origin, tenant.allowed_domains)) {
+  if (!ownApp && !isOriginAllowed(origin, tenant.allowed_domains)) {
     return Response.json({ error: "Origin not allowed" }, { status: 403 });
   }
   return { tenantId: tenant.id, origin, headers: corsHeaders(origin) };

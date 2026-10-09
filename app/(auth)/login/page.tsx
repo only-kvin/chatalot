@@ -122,8 +122,12 @@ export default function LoginPage() {
 
             <p className="mt-6 text-sm text-muted-foreground">
               New to {BRAND_NAME}?{" "}
+              <Link href="/signup" className="font-medium text-link hover:underline">
+                Start a free trial
+              </Link>{" "}
+              or{" "}
               <Link href="/demo" className="font-medium text-link hover:underline">
-                Get a demo
+                get a demo
               </Link>
             </p>
           </div>

@@ -1,8 +1,8 @@
 import type { Feature } from "@/lib/plans";
 
-// Self-serve sign-up (/signup) arrives in a later phase. Until then "Start
-// free trial" buttons are left out and "Get a demo" is the way in.
-export const SIGNUP_OPEN = false;
+// Self-serve sign-up at /signup. When false, "Start free trial" buttons are
+// left out and "Get a demo" is the only way in.
+export const SIGNUP_OPEN = true;
 
 // The public key of the platform's own "ChatAlot" tenant: its chat widget
 // runs on the marketing site, and /demo requests are filed as its leads.

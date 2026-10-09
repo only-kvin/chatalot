@@ -26,9 +26,17 @@ export async function embed(
   return json.data.map((d: { embedding: number[] }) => d.embedding);
 }
 
-// Top-k similar chunks (Phase 1+, once knowledge_chunks is populated) plus every
-// always-included `info` item (hours, address, contact) — per the spec, those are
-// never left to similarity search.
+// Website chunks are long, so only a few are added, within a character
+// budget: a big website mustn't crowd out what the owner typed.
+const MAX_WEBSITE_CHUNKS = 2;
+const WEBSITE_CHAR_BUDGET = 3500;
+
+type Match = { content: string; source: string | null; source_url: string | null };
+
+// The knowledge for one turn: every always-included `info` item (hours,
+// address, contact; never left to similarity search), the owner's best
+// matching items, then a little matching text from the business's website,
+// labelled as such so the prompt can tell the two apart (owner entries win).
 export async function getRelevantKnowledge(
   supabase: SupabaseClient,
   tenantId: string,
@@ -40,23 +48,39 @@ export async function getRelevantKnowledge(
       .from("knowledge_items")
       .select("title, content")
       .eq("tenant_id", tenantId)
-      .eq("type", "info"),
+      .eq("type", "info")
+      .eq("excluded", false),
     // Similarity search is best-effort: if embedding fails (e.g. Voyage rate
     // limits), the always-included info items below still reach the prompt.
-    searchChunks(supabase, tenantId, userMessage, k).catch((err) => {
+    // A wide search: website pages have many chunks and could otherwise
+    // fill every slot, leaving none of the owner's own items.
+    searchChunks(supabase, tenantId, userMessage, k * 4).catch((err) => {
       console.error("Knowledge search failed; using info items only:", err);
-      return [];
+      return [] as Match[];
     }),
   ]);
+  return assembleKnowledge(infoItems ?? [], matches, k);
+}
 
-  const sections: string[] = [];
-  for (const item of infoItems ?? []) {
-    sections.push(`${item.title}: ${item.content}`);
-  }
-  for (const match of matches) {
-    sections.push(match.content);
-  }
+// Pure, for testing: owner info items, up to k owner matches, then website
+// matches within their budget.
+export function assembleKnowledge(infoItems: { title: string; content: string }[], matches: Match[], k: number): string {
+  const sections = infoItems.map((item) => `${item.title}: ${item.content}`);
+  // Info items are already in; a search hit on one would only repeat it.
+  const infoText = new Set(infoItems.map((item) => item.content));
+  const owner = matches.filter((m) => m.source !== "website" && !infoText.has(m.content)).slice(0, k);
+  sections.push(...owner.map((m) => m.content));
 
+  let budget = WEBSITE_CHAR_BUDGET;
+  let added = 0;
+  for (const m of matches.filter((m) => m.source === "website")) {
+    if (added >= MAX_WEBSITE_CHUNKS) break;
+    // Too long for what's left: a shorter match further down may still fit.
+    if (m.content.length > budget) continue;
+    sections.push(`[From the business's website: ${m.source_url ?? "unknown page"}]\n${m.content}`);
+    budget -= m.content.length;
+    added++;
+  }
   return sections.join("\n\n");
 }
 
@@ -65,7 +89,7 @@ async function searchChunks(
   tenantId: string,
   userMessage: string,
   k: number,
-): Promise<{ content: string }[]> {
+): Promise<Match[]> {
   const [queryEmbedding] = await embed([userMessage], "query");
   const { data, error } = await supabase.rpc("match_chunks", {
     p_tenant_id: tenantId,
