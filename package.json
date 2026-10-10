@@ -12,7 +12,8 @@
     "bootstrap-admin": "dotenv -e .env.local -- tsx scripts/bootstrap-platform-admin.ts",
     "seed-demo-salon": "dotenv -e .env.local -- tsx scripts/seed-demo-salon.ts",
     "seed-chatalot": "dotenv -e .env.local -- tsx scripts/seed-chatalot.ts",
-    "reembed-tenant": "dotenv -e .env.local -- tsx scripts/reembed-tenant.ts"
+    "reembed-tenant": "dotenv -e .env.local -- tsx scripts/reembed-tenant.ts",
+    "eval-models": "dotenv -e .env.local -- tsx scripts/eval-models.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

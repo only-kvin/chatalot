@@ -389,3 +389,19 @@ Bookings at the customer's address (plumbers, electricians, mobile barbers, home
 - Tests: `tests/callouts.test.ts` (rules, labels, slot engine, prompt) and `tests/callouts-db.test.ts` (real database: address check, either-place, travel buffer, windows, areas, approval, agreed fee, emergency path, RLS on addresses, tenant filters); trades sign-up in `tests/signup.test.ts`.
 
 **Not in this phase:** payments and deposits, quote requests with photos, route optimisation or maps APIs, travel fees by distance.
+
+## Switchable AI provider and model comparison (2026-10-10)
+
+The AI can run on any OpenAI-compatible provider, chosen with environment variables (Groq stays the default, so nothing changes unless you set them):
+
+| Variable | Meaning |
+|---|---|
+| `LLM_PROVIDER` | `groq` (default), `gemini`, `openrouter` or `cerebras` |
+| `LLM_MODEL` | Optional model override. Required for `openrouter` (e.g. `qwen/qwen3-235b-a22b:free`) |
+| `GEMINI_API_KEY` / `OPENROUTER_API_KEY` / `CEREBRAS_API_KEY` | The key for that provider |
+
+Defaults: Groq `openai/gpt-oss-120b`, Gemini `gemini-flash-latest`, Cerebras `gpt-oss-120b`. Provider details live in `lib/agent/providers.ts`.
+
+**Compare models before switching:** `pnpm eval-models groq gemini` runs 22 scripted conversations (prices, hours, bookings with staff, rescheduling, off-topic requests, prompt injection, Afrikaans, safety) through the real prompt and tools with simulated tool results, so no database or real bookings are touched, and prints pass/fail per conversation plus a summary. Options: `--only=price,booking-complete`, `--delay=15` (seconds between conversations; free tiers have low per-minute limits), `--verbose`. A provider can be given as `provider:model`. Results vary between runs, so run it more than once before deciding.
+
+**Privacy:** Gemini's free tier may use requests to improve Google's models. Use it for this comparison (made-up data only), never for real customers. To switch production, set `LLM_PROVIDER`/`LLM_MODEL` and the key in Vercel and redeploy.

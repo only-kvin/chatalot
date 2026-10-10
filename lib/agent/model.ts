@@ -1,12 +1,14 @@
 // Provider adapter. This is the ONLY file that knows which LLM provider is behind
 // the agent — everything else (engine.ts, prompt.ts, tools.ts) is provider-neutral.
 //
-// Currently: Groq (free tier, OpenAI-compatible API), called directly via fetch —
-// no SDK dependency, since this is a temporary stand-in.
+// Currently: any OpenAI-compatible provider from providers.ts (Groq by default,
+// free tier), called directly via fetch — no SDK dependency, since this is a
+// temporary stand-in.
 // TODO(Phase 1 follow-up): swap this file's internals for @anthropic-ai/sdk
 // (claude-haiku-4-5-20251001, per the project spec) once Anthropic billing is set up.
 // The exported `runAgentTurn` signature should stay the same so nothing else changes.
 
+import { resolveLlm, type LlmTarget } from "./providers";
 import type { ToolDef, ToolCall } from "./tools";
 
 export type ChatMessage = { role: "user" | "assistant"; content: string };
@@ -16,7 +18,6 @@ export type AgentTurnEvent =
   | { type: "tool-executed"; call: ToolCall }
   | { type: "usage"; promptTokens: number; completionTokens: number };
 
-const GROQ_MODEL = "openai/gpt-oss-120b";
 // A cut + colour booking alone takes 4 tool calls (check availability and book,
 // twice); a reschedule adds a lookup. 3 was too few: the forced text-only
 // round then made the model call a tool anyway, which Groq rejects with 400.
@@ -58,6 +59,7 @@ type StreamResult = {
 };
 
 async function streamOnce(
+  target: LlmTarget,
   messages: OpenAiMessage[],
   tools: ToolDef[],
   maxTokens: number,
@@ -65,17 +67,14 @@ async function streamOnce(
   onText: (text: string) => void,
 ): Promise<StreamResult> {
   const body: Record<string, unknown> = {
-    model: GROQ_MODEL,
+    model: target.model,
     messages,
     max_tokens: maxTokens,
     stream: true,
-    // gpt-oss reasons before answering, and those tokens count against
-    // max_tokens: at the default effort a long turn could run out mid-thought
-    // and leak half-formed reasoning into the reply. Low effort keeps it
-    // short; include_reasoning:false keeps it out of the response entirely.
-    reasoning_effort: "low",
-    include_reasoning: false,
+    // Provider-specific settings, e.g. low reasoning effort (see providers.ts).
+    ...target.extraBody,
   };
+  if (target.askForUsage) body.stream_options = { include_usage: true };
   // Omit tools/tool_choice entirely (rather than an empty array) when this
   // call is forced text-only — some providers reject tool_choice with no tools.
   if (tools.length > 0) {
@@ -83,10 +82,10 @@ async function streamOnce(
     body.tool_choice = "auto";
   }
 
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+  const res = await fetch(`${target.baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      Authorization: `Bearer ${target.apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -97,7 +96,7 @@ async function streamOnce(
 
   if (!res.ok || !res.body) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Groq API error ${res.status}: ${body}`);
+    throw new Error(`${target.provider} API error ${res.status}: ${body}`);
   }
 
   const pending = new Map<number, PendingCall>();
@@ -122,7 +121,7 @@ async function streamOnce(
 
       const chunk = JSON.parse(data);
       if (chunk.error) {
-        throw new Error(`Groq stream error: ${chunk.error.message}`);
+        throw new Error(`${target.provider} stream error: ${chunk.error.message}`);
       }
       if (chunk.usage) {
         usage.promptTokens = chunk.usage.prompt_tokens ?? 0;
@@ -178,7 +177,10 @@ export async function* runAgentTurn(params: {
   // Deadline for the whole turn; aborting it throws out of this generator.
   signal: AbortSignal;
   executeTool: (call: ToolCall) => Promise<string>;
+  // Which provider and model to use; defaults to LLM_PROVIDER / LLM_MODEL.
+  target?: LlmTarget;
 }): AsyncGenerator<AgentTurnEvent> {
+  const target = params.target ?? resolveLlm();
   const openAiMessages: OpenAiMessage[] = [
     { role: "system", content: params.system },
     ...params.messages,
@@ -189,6 +191,7 @@ export async function* runAgentTurn(params: {
     const tools = finalRound ? [] : params.tools;
     let iterationText = "";
     const { calls: pendingCalls, usage } = await streamOnce(
+      target,
       finalRound ? [...openAiMessages, { role: "system", content: FINAL_ROUND_NOTE }] : openAiMessages,
       tools,
       params.maxTokens,

@@ -1,7 +1,50 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { runAgentTurn } from "../lib/agent/model";
+import { resolveLlm } from "../lib/agent/providers";
 
-afterEach(() => vi.unstubAllGlobals());
+// fetch is mocked below; the provider only needs some key to be set.
+beforeEach(() => {
+  vi.stubEnv("LLM_PROVIDER", "");
+  vi.stubEnv("LLM_MODEL", "");
+  vi.stubEnv("GROQ_API_KEY", "test-key");
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
+
+describe("resolveLlm", () => {
+  it("defaults to Groq gpt-oss-120b with low reasoning effort (empty env values count as unset)", () => {
+    const t = resolveLlm();
+    expect(t.provider).toBe("groq");
+    expect(t.model).toBe("openai/gpt-oss-120b");
+    expect(t.extraBody).toEqual({ reasoning_effort: "low", include_reasoning: false });
+  });
+
+  it("follows LLM_PROVIDER and LLM_MODEL", () => {
+    vi.stubEnv("LLM_PROVIDER", "gemini");
+    vi.stubEnv("LLM_MODEL", "gemini-test");
+    vi.stubEnv("GEMINI_API_KEY", "g-key");
+    const t = resolveLlm();
+    expect(t.baseUrl).toBe("https://generativelanguage.googleapis.com/v1beta/openai");
+    expect(t.model).toBe("gemini-test");
+    expect(t.apiKey).toBe("g-key");
+  });
+
+  it("an explicit provider ignores LLM_MODEL (that belongs to the deployment's provider)", () => {
+    vi.stubEnv("LLM_MODEL", "openai/gpt-oss-120b");
+    vi.stubEnv("CEREBRAS_API_KEY", "c-key");
+    expect(resolveLlm("cerebras").model).toBe("gpt-oss-120b");
+  });
+
+  it("refuses unknown providers, missing keys, and OpenRouter without a model", () => {
+    expect(() => resolveLlm("nope")).toThrow(/Unknown LLM provider/);
+    vi.stubEnv("GEMINI_API_KEY", "");
+    expect(() => resolveLlm("gemini")).toThrow(/GEMINI_API_KEY is not set/);
+    vi.stubEnv("OPENROUTER_API_KEY", "o-key");
+    expect(() => resolveLlm("openrouter")).toThrow(/Set LLM_MODEL/);
+  });
+});
 
 function sse(...chunks: unknown[]): Response {
   const body = chunks.map((c) => `data: ${JSON.stringify(c)}\n\n`).join("") + "data: [DONE]\n\n";
