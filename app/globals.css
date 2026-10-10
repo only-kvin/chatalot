@@ -266,6 +266,9 @@
   }
   html {
     @apply font-sans;
+    /* Always reserve the scrollbar's width, so content doesn't shift sideways
+       between pages that scroll and pages that don't. */
+    scrollbar-gutter: stable;
   }
 }
 
