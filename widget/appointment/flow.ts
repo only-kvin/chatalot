@@ -1,7 +1,8 @@
-// The appointment widget's step logic: services first, then who, then when,
-// then the customer's details. Pure, so tests cover it.
+// The appointment widget's step logic: services first, then where (for
+// services done at either place), then who, then when, then the customer's
+// details. Pure, so tests cover it.
 
-export type Step = "service" | "staff" | "time" | "details";
+export type Step = "service" | "where" | "staff" | "time" | "details";
 
 // The staff step is only worth showing when there's a real choice: nobody
 // offering the service means the business has no staff (one calendar), and
@@ -10,8 +11,10 @@ export function needsStaffStep(offeringCount: number): boolean {
   return offeringCount > 1;
 }
 
-export function stepsFor(staffStep: boolean): Step[] {
-  return staffStep ? ["service", "staff", "time", "details"] : ["service", "time", "details"];
+export function stepsFor(staffStep: boolean, whereStep = false): Step[] {
+  return (["service", "where", "staff", "time", "details"] as Step[]).filter(
+    (s) => (s !== "staff" || staffStep) && (s !== "where" || whereStep),
+  );
 }
 
 export function previousStep(steps: Step[], current: Step): Step | null {
@@ -21,6 +24,7 @@ export function previousStep(steps: Step[], current: Step): Step | null {
 
 export const STEP_LABEL: Record<Step, string> = {
   service: "Service",
+  where: "Where",
   staff: "Who",
   time: "Time",
   details: "Your details",

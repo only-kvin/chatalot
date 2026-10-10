@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { addDays, localDateISO, localToUtcDate, weekdayOf } from "@/lib/time";
+import { resolveBookingLocation, type BookingLocation, type ServiceLocation } from "./price-label";
 
 // When a service can be booked. The one place that decides it: the AI's
 // check_availability, the booking widgets, the dashboard and rescheduling
@@ -42,12 +43,38 @@ export type CalendarDay = {
 
 export type Slot = {
   time: string;
+  // Arrival windows only: when the window closes ("10:00" for 08:00–10:00).
+  end?: string;
   // Calendars free at this time, best first. Empty = fully booked, shown
   // disabled so the customer can see the day is busy.
   staffIds: (string | null)[];
 };
 
-export type ServiceTiming = { durationMinutes: number; bufferBeforeMinutes: number; bufferAfterMinutes: number };
+export type ServiceTiming = {
+  durationMinutes: number;
+  bufferBeforeMinutes: number;
+  bufferAfterMinutes: number;
+  // At the customer's address: kept free either side for getting there.
+  travelMinutes?: number;
+  // At the customer's address with an arrival window ("between 08:00 and
+  // 10:00"); null/undefined = an exact start time.
+  windowMinutes?: number | null;
+};
+
+// The calendar a booking takes, in minutes relative to its start: the same
+// rule as private.booking_block() in the database. With an arrival window it
+// runs from travel before the window to the latest possible finish (window
+// end + job + buffers + travel), so a window can't be double-sold.
+export function blockOffsets(s: ServiceTiming): { before: number; after: number; busy: number } {
+  const travel = s.travelMinutes ?? 0;
+  const window = s.windowMinutes ?? 0;
+  return {
+    before: s.bufferBeforeMinutes + travel,
+    after: window + s.durationMinutes + s.bufferAfterMinutes + travel,
+    // From the start: while the person is (or may be) on the job.
+    busy: window + s.durationMinutes,
+  };
+}
 
 const MINUTE_MS = 60_000;
 
@@ -90,13 +117,23 @@ export function computeSlots(p: {
   if (p.exception?.is_closed) return [];
 
   const earliest = p.now.getTime() + p.rules.leadMinutes * MINUTE_MS;
-  const { durationMinutes, bufferBeforeMinutes, bufferAfterMinutes } = p.service;
+  const window = p.service.windowMinutes ?? null;
+  // What must fit inside working hours: the job, or the whole arrival window
+  // (the job itself may then run past closing).
+  const span = window ?? p.service.durationMinutes;
+  const offsets = blockOffsets(p.service);
   const working = p.calendars.map((cal) => ({ cal, windows: effectiveWindows(cal, p.exception) }));
 
   const times = new Set<number>();
   for (const { windows } of working) {
     for (const w of windows) {
-      for (let m = w.start; m + durationMinutes <= w.end; m += p.rules.slotMinutes) times.add(m);
+      if (window) {
+        // Windows line up on the clock (08:00–10:00, 10:00–12:00), whatever
+        // time the business opens.
+        for (let m = Math.ceil(w.start / window) * window; m + window <= w.end; m += window) times.add(m);
+      } else {
+        for (let m = w.start; m + span <= w.end; m += p.rules.slotMinutes) times.add(m);
+      }
     }
   }
 
@@ -105,22 +142,19 @@ export function computeSlots(p: {
     const time = minutesToHHMM(minutes);
     const start = localToUtcDate(p.dateISO, time).getTime();
     if (start < earliest) continue;
-    const appointment = { start, end: start + durationMinutes * MINUTE_MS };
-    const blocked = {
-      start: appointment.start - bufferBeforeMinutes * MINUTE_MS,
-      end: appointment.end + bufferAfterMinutes * MINUTE_MS,
-    };
+    const appointment = { start, end: start + offsets.busy * MINUTE_MS };
+    const blocked = { start: start - offsets.before * MINUTE_MS, end: start + offsets.after * MINUTE_MS };
 
     const free = working
       .filter(({ cal, windows }) => {
-        const inHours = windows.some((w) => minutes >= w.start && minutes + durationMinutes <= w.end);
+        const inHours = windows.some((w) => minutes >= w.start && minutes + span <= w.end);
         if (!inHours || cal.timeOff.some((t) => overlaps(t, appointment))) return false;
         return cal.bookings.filter((b) => overlaps(b, blocked)).length < cal.capacity;
       })
       .map(({ cal }) => cal);
     // Stable sort keeps the staff's display order between equally busy people.
     free.sort((a, b) => a.bookedToday - b.bookedToday);
-    slots.push({ time, staffIds: free.map((c) => c.staffId) });
+    slots.push({ time, ...(window ? { end: minutesToHHMM(minutes + window) } : {}), staffIds: free.map((c) => c.staffId) });
   }
   return slots;
 }
@@ -140,11 +174,14 @@ export type AvailabilityQuery = {
   excludeBookingId?: string;
   // The team can book at short notice and beyond the horizon customers get.
   forTeam?: boolean;
+  // Where it happens; only matters for "either" services (default: at the
+  // business). A choice the service doesn't allow finds nothing.
+  location?: BookingLocation | null;
   now?: Date;
 };
 
 export type Availability = {
-  service: { id: string; name: string } & ServiceTiming;
+  service: { id: string; name: string; serviceLocation: ServiceLocation; location: BookingLocation } & ServiceTiming;
   days: { date: string; slots: Slot[] }[];
 };
 
@@ -169,14 +206,14 @@ export async function getAvailability(
     await Promise.all([
       client
         .from("services")
-        .select("id, name, duration_minutes, buffer_before_min, buffer_after_min")
+        .select("id, name, duration_minutes, buffer_before_min, buffer_after_min, location, arrival_window_minutes")
         .eq("tenant_id", tenantId)
         .eq("id", q.serviceId)
         .eq("active", true)
         .maybeSingle(),
       client
         .from("agent_configs")
-        .select("booking_lead_time_minutes, booking_horizon_days, slot_minutes")
+        .select("booking_lead_time_minutes, booking_horizon_days, slot_minutes, travel_buffer_minutes")
         .eq("tenant_id", tenantId)
         .maybeSingle(),
       client
@@ -214,6 +251,9 @@ export async function getAvailability(
   }
   const service = serviceRes.data;
   if (!service) return null;
+  const location = resolveBookingLocation(service.location as ServiceLocation, q.location);
+  if (!location) return null;
+  const atCustomer = location === "customer";
 
   const config = configRes.data;
   const rules: BookingRules = q.forTeam
@@ -243,6 +283,8 @@ export async function getAvailability(
     durationMinutes: service.duration_minutes,
     bufferBeforeMinutes: service.buffer_before_min,
     bufferAfterMinutes: service.buffer_after_min,
+    travelMinutes: atCustomer ? (config?.travel_buffer_minutes ?? 0) : 0,
+    windowMinutes: atCustomer ? service.arrival_window_minutes : null,
   };
 
   const days = dates.map((date) => {
@@ -268,7 +310,10 @@ export async function getAvailability(
     };
   });
 
-  return { service: { id: service.id, name: service.name, ...timing }, days };
+  return {
+    service: { id: service.id, name: service.name, serviceLocation: service.location as ServiceLocation, location, ...timing },
+    days,
+  };
 }
 
 // The bookable start times on one day, with anyone free — what the AI offers.
@@ -277,8 +322,8 @@ export async function getOpenSlots(
   tenantId: string,
   serviceId: string,
   dateISO: string,
-  options: { excludeBookingId?: string; forTeam?: boolean; staffId?: string } = {},
-): Promise<{ durationMinutes: number; slots: string[] } | null> {
+  options: { excludeBookingId?: string; forTeam?: boolean; staffId?: string; location?: BookingLocation | null } = {},
+): Promise<{ durationMinutes: number; slots: string[]; windows: { start: string; end: string }[] | null } | null> {
   const availability = await getAvailability(client, tenantId, {
     serviceId,
     fromDate: dateISO,
@@ -286,8 +331,10 @@ export async function getOpenSlots(
     ...options,
   });
   if (!availability) return null;
+  const open = availability.days[0].slots.filter((s) => s.staffIds.length > 0);
   return {
     durationMinutes: availability.service.durationMinutes,
-    slots: availability.days[0].slots.filter((s) => s.staffIds.length > 0).map((s) => s.time),
+    slots: open.map((s) => s.time),
+    windows: availability.service.windowMinutes ? open.map((s) => ({ start: s.time, end: s.end ?? s.time })) : null,
   };
 }

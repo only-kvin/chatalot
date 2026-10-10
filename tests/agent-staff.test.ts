@@ -40,7 +40,7 @@ describe("staff in the prompt", () => {
 describe("staff and link tool inputs", () => {
   it("accepts an optional staff name and treats empty as anyone", () => {
     const call = parseToolInput({ name: "check_availability", input: { service: "Cut", date: "2026-10-12", staff: "" } });
-    expect(call.ok && call.call.input).toEqual({ service: "Cut", date: "2026-10-12", staff: null });
+    expect(call.ok && call.call.input).toEqual({ service: "Cut", date: "2026-10-12", staff: null, location: null });
     const link = parseToolInput({ name: "send_booking_link", input: {} });
     expect(link.ok && link.call.input).toEqual({ service: null });
   });

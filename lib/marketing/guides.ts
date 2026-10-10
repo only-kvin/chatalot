@@ -46,7 +46,7 @@ export const GUIDES: Guide[] = [
       },
       {
         title: "Set up bookings (optional)",
-        text: "If customers book appointments with you, add your Services, your Staff and their hours, and your opening hours and closures under Availability. Businesses that take callouts instead can skip this.",
+        text: "Add your Services (and where each happens: at your place, at the customer's, or either), your Staff and their hours, and your opening hours and closures under Availability. Going to customers? Set your call-out fee on the service, and your service areas and travel time in Settings → Bookings.",
       },
       {
         title: "Make the chat yours",

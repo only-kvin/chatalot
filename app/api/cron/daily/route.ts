@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/db/supabase-admin";
 import { sendBookingReminder } from "@/lib/bookings/reminders";
+import { BOOKING_PLACE_COLUMNS, type BookingPlace } from "@/lib/bookings/place";
 import { REVIEW_LOOKBACK_DAYS, sendReviewRequest } from "@/lib/bookings/review-requests";
 import { tenantWhatsAppLookup, type TenantWhatsApp } from "@/lib/bookings/whatsapp-channel";
 import { sendDailySummary } from "@/lib/email/send-daily-summary";
@@ -38,7 +39,7 @@ async function sendReminders(admin: Admin, channelFor: ChannelFor, featuresFor: 
   const now = Date.now();
   const { data: bookings, error } = await admin
     .from("bookings")
-    .select("id, tenant_id, name, phone, starts_at, contact_id, conversation_id, services(name)")
+    .select(`id, tenant_id, name, phone, starts_at, contact_id, conversation_id, ${BOOKING_PLACE_COLUMNS}, services(name)`)
     .eq("status", "confirmed")
     .is("reminder_sent_at", null)
     .gte("starts_at", new Date(now).toISOString())
@@ -55,7 +56,11 @@ async function sendReminders(admin: Admin, channelFor: ChannelFor, featuresFor: 
       if (features.bookings !== "on" || features.whatsapp !== "on") continue;
       const channel = await channelFor(booking.tenant_id);
       if (!channel) continue;
-      const result = await sendBookingReminder(admin, { ...booking, serviceName: serviceName(booking.services) }, channel);
+      const result = await sendBookingReminder(
+        admin,
+        { ...booking, serviceName: serviceName(booking.services), place: booking as BookingPlace },
+        channel,
+      );
       if (result === "sent") sent++;
       else notSent++;
     } catch (err) {

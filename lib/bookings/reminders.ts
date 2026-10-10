@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { formatLocalDateTime } from "@/lib/time";
+import { formatBookingWhen } from "./when";
+import { addressText, type BookingPlace } from "./place";
+import { calloutFeeNotice } from "./price-label";
 import { isWithinServiceWindow, sendWhatsAppTemplate, sendWhatsAppText } from "@/lib/channels/whatsapp";
 import { canonicalPhone, formatPhone } from "@/lib/contacts/phone";
 import { isOptedOut } from "@/lib/contacts/consent";
@@ -17,6 +19,10 @@ import type { TenantWhatsApp } from "./whatsapp-channel";
 
 // Must exist and be approved in Meta Business Manager — see docs/SETUP.md.
 export const REMINDER_TEMPLATE_NAME = "booking_reminder";
+// For call-outs: adds the address, fee and policy. Until Meta approves it,
+// call-outs fall back to booking_reminder (whose {{3}} takes the window:
+// "on Friday 2 October, between 08:00 and 10:00").
+export const CALLOUT_REMINDER_TEMPLATE_NAME = "callout_reminder";
 const REMINDER_TEMPLATE_LANGUAGE = "en";
 
 export type NotSentReason = "opted_out" | "no_template" | "send_failed";
@@ -40,9 +46,30 @@ export function classifyTemplateError(err: unknown): NotSentReason {
   return /"code"\s*:\s*132\d{3}/.test(text) ? "no_template" : "send_failed";
 }
 
-export function reminderText(p: { name: string; service: string; business: string; startsAt: string }): string {
+// The fee and policy sentence for a call-out reminder; never empty (a
+// template variable can't be).
+export function calloutReminderExtras(p: { business: string; feeCents: number | null; policy: string }): string {
+  const fee = calloutFeeNotice(p.feeCents, p.business);
+  const parts = [fee ? `${fee}.` : "", p.policy.trim() ? `Cancellation policy: ${p.policy.trim()}` : ""].filter(Boolean);
+  return parts.length ? parts.join(" ") : "See you then.";
+}
+
+export function reminderText(p: {
+  name: string;
+  service: string;
+  business: string;
+  startsAt: string;
+  place?: BookingPlace;
+  cancellationPolicy?: string;
+}): string {
+  const when = formatBookingWhen(p.startsAt, p.place?.arrival_window_end);
+  const address = p.place ? addressText(p.place) : null;
+  if (address) {
+    const extras = calloutReminderExtras({ business: p.business, feeCents: p.place!.callout_fee_cents, policy: p.cancellationPolicy ?? "" });
+    return `Hi ${p.name}, a reminder that ${p.business || "we"} ${p.business ? "is" : "are"} coming to you for your ${p.service} on ${when}, at ${address}. ${extras === "See you then." ? "" : `${extras} `}Reply here if you need to change it.`;
+  }
   const at = p.business ? ` at ${p.business}` : "";
-  return `Hi ${p.name}, a reminder of your ${p.service}${at} on ${formatLocalDateTime(p.startsAt)}. Reply here if you need to change it.`;
+  return `Hi ${p.name}, a reminder of your ${p.service}${at} on ${when}.${p.cancellationPolicy?.trim() ? ` Cancellation policy: ${p.cancellationPolicy.trim()}` : ""} Reply here if you need to change it.`;
 }
 
 export type ReminderBooking = {
@@ -54,9 +81,13 @@ export type ReminderBooking = {
   contact_id: string | null;
   conversation_id: string | null;
   serviceName: string;
+  // Where, the window and the agreed fee (call-outs).
+  place?: BookingPlace;
 };
 
-export type ReminderChannel = Pick<TenantWhatsApp, "phoneNumberId" | "accessToken" | "businessName">;
+export type ReminderChannel = Pick<TenantWhatsApp, "phoneNumberId" | "accessToken" | "businessName"> & {
+  cancellationPolicy?: string;
+};
 
 // The WhatsApp conversation to remind them in: the one the booking was made
 // in, else this customer's latest WhatsApp chat (e.g. they booked on the
@@ -128,7 +159,7 @@ async function markNotSent(admin: SupabaseClient, b: ReminderBooking, reason: No
     tenantId: b.tenant_id,
     type: "reminder_not_sent",
     title: `Couldn't remind ${b.name}`,
-    body: `${b.serviceName} on ${formatLocalDateTime(b.starts_at)}: ${NOT_SENT_REASON[reason]}. Call them on ${formatPhone(canonicalPhone(b.phone)) || b.phone}.`,
+    body: `${b.serviceName} on ${formatBookingWhen(b.starts_at, b.place?.arrival_window_end)}: ${NOT_SENT_REASON[reason]}. Call them on ${formatPhone(canonicalPhone(b.phone)) || b.phone}.`,
   });
 }
 
@@ -146,7 +177,14 @@ export async function sendBookingReminder(
   const route = reminderRoute({ optedOut: false, windowOpen: isWithinServiceWindow(conversation?.last_inbound_at ?? null) });
 
   if (route === "message" && conversation) {
-    const text = reminderText({ name: b.name, service: b.serviceName, business: channel.businessName, startsAt: b.starts_at });
+    const text = reminderText({
+      name: b.name,
+      service: b.serviceName,
+      business: channel.businessName,
+      startsAt: b.starts_at,
+      place: b.place,
+      cancellationPolicy: channel.cancellationPolicy,
+    });
     try {
       await sendWhatsAppText(channel.phoneNumberId, channel.accessToken, conversation.external_id, text);
     } catch (err) {
@@ -170,12 +208,33 @@ export async function sendBookingReminder(
     await markNotSent(admin, b, "send_failed");
     return "not_sent";
   }
+  const when = formatBookingWhen(b.starts_at, b.place?.arrival_window_end);
+  const address = b.place ? addressText(b.place) : null;
   try {
-    await sendWhatsAppTemplate(channel.phoneNumberId, channel.accessToken, to, REMINDER_TEMPLATE_NAME, REMINDER_TEMPLATE_LANGUAGE, [
-      b.name,
-      b.serviceName,
-      formatLocalDateTime(b.starts_at),
-    ]);
+    let usedGeneric = !address;
+    if (address) {
+      try {
+        await sendWhatsAppTemplate(channel.phoneNumberId, channel.accessToken, to, CALLOUT_REMINDER_TEMPLATE_NAME, REMINDER_TEMPLATE_LANGUAGE, [
+          b.name,
+          b.serviceName,
+          channel.businessName || "we",
+          when,
+          address,
+          calloutReminderExtras({ business: channel.businessName, feeCents: b.place!.callout_fee_cents, policy: channel.cancellationPolicy ?? "" }),
+        ]);
+      } catch (err) {
+        // Not approved yet: the generic reminder still carries the window.
+        if (classifyTemplateError(err) !== "no_template") throw err;
+        usedGeneric = true;
+      }
+    }
+    if (usedGeneric) {
+      await sendWhatsAppTemplate(channel.phoneNumberId, channel.accessToken, to, REMINDER_TEMPLATE_NAME, REMINDER_TEMPLATE_LANGUAGE, [
+        b.name,
+        b.serviceName,
+        when,
+      ]);
+    }
   } catch (err) {
     console.error(`Reminder template for booking ${b.id} failed:`, err);
     await markNotSent(admin, b, classifyTemplateError(err));

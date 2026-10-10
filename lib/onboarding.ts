@@ -8,13 +8,16 @@ export type SetupStep = { title: string; text: string; href: string; done: boole
 
 export async function loadSetupSteps(supabase: SupabaseClient, tenantId: string, bookings: boolean): Promise<SetupStep[]> {
   const count = { count: "exact", head: true } as const;
-  const [knowledge, infoItems, hours, tenant, chats] = await Promise.all([
+  const [knowledge, infoItems, hours, tenant, chats, callouts, config] = await Promise.all([
     // The owner's own entries; an imported website doesn't tick this off.
     supabase.from("knowledge_items").select("id", count).eq("tenant_id", tenantId).eq("source", "manual"),
     supabase.from("knowledge_items").select("id", count).eq("tenant_id", tenantId).eq("type", "info"),
     supabase.from("availability_rules").select("id", count).eq("tenant_id", tenantId),
     supabase.from("tenants").select("allowed_domains, status").eq("id", tenantId).maybeSingle(),
     supabase.from("conversations").select("id", count).eq("tenant_id", tenantId).eq("channel", "web"),
+    // Services done at the customer's address, and whether each has a fee.
+    supabase.from("services").select("callout_fee_cents").eq("tenant_id", tenantId).eq("active", true).neq("location", "business"),
+    supabase.from("agent_configs").select("service_areas").eq("tenant_id", tenantId).maybeSingle(),
   ]);
   const pending = tenant.data?.status === "pending";
 
@@ -53,6 +56,18 @@ export async function loadSetupSteps(supabase: SupabaseClient, tenantId: string,
       done: (chats.count ?? 0) > 0,
     },
   ];
+
+  // Call-out businesses (every new trades business starts with one): the
+  // fee customers are quoted, and where they work. A fee of R0 counts.
+  const calloutServices = callouts.data ?? [];
+  if (bookings && calloutServices.length) {
+    steps.splice(2, 0, {
+      title: "Add your call-out fee and service areas",
+      text: "Set the call-out fee on your services and list the suburbs you cover, so customers know before they book.",
+      href: calloutServices.some((s) => s.callout_fee_cents === null) ? "/dashboard/services" : "/dashboard/settings#bookings",
+      done: calloutServices.every((s) => s.callout_fee_cents !== null) && (config.data?.service_areas?.length ?? 0) > 0,
+    });
+  }
 
   return steps;
 }

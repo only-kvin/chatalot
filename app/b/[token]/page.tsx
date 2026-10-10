@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
+import { Fragment } from "react";
 import { bookingRef } from "@/lib/bookings/manage";
 import { STATUS_LABEL, type BookingStatus } from "@/lib/bookings/labels";
-import { formatLocalDateTime } from "@/lib/time";
+import { formatBookingWhen } from "@/lib/bookings/when";
 import { loadBookingFromToken } from "@/lib/bookings/manage-link";
 import { CancelBooking } from "./cancel-booking";
 import { ChangeTime } from "./change-time";
@@ -35,13 +36,21 @@ export default async function ManageBookingPage({ params }: { params: Promise<{ 
             </div>
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
               <dt className="text-zinc-500">When</dt>
-              <dd>{formatLocalDateTime(booking.startsAt)}</dd>
+              <dd>{formatBookingWhen(booking.startsAt, booking.windowEnd)}</dd>
               {booking.staffName && (
                 <>
                   <dt className="text-zinc-500">With</dt>
                   <dd>{booking.staffName}</dd>
                 </>
               )}
+              {booking.placeLines
+                .filter(([, v]) => v)
+                .map(([label, value]) => (
+                  <Fragment key={label}>
+                    <dt className="text-zinc-500">{label}</dt>
+                    <dd>{value}</dd>
+                  </Fragment>
+                ))}
               <dt className="text-zinc-500">Name</dt>
               <dd>{booking.name}</dd>
               <dt className="text-zinc-500">Reference</dt>

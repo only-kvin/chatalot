@@ -120,7 +120,9 @@ Manual steps the platform owner needs to do. Kept up to date as new phases add n
    Thank you!
    ```
 
-   (It must match `reviewRequestText()` in `lib/bookings/rating.ts`, which is also what's sent inside the 24h window.) Then, per business, paste their **Google review link** in Dashboard → Settings → Reviews (Google Business Profile → "Ask for reviews" → copy link). Review requests are off until that link is set.
+   (It must match `reviewRequestText()` in `lib/bookings/rating.ts`, which is also what's sent inside the 24h window.)
+
+   Two more templates came with call-outs (2026-10-10): **`callout_reminder`** and **`urgent_alert`**. See "Call-outs and mobile services" below for their exact wording. Then, per business, paste their **Google review link** in Dashboard → Settings → Reviews (Google Business Profile → "Ask for reviews" → copy link). Review requests are off until that link is set.
 
    How it works (`lib/bookings/review-requests.ts`): each morning, bookings marked **Attended** in the last 3 days are asked once — skipped after STOP, a normal message inside the 24h window, else the template. It's never retried; if it can't go out, the booking history says "Review request not sent: <why>". A reply that is just a score ("5", "4/5", "⭐⭐⭐") within 7 days is saved on the booking (star rating on the Bookings pages) and thanked; 3 or below also alerts the owner (bell + email). **The Google link goes to every customer whatever their score** — Google forbids review gating, so never change the code to show it only to happy customers.
 
@@ -262,7 +264,7 @@ The marketing site runs ChatAlot's own AI receptionist, set up exactly like a cu
 No manual steps. All 41 new pages are built at deploy time from data files, so editing copy is a change to one file:
 
 - **Features** (`/features`, `/features/<group>`): `lib/marketing/features.ts`. The Features menu, the home page tour and these pages all read it; menu links jump to each section's anchor.
-- **Business types** (`/for/<group>` and `/for/<type>`, 34 pages): names and slugs in `lib/marketing/business-types.ts` (menus, demo form); headlines, problems, highlights and each type's sample chat in `lib/marketing/business-pages.ts`. Trades pages show callout leads instead of bookings. `tests/marketing-content.test.ts` fails if the two files drift apart, a booking chat doesn't offer its own time, or any menu link points at a page that doesn't exist.
+- **Business types** (`/for/<group>` and `/for/<type>`, 34 pages): names and slugs in `lib/marketing/business-types.ts` (menus, demo form); headlines, problems, highlights and each type's sample chat in `lib/marketing/business-pages.ts`. Trades pages show call-out booking (since 2026-10-10, see "Call-outs and mobile services" below). `tests/marketing-content.test.ts` fails if the two files drift apart, a booking chat doesn't offer its own time, or any menu link points at a page that doesn't exist.
 - **Pricing** (`/pricing`): plan contents from `lib/plans.ts`, amounts from `lib/pricing.ts` ("Contact us" while `null`).
 - **Resources** (`/resources`, `/resources/<guide>`): guides in `lib/marketing/guides.ts`; FAQ in `lib/marketing/faq.ts`. Guides name real dashboard pages and buttons; update them when the dashboard changes.
 - `sitemap.xml` lists every page from the same data (`lib/marketing/paths.ts`).
@@ -276,7 +278,7 @@ No manual steps. All 41 new pages are built at deploy time from data files, so e
 **How it works:**
 
 - `/signup` (email, business name, business type, terms): Zod validation, a honeypot and 3-second check, and rate limits of 5 attempts per IP and 3 per email address an hour (Upstash). One trial per email: an address that already started a business, or already belongs to one, is told to sign in instead. An unconfirmed sign-up can be sent again.
-- The magic link confirms the email and lands on `/signup/complete`, which calls `public.complete_signup()`: in one transaction it creates the business (status `pending`, plan `trial`, a slug from its name), its agent config and widget settings, and makes the person its owner. Trades start with bookings hidden. Using the link twice opens the same business. Platform admins are emailed.
+- The magic link confirms the email and lands on `/signup/complete`, which calls `public.complete_signup()`: in one transaction it creates the business (status `pending`, plan `trial`, a slug from its name), its agent config and widget settings, and makes the person its owner. Trades start with call-out bookings on and a starter "Call-out" service (since 2026-10-10; see "Call-outs and mobile services"). Using the link twice opens the same business. Platform admins are emailed.
 - **While pending** the owner can set everything up; the dashboard shows a "Waiting for approval" banner. Nothing is public: every public endpoint only serves `active` businesses (their own dashboard preview still works).
 - **Admin → Waiting for approval** lists them with Approve and Decline. Approving makes the business `active` and emails the owner; declining shows them a "not approved" screen.
 - The Overview shows a **Get set up** checklist (knowledge, hours, install the widget, test a chat) until every step is done.
@@ -333,3 +335,57 @@ Businesses can import their own website into their knowledge base, so the AI ans
 **Replace website** (tenant page → Site brief): when a client's new site launches, enter its domain. It adds the domain to their allowed domains, removes the old site's imported knowledge (after a confirmation), imports the new site, and marks their latest brief `live` on that domain. Needs `website_content` consent.
 
 Tests: `tests/site-brief-build.test.ts` (unit) and `tests/site-brief.test.ts` (real database, model and website mocked).
+
+## Call-outs and mobile services (2026-10-10)
+
+Bookings at the customer's address (plumbers, electricians, mobile barbers, home massage) through the same booking engine as salon appointments. **No payments:** fees are shown and agreed upfront, and paid to the business directly. Brief: `docs/CALLOUT_BRIEF.md`.
+
+**Manual steps:**
+
+1. **Migrations** (applied to the dev/live project 2026-10-10, through the session pooler):
+   - `20261010090000_callouts.sql`: services `location` (business/customer/either), `price_type` (fixed/from/on_inspection), `callout_fee_cents`, `arrival_window_minutes`; agent_configs `service_areas`, `travel_buffer_minutes`, `cancellation_policy`, `callouts_confirm_instantly`, `emergency_callouts`, `emergency_note`; bookings `location`, `address_line`, `suburb`, `city`, `postal_code`, `access_notes`, `arrival_window_end`, `callout_fee_cents`, `outside_service_area` (+ a check that a customer booking has a street address and suburb); `urgent` on conversations and leads; the `urgent` notification type; `private.booking_block()`; new `create_booking()` (extra parameters all default, so older callers keep working), `reschedule_booking()`, the sync trigger, and `complete_signup()` for trades.
+   - `20261010093000_owner_alert_phone.sql`: `agent_configs.owner_alert_phone` (the owner's own mobile for urgent WhatsApp alerts).
+   - `20261010094000_business_address.sql`: `agent_configs.business_address` (shown on bookings at the business).
+   - Deploy order doesn't matter for these: the database is backward compatible with the code before them.
+2. **WhatsApp templates to submit** in WhatsApp Manager → Message Templates (English, **Utility**). Until each is approved, the fallbacks below keep things working.
+   - **`callout_reminder`**, six body variables in this order: customer name, service, business name, when, address, fee-and-policy sentence. The body must read exactly:
+
+     ```
+     Hi {{1}}, a reminder that {{3}} is coming to you for your {{2}} on {{4}}, at {{5}}. {{6}} Reply here if you need to change it.
+     ```
+
+     Example values: `Sipho`, `Call-out`, `FlowFix Plumbing`, `Friday 16 October, between 08:00 and 10:00`, `12 Oak Street, Sandton`, `Call-out fee R450, payable to FlowFix Plumbing on arrival. Cancellation policy: 24 hours' notice please.` ({{6}} is "See you then." when there's no fee or policy, since a variable can't be empty.)
+     **Fallback until approved:** call-outs get the existing `booking_reminder` template. Its {{3}} ("…your {{2}} on {{3}}") takes a window fine: "on Friday 16 October, between 08:00 and 10:00". That version has no address, fee or policy; the free-form reminder inside the 24-hour window always has them.
+   - **`urgent_alert`**, three body variables: business name, the problem, the customer's name and phone. Suggested body:
+
+     ```
+     URGENT call-out for {{1}}: {{2}}. Customer: {{3}}. Open ChatAlot to reply.
+     ```
+
+     Sent to the owner's own mobile (Settings → Bookings → "Your mobile for WhatsApp alerts") when the AI reports an emergency. Inside the owner's 24-hour window (they've messaged the business number recently) a normal message goes instead. **Until approved:** the WhatsApp alert fails quietly (logged); the bell and the email still go out.
+3. **Nothing else to set up per business beyond the dashboard:** Services (where it happens, price type, call-out fee, arrival window) and Settings → Bookings (address, service areas, travel time, cancellation policy, "Confirm call-outs instantly", emergency call-outs and note, owner's mobile).
+
+**Switching an existing trades business to call-outs** (they're not changed automatically; trades that signed up before 2026-10-10 have bookings switched off):
+
+1. **Admin → the tenant → Plan & features:** set Bookings back to the plan default (or "On"). In SQL: `update tenants set feature_overrides = feature_overrides - 'bookings' where id = '<tenant-id>';`
+2. Tell the owner (or do it with them) to:
+   - add a service under **Services** with "Where it happens: At the customer's address", price type (usually "Quoted on site"), the call-out fee and an arrival window (the starter for new sign-ups is "Call-out", 60 min, 2-hour window);
+   - set their hours under **Availability**;
+   - fill in **Settings → Bookings**: service areas, travel time (new trades get 30 min), cancellation policy, and emergency call-outs if they take them.
+3. Call-outs then wait for the owner's approval unless they turn on "Confirm call-outs instantly". The Overview checklist shows "Add your call-out fee and service areas" until both are set.
+
+**How it works:**
+
+- **Where:** a service happens at the business, at the customer's, or either (the customer chooses: "At our place, or at yours?"). Customer bookings need a street address and suburb (city, postal code and access notes optional), enforced by the app and by a database check.
+- **Calendar:** at the customer's, `travel_buffer_minutes` is added before and after, on top of the service's buffers. With an **arrival window** (e.g. 2 hours), customers pick windows aligned to the clock (08:00–10:00, 10:00–12:00, …) that fit inside working hours, and a booked window blocks from travel before it opens until the latest possible finish: window end + job + buffers + travel (approved rule, 2026-10-10). So the window can't be double-sold; with a 2-hour window, a 1-hour job and 30 min travel, one person takes up to three windows a day (08–10, 12–14, 16–18). Add staff for more. The same rule is in `private.booking_block()` (database) and `blockOffsets()` in `lib/bookings/availability.ts` (offered times); capacity is still checked under the per-business lock in `create_booking()`.
+- **Service areas:** the customer's suburb (or city) is compared with the listed areas: case and spacing ignored, "Sandton" matches "Sandton, Johannesburg" either way round; a listed city covers suburbs when the customer gives that city. No paid geocoding. No match → it's still taken, marked **Outside listed area**, always waits for approval, and the customer is told the business will confirm whether it covers them. No areas listed = any address.
+- **Approval:** call-outs are requests the owner approves (the existing Approve/Decline), whatever "Bookings need approval" says, unless "Confirm call-outs instantly" is on. Outside-area requests always wait.
+- **Prices:** one helper (`lib/bookings/price-label.ts`, re-exported from `labels.ts`) words prices everywhere: "R350", "from R350", "Quoted on site · call-out fee R450", "Call-out fee R450, payable to <business> on arrival". The fee is **copied onto the booking** when it's made, so later price changes don't rewrite it (moving the booking keeps it too).
+- **The AI:** `check_availability`/`create_booking` take `location` and the address fields. Platform rules: safety first, always (gas, sparking, flooding near electrics, anyone hurt → get to safety and call emergency services first; no repair instructions beyond basic safe steps in the business's own knowledge); never state a price for "quoted on site"; always state the call-out fee and window before asking to book; collect the address one question at a time; outside the area → take the request, don't refuse; mention the cancellation policy when confirming. The address only goes to the model inside the current conversation.
+- **Emergencies** (Settings → Bookings → Emergency call-outs): the AI calls `report_emergency` instead of offering times. It marks the conversation and a new lead **urgent**, alerts the owner (bell, shown first and in red; email; WhatsApp to their mobile), and hands over (on WhatsApp the AI stops replying). It passes on only the owner's own emergency note ("we'll call within 30 minutes" only if they wrote it). An urgent chat never gets booking times. Conversations and Leads have an **Urgent** filter; "Mark handled" on the conversation clears its flag.
+- **Customers see** (appointment and schedule widgets, `/book/<slug>`): a "Where?" step for either-place services, the address fields with the service-area message, windows as "08:00–10:00", price labels from the helper. **Confirmation emails, `/b/<token>`, `/c/<token>` and reminders** show the address, the window or time, the agreed call-out fee and the cancellation policy.
+- **Owners see:** Bookings → **Day view** (call-outs in arrival order with address, **Open in Maps** (a plain Google Maps search link, no API key), access notes and fee); the address, window, fee and an "Outside listed area" badge on the list and booking page.
+- **Widget sizes** (gzipped): appointment 12.5 → 14.3 KB, schedule 11.0 → 12.8 KB, reschedule 9.2 → 9.4 KB; all widgets 53.9 KB of the 60 KB budget.
+- Tests: `tests/callouts.test.ts` (rules, labels, slot engine, prompt) and `tests/callouts-db.test.ts` (real database: address check, either-place, travel buffer, windows, areas, approval, agreed fee, emergency path, RLS on addresses, tenant filters); trades sign-up in `tests/signup.test.ts`.
+
+**Not in this phase:** payments and deposits, quote requests with photos, route optimisation or maps APIs, travel fees by distance.

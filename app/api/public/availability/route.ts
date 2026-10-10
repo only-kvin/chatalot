@@ -11,17 +11,21 @@ export const OPTIONS = preflight;
 
 // The booking a valid manage-link token points at, if it belongs to this
 // business and is for this service.
-async function bookingFromToken(tenantId: string, token: string, serviceId: string): Promise<string | null> {
+async function bookingFromToken(
+  tenantId: string,
+  token: string,
+  serviceId: string,
+): Promise<{ id: string; location: "business" | "customer" } | null> {
   const bookingId = readBookingToken(token);
   if (!bookingId) return null;
   const { data } = await createAdminClient()
     .from("bookings")
-    .select("id")
+    .select("id, location")
     .eq("tenant_id", tenantId)
     .eq("id", bookingId)
     .eq("service_id", serviceId)
     .maybeSingle();
-  return data?.id ?? null;
+  return data ? { id: data.id, location: data.location === "customer" ? "customer" : "business" } : null;
 }
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -29,6 +33,8 @@ const querySchema = z
   .object({
     service: z.string().uuid(),
     staff: z.string().uuid().optional(),
+    // Where it happens, for services done at either place.
+    location: z.enum(["business", "customer"]).optional(),
     from: date,
     to: date,
     // A customer's manage-link token, when they're moving that booking.
@@ -51,6 +57,7 @@ export async function GET(request: Request) {
   const parsed = querySchema.safeParse({
     service: params.get("service"),
     staff: params.get("staff") || undefined,
+    location: params.get("location") || undefined,
     from: params.get("from"),
     to: params.get("to"),
     token: params.get("token") || undefined,
@@ -81,14 +88,16 @@ export async function GET(request: Request) {
       staffId: q.staff,
       fromDate: q.from,
       toDate: q.to,
-      excludeBookingId: moving ?? undefined,
+      excludeBookingId: moving?.id,
+      // A booking being moved stays where it was.
+      location: moving?.location ?? q.location,
     });
     if (!availability) return NextResponse.json({ error: "Not found" }, { status: 404, headers });
     return NextResponse.json(
       {
         days: availability.days.map((d) => ({
           date: d.date,
-          slots: d.slots.map((s) => ({ time: s.time, available: s.staffIds.length > 0 })),
+          slots: d.slots.map((s) => ({ time: s.time, ...(s.end ? { end: s.end } : {}), available: s.staffIds.length > 0 })),
         })),
       },
       { headers },

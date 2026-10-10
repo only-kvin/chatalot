@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { calloutFeeNotice, priceLabel, type PriceType, type ServiceLocation } from "@/lib/bookings/price-label";
 
 type Service = {
   id: string;
@@ -23,6 +24,10 @@ type Service = {
   price_cents: number | null;
   active: boolean;
   online_bookable: boolean;
+  location: ServiceLocation;
+  price_type: PriceType;
+  callout_fee_cents: number | null;
+  arrival_window_minutes: number | null;
   // Empty = anyone.
   staffIds: string[];
 };
@@ -38,20 +43,50 @@ const BLANK: Omit<Service, "id"> = {
   price_cents: null,
   active: true,
   online_bookable: true,
+  location: "business",
+  price_type: "fixed",
+  callout_fee_cents: null,
+  arrival_window_minutes: null,
   staffIds: [],
 };
 
-function formatPrice(cents: number | null): string {
-  return cents === null ? "Price not set" : `R${(cents / 100).toFixed(2)}`;
+const LOCATION_LABEL: Record<ServiceLocation, string> = {
+  business: "At your place of business",
+  customer: "At the customer's address",
+  either: "Either: the customer chooses",
+};
+
+const WINDOWS = [
+  { value: "", label: "Exact start time" },
+  { value: "60", label: "1-hour window" },
+  { value: "120", label: "2-hour window" },
+  { value: "180", label: "3-hour window" },
+  { value: "240", label: "4-hour window" },
+  { value: "480", label: "Morning or afternoon (8 hours)" },
+];
+
+const toRand = (cents: number | null) => (cents !== null ? (cents / 100).toFixed(2) : "");
+const fromRand = (v: string) => (v.trim() && Number.isFinite(Number(v)) ? Math.round(Number(v) * 100) : null);
+
+// The customer-facing line, from the same helper the AI and widgets use.
+function priceSummary(s: Pick<Service, "price_type" | "price_cents" | "callout_fee_cents" | "location">): string {
+  return (
+    priceLabel(
+      { priceType: s.price_type, priceCents: s.price_cents, calloutFeeCents: s.callout_fee_cents },
+      s.location !== "business",
+    ) ?? "Price not set"
+  );
 }
 
 function ServiceForm({
   service,
   staff,
+  businessName,
   onDone,
 }: {
   service: Service | null;
   staff: Staff[];
+  businessName: string;
   onDone: () => void;
 }) {
   const router = useRouter();
@@ -59,6 +94,18 @@ function ServiceForm({
   const [error, setError] = useState<string | null>(null);
   const values = service ?? BLANK;
   const [staffMode, setStaffMode] = useState<"anyone" | "chosen">(values.staffIds.length ? "chosen" : "anyone");
+  // Drive the live price preview.
+  const [location, setLocation] = useState<ServiceLocation>(values.location);
+  const [priceType, setPriceType] = useState<PriceType>(values.price_type);
+  const [priceRand, setPriceRand] = useState(toRand(values.price_cents));
+  const [feeRand, setFeeRand] = useState(toRand(values.callout_fee_cents));
+  const comesToCustomer = location !== "business";
+  const preview = {
+    price_type: priceType,
+    price_cents: priceType === "on_inspection" ? null : fromRand(priceRand),
+    callout_fee_cents: comesToCustomer ? fromRand(feeRand) : null,
+    location,
+  };
 
   function submit(formData: FormData) {
     setError(null);
@@ -108,7 +155,9 @@ function ServiceForm({
             type="number"
             min={0}
             step="0.01"
-            defaultValue={values.price_cents !== null ? (values.price_cents / 100).toFixed(2) : ""}
+            disabled={priceType === "on_inspection"}
+            value={priceType === "on_inspection" ? "" : priceRand}
+            onChange={(e) => setPriceRand(e.target.value)}
           />
         </div>
         <div className="flex w-36 flex-col gap-2">
@@ -123,6 +172,82 @@ function ServiceForm({
       <p className="-mt-2 text-xs text-muted-foreground">
         Time kept free around each appointment for setting up or cleaning up. Customers don&apos;t see it.
       </p>
+
+      <div className="flex flex-wrap gap-4">
+        <div className="flex min-w-56 flex-1 flex-col gap-2">
+          <Label htmlFor="location">Where it happens</Label>
+          <select
+            id="location"
+            name="location"
+            value={location}
+            onChange={(e) => setLocation(e.target.value as ServiceLocation)}
+            className="h-9 rounded-md border bg-transparent px-3 text-sm"
+          >
+            {(Object.keys(LOCATION_LABEL) as ServiceLocation[]).map((l) => (
+              <option key={l} value={l}>
+                {LOCATION_LABEL[l]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex min-w-48 flex-1 flex-col gap-2">
+          <Label htmlFor="price_type">Price type</Label>
+          <select
+            id="price_type"
+            name="price_type"
+            value={priceType}
+            onChange={(e) => setPriceType(e.target.value as PriceType)}
+            className="h-9 rounded-md border bg-transparent px-3 text-sm"
+          >
+            <option value="fixed">Fixed price</option>
+            <option value="from">From a price</option>
+            <option value="on_inspection">Quoted on site</option>
+          </select>
+        </div>
+      </div>
+      {comesToCustomer && (
+        <div className="flex flex-wrap gap-4">
+          <div className="flex w-44 flex-col gap-2">
+            <Label htmlFor="callout_fee_rand">Call-out fee (R, optional)</Label>
+            <Input
+              id="callout_fee_rand"
+              name="callout_fee_rand"
+              type="number"
+              min={0}
+              step="0.01"
+              value={feeRand}
+              onChange={(e) => setFeeRand(e.target.value)}
+            />
+          </div>
+          <div className="flex min-w-56 flex-1 flex-col gap-2">
+            <Label htmlFor="arrival_window_minutes">Arrival time</Label>
+            <select
+              id="arrival_window_minutes"
+              name="arrival_window_minutes"
+              defaultValue={values.arrival_window_minutes ? String(values.arrival_window_minutes) : ""}
+              className="h-9 rounded-md border bg-transparent px-3 text-sm"
+            >
+              {WINDOWS.map((w) => (
+                <option key={w.value} value={w.value}>
+                  {w.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+      <div className="rounded-md border border-dashed px-3 py-2 text-sm" aria-live="polite">
+        <span className="text-muted-foreground">Customers see: </span>
+        <span className="font-medium">{priceSummary(preview)}</span>
+        {comesToCustomer && preview.callout_fee_cents ? (
+          <span className="block text-xs text-muted-foreground">
+            Before booking: &ldquo;{calloutFeeNotice(preview.callout_fee_cents, businessName)}&rdquo;
+          </span>
+        ) : null}
+        {location === "either" && (
+          <span className="block text-xs text-muted-foreground">The call-out fee and window only apply when they choose &ldquo;at yours&rdquo;.</span>
+        )}
+      </div>
 
       {staff.length > 0 && (
         <fieldset className="flex flex-col gap-2">
@@ -187,7 +312,15 @@ function ServiceForm({
   );
 }
 
-export function ServicesEditor({ initialServices, staff }: { initialServices: Service[]; staff: Staff[] }) {
+export function ServicesEditor({
+  initialServices,
+  staff,
+  businessName,
+}: {
+  initialServices: Service[];
+  staff: Staff[];
+  businessName: string;
+}) {
   const router = useRouter();
   const [editing, setEditing] = useState<Service | null>(null);
   // Remounts the add form after a save, clearing it.
@@ -216,6 +349,7 @@ export function ServicesEditor({ initialServices, staff }: { initialServices: Se
             key={editing?.id ?? `new-${formKey}`}
             service={editing}
             staff={staff}
+            businessName={businessName}
             onDone={() => {
               setEditing(null);
               setFormKey((k) => k + 1);
@@ -236,9 +370,14 @@ export function ServicesEditor({ initialServices, staff }: { initialServices: Se
                   {service.category && <Badge variant="outline">{service.category}</Badge>}
                   {!service.active && <Badge variant="secondary">Inactive</Badge>}
                   {service.active && !service.online_bookable && <Badge variant="secondary">Not on website</Badge>}
+                  {service.location === "customer" && <Badge variant="outline">Call-out</Badge>}
+                  {service.location === "either" && <Badge variant="outline">Here or at theirs</Badge>}
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {service.duration_minutes} min · {formatPrice(service.price_cents)}
+                  {service.duration_minutes} min · {priceSummary(service)}
+                  {service.location !== "business" &&
+                    service.arrival_window_minutes &&
+                    ` · ${service.arrival_window_minutes / 60}-hour arrival window`}
                   {(service.buffer_before_min > 0 || service.buffer_after_min > 0) &&
                     ` · ${[
                       service.buffer_before_min && `${service.buffer_before_min} min free before`,

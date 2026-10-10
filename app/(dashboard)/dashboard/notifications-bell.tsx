@@ -186,7 +186,10 @@ export function NotificationsBell() {
           )}
 
           <ul className="overflow-y-auto">
-            {items.map((item) => (
+            {/* Unread emergencies first; otherwise newest first, as loaded. */}
+            {[...items]
+              .sort((a, b) => Number(b.type === "urgent" && !b.read) - Number(a.type === "urgent" && !a.read))
+              .map((item) => (
               <li key={item.id}>
                 <button
                   type="button"
@@ -194,10 +197,13 @@ export function NotificationsBell() {
                   className={cn(
                     "flex w-full flex-col gap-0.5 border-b px-4 py-3 text-left hover:bg-muted/60",
                     !item.read && "bg-indigo-50/60 dark:bg-indigo-950/40",
+                    item.type === "urgent" && !item.read && "border-l-4 border-l-red-600 bg-red-50 dark:bg-red-950/50",
                   )}
                 >
-                  <span className="flex items-center gap-2 text-sm font-medium">
-                    {!item.read && <span className="size-2 shrink-0 rounded-full bg-indigo-600" aria-hidden />}
+                  <span className={cn("flex items-center gap-2 text-sm font-medium", item.type === "urgent" && "text-red-700 dark:text-red-300")}>
+                    {!item.read && (
+                      <span className={cn("size-2 shrink-0 rounded-full", item.type === "urgent" ? "bg-red-600" : "bg-indigo-600")} aria-hidden />
+                    )}
                     {item.title}
                   </span>
                   {item.body && <span className="line-clamp-2 text-xs text-muted-foreground">{item.body}</span>}

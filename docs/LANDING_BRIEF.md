@@ -60,7 +60,7 @@ Leave out (not built yet): payments, marketing campaigns, a client marketplace, 
 - **Trades and home services:** plumbers, electricians, handymen, cleaners, pest control
 - **Clinics and professional services:** dental practice, optometrist, vet, consultants
 
-Each group has an "All …" page. Each type has its own entry with: name, slug, headline, the three problems it has (e.g. a plumber missing calls while on a job), a sample conversation for the hero chat animation, and the features to show. **Trades don't show booking features.** They show callout requests through the AI and contact form instead, matching how the plans switches work. Leave out "Enterprise / multi-location" until it exists.
+Each group has an "All …" page. Each type has its own entry with: name, slug, headline, the three problems it has (e.g. a plumber missing calls while on a job), a sample conversation for the hero chat animation, and the features to show. **Trades show call-out booking** (request a call-out, arrival windows, call-out fee upfront, service areas, urgent jobs) rather than salon-style appointments. This changed after the first build: see `docs/CALLOUT_BRIEF.md`. Leave out "Enterprise / multi-location" until it exists.
 
 **Resources ▾:** Getting started guide · Installing the widget · Connecting WhatsApp · FAQ · Watch the demo · Privacy and POPIA.
 

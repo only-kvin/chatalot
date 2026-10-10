@@ -4,7 +4,9 @@ import { createBooking, type BookingFailure, type CreatedBooking } from "@/lib/b
 import { upsertContact } from "@/lib/contacts/upsert";
 import { emailCustomerAboutBooking } from "@/lib/email/customer-booking";
 import { notifyOwnerOfBooking } from "@/lib/email/notify-booking";
-import { formatLocalDateTime } from "@/lib/time";
+import { formatBookingWhen } from "@/lib/bookings/labels";
+import type { CustomerAddress } from "@/lib/bookings/callout";
+import type { BookingLocation } from "@/lib/bookings/price-label";
 import type { Answers } from "./fields";
 
 // A booking made by a customer through a website widget. The answers have
@@ -22,6 +24,8 @@ export async function bookFromWidget(
     answers: Answers;
     idempotencyKey: string;
     widget: "schedule" | "appointment";
+    location?: BookingLocation | null;
+    address?: CustomerAddress | null;
   },
 ): Promise<CreatedBooking | BookingFailure> {
   const { answers } = b;
@@ -53,6 +57,8 @@ export async function bookFromWidget(
     lead: { source: `${b.widget}_widget`, summary: `Booked on the website for ${b.date} at ${b.time}` },
     actor: "customer",
     channel: "web",
+    location: b.location,
+    address: b.address,
   });
   if (!booked.ok || booked.repeat) return booked;
 
@@ -64,7 +70,7 @@ export async function bookFromWidget(
 
 async function notify(
   admin: SupabaseClient,
-  b: { tenantId: string; answers: Answers },
+  b: { tenantId: string; answers: Answers; address?: CustomerAddress | null },
   booked: CreatedBooking,
 ): Promise<void> {
   const { answers } = b;
@@ -81,7 +87,9 @@ async function notify(
       phone: answers.phone,
       email: answers.email,
       serviceName: booked.serviceName,
-      startsAtLabel: formatLocalDateTime(booked.startsAt),
+      startsAtLabel: formatBookingWhen(booked.startsAt, booked.windowEnd),
+      address: booked.location === "customer" && b.address ? `${b.address.line}, ${b.address.suburb}` : null,
+      outsideArea: booked.outsideArea,
       staffName: staff?.name ?? null,
       viaWidget: true,
       pending,

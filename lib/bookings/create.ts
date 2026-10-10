@@ -2,6 +2,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { localToUtcDate } from "@/lib/time";
 import { getAvailability } from "./availability";
 import { bookingRef, type BookingActor, type BookingEventChannel } from "./manage";
+import { addressProblem, needsApproval, type CustomerAddress } from "./callout";
+import type { BookingLocation } from "./price-label";
+import { inServiceArea } from "./service-area";
 
 // Making a booking — the one way in for the AI, the booking widgets and the
 // dashboard. The slot is re-checked against the live calendar here (what the
@@ -33,6 +36,10 @@ export type CreateBookingInput = {
   channel: BookingEventChannel;
   createdBy?: string | null;
   forTeam?: boolean;
+  // Where it happens: needed for "either" services, implied otherwise.
+  location?: BookingLocation | null;
+  // Required for a booking at the customer's address.
+  address?: CustomerAddress | null;
   now?: Date;
 };
 
@@ -48,13 +55,22 @@ export type CreatedBooking = {
   status: "confirmed" | "pending";
   // An earlier request with the same idempotency key made it.
   repeat: boolean;
+  location: BookingLocation;
+  // Arrival windows: when the window closes (startsAt is its start).
+  windowEnd: string | null;
+  // The call-out fee as agreed now.
+  calloutFeeCents: number | null;
+  // The suburb isn't one the business lists: a request it confirms.
+  outsideArea: boolean;
 };
 
 export type BookingFailure = {
   ok: false;
   // unavailable: not a bookable time (closed, too soon, nobody free).
   // slot_taken: it was free a moment ago, someone else just took it.
-  reason: "unavailable" | "slot_taken" | "unknown_service" | "unknown_staff" | "failed";
+  // address_required: a call-out without a street address and suburb.
+  // invalid_location: e.g. "at yours" for a service only done here.
+  reason: "unavailable" | "slot_taken" | "unknown_service" | "unknown_staff" | "address_required" | "invalid_location" | "failed";
 };
 
 type RpcResult = { ok: true; booking_id: string; repeat: boolean } | { ok: false; reason: string };
@@ -62,7 +78,7 @@ type RpcResult = { ok: true; booking_id: string; repeat: boolean } | { ok: false
 async function findByIdempotencyKey(admin: SupabaseClient, tenantId: string, key: string) {
   const { data } = await admin
     .from("bookings")
-    .select("id, staff_id, starts_at, ends_at, status, services(name)")
+    .select("id, staff_id, starts_at, ends_at, status, location, arrival_window_end, callout_fee_cents, outside_service_area, services(name)")
     .eq("tenant_id", tenantId)
     .eq("idempotency_key", key)
     .maybeSingle();
@@ -88,6 +104,10 @@ export async function createBooking(
         endsAt: existing.ends_at,
         status: existing.status === "pending" ? "pending" : "confirmed",
         repeat: true,
+        location: existing.location as BookingLocation,
+        windowEnd: existing.arrival_window_end,
+        calloutFeeCents: existing.callout_fee_cents,
+        outsideArea: existing.outside_service_area,
       };
     }
   }
@@ -98,24 +118,42 @@ export async function createBooking(
     fromDate: input.date,
     toDate: input.date,
     forTeam: input.forTeam,
+    location: input.location,
     now: input.now,
   });
-  if (!availability) return { ok: false, reason: "unknown_service" };
+  if (!availability) {
+    // Distinguish "no such service" from "not done there".
+    const known = await getAvailability(client, input.tenantId, {
+      serviceId: input.serviceId,
+      fromDate: input.date,
+      toDate: input.date,
+      now: input.now,
+    });
+    return { ok: false, reason: known ? "invalid_location" : "unknown_service" };
+  }
+  const location = availability.service.location;
+  if (addressProblem(location, input.address)) return { ok: false, reason: "address_required" };
   const slot = availability.days[0]?.slots.find((s) => s.time === input.time);
   if (!slot || slot.staffIds.length === 0) return { ok: false, reason: "unavailable" };
 
   const startsAt = localToUtcDate(input.date, input.time).toISOString();
-  // Customers' bookings wait for approval when the business wants that;
-  // the team's own bookings never do.
-  let status: CreatedBooking["status"] = "confirmed";
-  if (!input.forTeam) {
-    const { data: config } = await client
-      .from("agent_configs")
-      .select("bookings_need_approval")
-      .eq("tenant_id", input.tenantId)
-      .maybeSingle();
-    if (config?.bookings_need_approval) status = "pending";
-  }
+  const { data: config } = await client
+    .from("agent_configs")
+    .select("bookings_need_approval, callouts_confirm_instantly, service_areas")
+    .eq("tenant_id", input.tenantId)
+    .maybeSingle();
+  const outsideArea =
+    location === "customer" && !inServiceArea(config?.service_areas ?? [], input.address?.suburb, input.address?.city);
+  const status: CreatedBooking["status"] = needsApproval({
+    forTeam: Boolean(input.forTeam),
+    location,
+    outsideArea,
+    bookingsNeedApproval: Boolean(config?.bookings_need_approval),
+    calloutsConfirmInstantly: Boolean(config?.callouts_confirm_instantly),
+  })
+    ? "pending"
+    : "confirmed";
+  const address = location === "customer" ? input.address : null;
   // With "anyone", try each free person in turn: if the first was just
   // taken, the next may still be free.
   let lastReason: BookingFailure["reason"] = "slot_taken";
@@ -140,6 +178,13 @@ export async function createBooking(
       p_channel: input.channel,
       p_created_by: input.createdBy ?? null,
       p_status: status,
+      p_location: location,
+      p_address_line: address?.line ?? null,
+      p_suburb: address?.suburb ?? null,
+      p_city: address?.city ?? null,
+      p_postal_code: address?.postalCode ?? null,
+      p_access_notes: address?.accessNotes ?? null,
+      p_outside_service_area: outsideArea,
     });
     if (error) {
       console.error(`Creating a booking for tenant ${input.tenantId} failed:`, error);
@@ -147,6 +192,13 @@ export async function createBooking(
     }
     const result = data as RpcResult;
     if (result.ok) {
+      // The fee is fixed by the database at booking time; read it back.
+      const { data: row } = await client
+        .from("bookings")
+        .select("callout_fee_cents, arrival_window_end")
+        .eq("tenant_id", input.tenantId)
+        .eq("id", result.booking_id)
+        .maybeSingle();
       return {
         ok: true,
         bookingId: result.booking_id,
@@ -157,6 +209,10 @@ export async function createBooking(
         endsAt: new Date(new Date(startsAt).getTime() + availability.service.durationMinutes * 60_000).toISOString(),
         status,
         repeat: result.repeat,
+        location,
+        windowEnd: row?.arrival_window_end ?? null,
+        calloutFeeCents: row?.callout_fee_cents ?? null,
+        outsideArea,
       };
     }
     lastReason = result.reason as BookingFailure["reason"];

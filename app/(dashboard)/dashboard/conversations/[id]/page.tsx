@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/db/supabase-server";
 import { getSessionUser } from "@/lib/db/auth";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
-import { toggleTakeOverAction } from "../actions";
+import { clearUrgentAction, toggleTakeOverAction } from "../actions";
 import { Button } from "@/components/ui/button";
 import { CONVERSATION_LABEL, conversationTone } from "@/lib/ui/status-tones";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +25,7 @@ export default async function ConversationPage({
 
   const { data: conversation } = await supabase
     .from("conversations")
-    .select("id, channel, status, external_id, last_inbound_at, contacts(id, name, phone_e164)")
+    .select("id, channel, status, urgent, external_id, last_inbound_at, contacts(id, name, phone_e164)")
     .eq("id", id)
     .eq("tenant_id", tenantId)
     .single();
@@ -54,6 +54,20 @@ export default async function ConversationPage({
 
   return (
     <div className="mx-auto max-w-2xl p-8">
+      {conversation.urgent && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+          <span>
+            <strong>Urgent:</strong> the customer described an emergency. The AI stopped offering booking times and
+            handed the chat to you.
+          </span>
+          <form action={clearUrgentAction}>
+            <input type="hidden" name="id" value={conversation.id} />
+            <Button type="submit" size="sm" variant="outline">
+              Mark handled
+            </Button>
+          </form>
+        </div>
+      )}
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Conversation</h1>

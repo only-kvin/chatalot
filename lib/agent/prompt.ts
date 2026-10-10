@@ -1,4 +1,5 @@
 import { todayLocalLabel } from "@/lib/time";
+import { calloutFeeNotice, formatRand, priceLabel, type PriceType, type ServiceLocation } from "@/lib/bookings/price-label";
 
 export type AgentConfig = {
   business_name: string;
@@ -6,6 +7,11 @@ export type AgentConfig = {
   greeting: string;
   system_prompt_extra: string;
   handoff_contact: string;
+  // Call-outs (optional so older callers and tests keep working).
+  service_areas?: string[];
+  cancellation_policy?: string;
+  emergency_callouts?: boolean;
+  emergency_note?: string;
 };
 
 // Constant across every tenant. Kept separate from the tenant layer so it can be
@@ -46,10 +52,57 @@ which one below. Follow these rules at all times:
   and create_booking); otherwise book anyone free, and say who the result names.
 - If the visitor would rather book themselves, or picking a time in chat is getting
   long, call send_booking_link and share the link it returns.
+- Safety first, always: if anyone mentions a gas smell, sparking or an electrical
+  burning smell, flooding near electrics or plugs, or someone hurt, your first words
+  tell them to get everyone to safety and call emergency services (10111, or 112 from
+  a mobile) before anything else. Never give repair or "turn this off" instructions of
+  your own: only basic safe steps the business information itself gives (for example
+  "switch off the geyser at the DB board").
+- Prices: say a service's price only as the services list words it. For a service
+  "quoted on site", never state or estimate a price: say it's quoted on site and give
+  the call-out fee if there is one.
+- Call-outs (services done at the visitor's address): for a service done at either
+  place, first ask where they'd like it, at the business or at their place. For one at
+  their place, collect the street address, then the suburb, then any access notes
+  (gate code, parking), one question at a time. Before asking for consent to book,
+  always state the call-out fee (if there is one) and the arrival window or time. If
+  their suburb isn't in the areas the business lists, still take the request and say
+  the business will confirm whether they cover it; never refuse outright.
+- When confirming a booking, mention the cancellation policy if the business has one.
 - Reply in plain text only — no markdown (no **bold**, no bullet points with -/*, no
   headers). This is read as-is in a chat widget and on WhatsApp, not rendered.`;
 
-export type BookableService = { name: string; duration_minutes: number };
+export type BookableService = {
+  name: string;
+  duration_minutes: number;
+  location?: ServiceLocation;
+  price_type?: PriceType;
+  price_cents?: number | null;
+  callout_fee_cents?: number | null;
+  arrival_window_minutes?: number | null;
+};
+
+// "Call-out (60 min; at the customer's address; quoted on site, no stated price ·
+// call-out fee R450; 2-hour arrival windows)".
+export function describeService(s: BookableService): string {
+  const location = s.location ?? "business";
+  const parts = [`${s.duration_minutes} min`];
+  if (location === "customer") parts.push("at the customer's address");
+  if (location === "either") parts.push("at the business or at the customer's address");
+  const fee = location !== "business" && s.callout_fee_cents ? `call-out fee ${formatRand(s.callout_fee_cents)}` : null;
+  if (s.price_type === "on_inspection") {
+    parts.push("quoted on site, no stated price");
+  } else {
+    const price = priceLabel({ priceType: s.price_type ?? "fixed", priceCents: s.price_cents ?? null, calloutFeeCents: null }, false);
+    if (price) parts.push(price);
+  }
+  if (fee) parts.push(location === "either" ? `${fee} (only at their place)` : fee);
+  if (location !== "business" && s.arrival_window_minutes) {
+    const hours = s.arrival_window_minutes / 60;
+    parts.push(`${Number.isInteger(hours) ? `${hours}-hour` : `${s.arrival_window_minutes}-minute`} arrival windows at their place`);
+  }
+  return `${s.name} (${parts.join("; ")})`;
+}
 export type PromptStaff = { name: string; role: string; services: string[] };
 
 function buildTenantLayer(
@@ -74,9 +127,25 @@ function buildTenantLayer(
   if (services.length) {
     // Exact names matter: the booking tools look services up by name.
     lines.push(
-      `Bookable services (use these exact names with the booking tools): ${services
-        .map((s) => `${s.name} (${s.duration_minutes} min)`)
-        .join(", ")}.`,
+      `Bookable services (use these exact names with the booking tools): ${services.map(describeService).join(", ")}.`,
+    );
+    if (services.some((s) => s.location && s.location !== "business")) {
+      const fee = services.find((s) => s.callout_fee_cents)?.callout_fee_cents ?? null;
+      const notice = calloutFeeNotice(fee, config.business_name);
+      if (notice) lines.push(`Call-out fees are paid to the business directly, e.g. "${notice}". There's no online payment.`);
+      lines.push(
+        config.service_areas?.length
+          ? `Areas covered for call-outs: ${config.service_areas.join(", ")}.`
+          : "The business hasn't listed the areas it covers; take any address.",
+      );
+    }
+  }
+  if (config.cancellation_policy?.trim()) lines.push(`Cancellation policy: ${config.cancellation_policy.trim()}`);
+  if (config.emergency_callouts) {
+    lines.push(
+      `This business takes emergency call-outs. When someone describes something urgent (a burst pipe, no power, flooding, a blocked toilet on a weekend), don't offer booking times: after any safety advice, call report_emergency straight away, then tell them the team has been alerted${
+        config.emergency_note?.trim() ? ` and pass on exactly this: "${config.emergency_note.trim()}"` : ", without promising how quickly anyone will call"
+      }. Never promise that someone is on the way, or any time or price beyond that.`,
     );
   }
   if (staff.length) {

@@ -105,6 +105,7 @@ textarea { resize: vertical; }
 .slots { display: flex; flex-direction: column; gap: 12px; }
 .slots h3 { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--ca-muted); text-transform: uppercase; letter-spacing: .05em; }
 .slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; }
+.slot-grid.wide { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); }
 .slot {
   min-height: 44px; border-radius: calc(var(--ca-radius) / 1.6); border: none; font-weight: 600; font-variant-numeric: tabular-nums;
   background: var(--ca-raised); box-shadow: 0 0 0 1px var(--ca-line), 0 1px 2px var(--ca-shade);
@@ -126,6 +127,8 @@ form { display: flex; flex-direction: column; gap: 16px; margin: 0; }
 .req { color: #dc2626; }
 .check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; min-height: 44px; }
 .check input { width: 20px; height: 20px; min-height: 0; margin: 2px 0 0; flex: none; accent-color: var(--ca-primary); box-shadow: none; }
+fieldset.address { border: none; padding: 0; margin: 0; min-width: 0; }
+fieldset.address legend { font-weight: 600; font-size: 14px; padding: 0; margin-bottom: 8px; }
 .trap { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
 
 .primary {

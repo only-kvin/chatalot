@@ -4,7 +4,8 @@ import { addDays, weekdayOf } from "../../lib/time";
 // Date-object arithmetic, so the visitor's own time zone never matters).
 // Pure, so tests cover it.
 
-export type Slot = { time: string; available: boolean };
+// end: arrival windows only, when the window closes.
+export type Slot = { time: string; end?: string; available: boolean };
 
 // The Monday on or before a date.
 export function weekStart(dateISO: string): string {

@@ -25,6 +25,21 @@ export async function toggleTakeOverAction(formData: FormData) {
   revalidatePath("/dashboard/conversations");
 }
 
+// The emergency has been dealt with: the chat stops standing out. Its
+// lead keeps its urgent flag as a record.
+export async function clearUrgentAction(formData: FormData) {
+  const tenantId = await getCurrentTenantId();
+  if (!tenantId) throw new Error("Not authorized");
+  const id = z.string().uuid().parse(formData.get("id"));
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("conversations").update({ urgent: false }).eq("id", id).eq("tenant_id", tenantId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/dashboard/conversations/${id}`);
+  revalidatePath("/dashboard/conversations");
+}
+
 const replySchema = z.object({
   conversationId: z.string().uuid(),
   // WhatsApp's text body limit.

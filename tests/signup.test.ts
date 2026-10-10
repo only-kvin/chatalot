@@ -12,6 +12,7 @@ import { createTenant } from "../lib/db/create-tenant";
 import { checkSignup, completeSignup, saveSignup } from "../lib/signup";
 import { currentConsents } from "../lib/consent/business-consent";
 import { resolvePublicTenant } from "../lib/widgets/public-request";
+import { loadSetupSteps } from "../lib/onboarding";
 
 const PASSWORD = "test-password-0123!";
 const admin = createAdminClient();
@@ -104,13 +105,55 @@ describe("self-serve sign-up", () => {
     await admin.from("tenant_members").delete().eq("tenant_id", other.id).eq("user_id", tradesUserId);
   });
 
-  it("starts trades with bookings hidden", async () => {
+  it("starts trades with call-out bookings on, a starter Call-out service and call-out defaults", async () => {
     const result = await completeSignup(admin, tradesUserId, tradesEmail);
     expect(result).toMatchObject({ ok: true, created: true });
     if (!result.ok) return;
     tradesTenantId = result.tenantId;
-    const { data } = await admin.from("tenants").select("feature_overrides").eq("id", tradesTenantId).single();
-    expect(data?.feature_overrides).toEqual({ bookings: "off" });
+    const [{ data: tenant }, { data: config }, { data: services }] = await Promise.all([
+      admin.from("tenants").select("feature_overrides").eq("id", tradesTenantId).single(),
+      admin
+        .from("agent_configs")
+        .select("travel_buffer_minutes, callouts_confirm_instantly")
+        .eq("tenant_id", tradesTenantId)
+        .single(),
+      admin
+        .from("services")
+        .select("name, location, price_type, duration_minutes, arrival_window_minutes, callout_fee_cents, price_cents")
+        .eq("tenant_id", tradesTenantId),
+    ]);
+    // Bookings aren't switched off any more.
+    expect(tenant?.feature_overrides).toEqual({});
+    // Approval on for call-outs (not confirmed instantly), 30 minutes' travel.
+    expect(config).toEqual({ travel_buffer_minutes: 30, callouts_confirm_instantly: false });
+    expect(services).toEqual([
+      {
+        name: "Call-out",
+        location: "customer",
+        price_type: "on_inspection",
+        duration_minutes: 60,
+        arrival_window_minutes: 120,
+        callout_fee_cents: null,
+        price_cents: null,
+      },
+    ]);
+
+    // The checklist asks for the fee and areas.
+    const steps = await loadSetupSteps(admin, tradesTenantId, true);
+    expect(steps.find((s) => s.title === "Add your call-out fee and service areas")).toMatchObject({ done: false });
+  });
+
+  it("leaves other business types unchanged", async () => {
+    const [{ data: tenant }, { data: config }, { count }] = await Promise.all([
+      admin.from("tenants").select("feature_overrides").eq("id", tenantId).single(),
+      admin.from("agent_configs").select("travel_buffer_minutes").eq("tenant_id", tenantId).single(),
+      admin.from("services").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
+    ]);
+    expect(tenant?.feature_overrides).toEqual({});
+    expect(config?.travel_buffer_minutes).toBe(0);
+    expect(count).toBe(0);
+    const steps = await loadSetupSteps(admin, tenantId, true);
+    expect(steps.some((s) => s.title.includes("call-out"))).toBe(false);
   });
 });
 

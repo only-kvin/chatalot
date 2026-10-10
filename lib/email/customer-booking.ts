@@ -3,7 +3,8 @@ import { appUrl } from "@/lib/app-url";
 import { bookingIcs } from "@/lib/bookings/ics";
 import { bookingRef } from "@/lib/bookings/manage";
 import { createBookingToken } from "@/lib/security/signed-token";
-import { formatLocalDateTime } from "@/lib/time";
+import { formatBookingWhen } from "@/lib/bookings/when";
+import { BOOKING_PLACE_COLUMNS, customerPlaceLines, type BookingPlace } from "@/lib/bookings/place";
 import { escapeHtml, sendCustomerEmail } from "./send";
 
 // Emails to the customer about their booking: made (confirmed or awaiting
@@ -30,6 +31,10 @@ type BookingForEmail = {
   staffName: string | null;
   businessName: string;
   contact: string;
+  // Call-outs: the address, window, agreed fee; plus the cancellation policy.
+  place?: BookingPlace;
+  businessAddress?: string;
+  cancellationPolicy?: string;
 };
 
 const SUBJECT: Record<CustomerBookingEmailKind, (b: BookingForEmail) => string> = {
@@ -56,17 +61,26 @@ export function renderCustomerBookingEmail(
   b: BookingForEmail,
   extra: { reason?: string | null; manageUrl?: string } = {},
 ): { subject: string; html: string; ics: string | null } {
-  const when = formatLocalDateTime(b.startsAt);
+  const when = formatBookingWhen(b.startsAt, b.place?.arrival_window_end);
   const lines: [string, string | null][] = [
     ["Service", b.serviceName],
     ["When", when],
     ["With", b.staffName],
+    ...(b.place
+      ? customerPlaceLines(b.place, {
+          businessName: b.businessName,
+          businessAddress: b.businessAddress ?? "",
+          cancellationPolicy: b.cancellationPolicy ?? "",
+        })
+      : []),
     ["Reference", bookingRef(b.id)],
   ];
+  const outsideArea = kind === "requested" && b.place?.outside_service_area;
   const active = kind === "confirmed" || kind === "requested" || kind === "approved" || kind === "rescheduled";
   const html = `
     <p>Hi ${escapeHtml(b.name)},</p>
     <p>${escapeHtml(INTRO[kind])}</p>
+    ${outsideArea ? `<p>${escapeHtml("Your suburb isn't in our listed service areas, so we'll confirm whether we can come.")}</p>` : ""}
     ${kind === "declined" && extra.reason ? `<p>${escapeHtml(extra.reason)}</p>` : ""}
     <p>${lines
       .filter(([, v]) => v)
@@ -104,11 +118,15 @@ export async function emailCustomerAboutBooking(
     const [{ data: booking }, { data: config }] = await Promise.all([
       admin
         .from("bookings")
-        .select("id, name, email, starts_at, ends_at, services(name), staff(name)")
+        .select(`id, name, email, starts_at, ends_at, ${BOOKING_PLACE_COLUMNS}, services(name), staff(name)`)
         .eq("tenant_id", tenantId)
         .eq("id", bookingId)
         .maybeSingle(),
-      admin.from("agent_configs").select("business_name, handoff_contact").eq("tenant_id", tenantId).maybeSingle(),
+      admin
+        .from("agent_configs")
+        .select("business_name, handoff_contact, business_address, cancellation_policy")
+        .eq("tenant_id", tenantId)
+        .maybeSingle(),
     ]);
     if (!booking?.email) return;
 
@@ -122,6 +140,9 @@ export async function emailCustomerAboutBooking(
       staffName: (booking.staff as unknown as { name: string } | null)?.name ?? null,
       businessName: config?.business_name || "us",
       contact: config?.handoff_contact ?? "",
+      place: booking as BookingPlace,
+      businessAddress: config?.business_address ?? "",
+      cancellationPolicy: config?.cancellation_policy ?? "",
     };
     const email = renderCustomerBookingEmail(kind, b, { ...extra, manageUrl: manageBookingUrl(b.id, b.endsAt) });
     await sendCustomerEmail({

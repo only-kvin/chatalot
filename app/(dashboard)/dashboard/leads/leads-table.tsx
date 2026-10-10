@@ -2,7 +2,9 @@
 
 import { useTransition } from "react";
 import { updateLeadStatusAction } from "./actions";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -29,13 +31,15 @@ type Lead = {
   interest: string | null;
   status: "new" | "contacted" | "booked" | "won" | "lost";
   source: string;
+  urgent: boolean;
+  conversation_id: string | null;
   created_at: string;
 };
 
 const STATUSES: Lead["status"][] = ["new", "contacted", "booked", "won", "lost"];
 
 function toCsv(leads: Lead[]): string {
-  const header = ["Name", "Phone", "Email", "Interest", "Status", "Source", "Created"];
+  const header = ["Name", "Phone", "Email", "Interest", "Status", "Source", "Urgent", "Created"];
   const rows = leads.map((l) => [
     l.name ?? "",
     l.phone ?? "",
@@ -43,6 +47,7 @@ function toCsv(leads: Lead[]): string {
     l.interest ?? "",
     l.status,
     l.source,
+    l.urgent ? "yes" : "",
     l.created_at,
   ]);
   const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
@@ -92,12 +97,26 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
         <TableBody>
           {leads.map((lead) => (
             <TableRow key={lead.id}>
-              <TableCell>{lead.name}</TableCell>
+              <TableCell>
+                {lead.name ?? <span className="text-muted-foreground">Not given yet</span>}
+                {lead.urgent && (
+                  <Badge variant="danger" className="ml-2">
+                    Urgent
+                  </Badge>
+                )}
+              </TableCell>
               <TableCell>
                 {lead.phone}
                 {lead.email ? ` / ${lead.email}` : ""}
               </TableCell>
-              <TableCell>{lead.interest}</TableCell>
+              <TableCell>
+                {lead.interest}
+                {lead.conversation_id && (
+                  <Link href={`/dashboard/conversations/${lead.conversation_id}`} className="block text-xs text-muted-foreground hover:underline">
+                    View chat
+                  </Link>
+                )}
+              </TableCell>
               <TableCell>
                 <Select
                   defaultValue={lead.status}

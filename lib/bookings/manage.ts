@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { formatLocalDateTime, formatLocalTime, localDateISO, localToUtcDate } from "@/lib/time";
+import { formatLocalTime, localDateISO, localToUtcDate } from "@/lib/time";
+import { formatBookingWhen } from "./when";
+import type { BookingLocation } from "./price-label";
 import { getAvailability } from "./availability";
 
 // Booking changes shared by the AI tools (service-role client, actor "ai") and
@@ -35,6 +37,8 @@ export type BookingSummary = {
   startsAt: string;
   status: string;
   customerName: string;
+  // Arrival windows: when the window closes.
+  windowEnd?: string | null;
 };
 
 type Actor = { actor: BookingActor; channel: BookingEventChannel; createdBy?: string | null };
@@ -87,7 +91,7 @@ export async function listManageableBookings(
 
   let query = admin
     .from("bookings")
-    .select("id, service_id, starts_at, status, name, services(name)")
+    .select("id, service_id, starts_at, arrival_window_end, status, name, services(name)")
     .eq("tenant_id", s.tenantId)
     .in("status", ACTIVE_STATUSES)
     .gt("starts_at", new Date().toISOString())
@@ -105,11 +109,12 @@ export async function listManageableBookings(
     startsAt: b.starts_at,
     status: b.status,
     customerName: b.name,
+    windowEnd: b.arrival_window_end,
   }));
 }
 
-export function describeBooking(b: { serviceName: string; startsAt: string }): string {
-  return `${b.serviceName} on ${formatLocalDateTime(b.startsAt)}`;
+export function describeBooking(b: { serviceName: string; startsAt: string; windowEnd?: string | null }): string {
+  return `${b.serviceName} on ${formatBookingWhen(b.startsAt, b.windowEnd)}`;
 }
 
 // True when the booking starts within the tenant's minimum notice, so the
@@ -150,7 +155,7 @@ export async function rescheduleBooking(
 ): Promise<{ ok: true; from: string; to: string } | { ok: false; error: string }> {
   const { data: booking } = await client
     .from("bookings")
-    .select("id, service_id, staff_id, status")
+    .select("id, service_id, staff_id, status, location")
     .eq("id", r.bookingId)
     .eq("tenant_id", r.tenantId)
     .maybeSingle();
@@ -166,6 +171,7 @@ export async function rescheduleBooking(
     toDate: r.date,
     excludeBookingId: booking.id,
     forTeam: r.actor === "team",
+    location: booking.location as BookingLocation,
   });
   const slot = availability?.days[0]?.slots.find((s) => s.time === r.time);
   if (!slot || slot.staffIds.length === 0) {
@@ -208,7 +214,7 @@ export async function assignStaff(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const { data: booking } = await client
     .from("bookings")
-    .select("id, service_id, staff_id, starts_at, status")
+    .select("id, service_id, staff_id, starts_at, status, location")
     .eq("id", a.bookingId)
     .eq("tenant_id", a.tenantId)
     .maybeSingle();
@@ -224,6 +230,7 @@ export async function assignStaff(
     toDate: date,
     excludeBookingId: booking.id,
     forTeam: true,
+    location: booking.location as BookingLocation,
   });
   const slot = availability?.days[0]?.slots.find((s) => s.time === time);
   if (!slot?.staffIds.includes(a.staffId)) {

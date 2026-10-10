@@ -1,10 +1,12 @@
 import { createAdminClient } from "@/lib/db/supabase-admin";
 import { buildSystemPrompt, type AgentConfig } from "./prompt";
 import { runAgentTurn, type ChatMessage } from "./model";
-import { CORE_TOOL_NAMES, parseToolInput, toolsFor, type ToolCall } from "./tools";
+import { CORE_TOOL_NAMES, EMERGENCY_TOOL, parseToolInput, toolsFor, type ToolCall } from "./tools";
+import { reportEmergency } from "./emergency";
 import { hasFeature } from "@/lib/features";
 import { getRelevantKnowledge } from "./retrieval";
-import { findServiceByName, listActiveServiceNames, listActiveServices, listActiveStaff, matchStaff } from "@/lib/bookings/catalog";
+import { findServiceByName, listActiveServiceNames, listActiveServices, listActiveStaff, matchStaff, type ActiveService } from "@/lib/bookings/catalog";
+import { calloutFeeNotice, formatBookingWhen, priceLabel, timeRangeLabel } from "@/lib/bookings/labels";
 import { bookingLinkFor } from "@/lib/widgets/booking-link";
 import { getOpenSlots } from "@/lib/bookings/availability";
 import { createBooking } from "@/lib/bookings/create";
@@ -50,7 +52,7 @@ async function resolveService(
   admin: AdminClient,
   tenantId: string,
   name: string,
-): Promise<{ id: string; name: string; duration_minutes: number } | string> {
+): Promise<ActiveService | string> {
   const service = await findServiceByName(admin, tenantId, name);
   if (service) return service;
 
@@ -115,7 +117,24 @@ export type ToolContext = {
   // Online bookings are on the business's plan. Without them only the core
   // tools run, whatever the model asks for.
   takesBookings: boolean;
+  // The business takes emergency call-outs (report_emergency is offered).
+  emergencyCallouts?: boolean;
+  emergencyNote?: string;
+  cancellationPolicy?: string;
 };
+
+// The service's price as customers see it, for tool results.
+function priceFor(service: ActiveService, atCustomer: boolean): string {
+  if (service.price_type === "on_inspection") {
+    const fee = atCustomer ? calloutFeeNotice(service.callout_fee_cents, "the business") : null;
+    return ` Price: quoted on site (never state a price)${fee ? `; ${fee}` : ""}.`;
+  }
+  const label = priceLabel(
+    { priceType: service.price_type, priceCents: service.price_cents, calloutFeeCents: service.callout_fee_cents },
+    atCustomer,
+  );
+  return label ? ` Price: ${label}.` : "";
+}
 
 // Tool result for request_human on the website, where the owner can't reply
 // in the chat: the model steers the visitor to a channel that reaches a person.
@@ -163,6 +182,14 @@ export async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall:
   const parsed = parseToolInput(rawCall);
   if (!parsed.ok) return parsed.error;
   const call = parsed.call;
+  if (call.name === EMERGENCY_TOOL) {
+    if (!ctx.emergencyCallouts) return "This business doesn't take emergency call-outs. Offer a person (request_human) instead.";
+    return reportEmergency(
+      admin,
+      { tenantId, businessName, conversationId, channel: ctx.channel, emergencyNote: ctx.emergencyNote ?? "" },
+      call.input,
+    );
+  }
   if (!ctx.takesBookings && !CORE_TOOL_NAMES.includes(call.name)) {
     return "Bookings can't be made in this chat. Offer to take their name and phone number for a callback (save_lead).";
   }
@@ -170,6 +197,28 @@ export async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall:
   if (call.name === "save_lead") {
     const lead = call.input;
     const contactId = await rememberCustomer(admin, ctx, lead);
+    // After report_emergency, the details complete its urgent lead rather
+    // than filing a second one.
+    const { data: urgentLead } = await admin
+      .from("leads")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("conversation_id", conversationId)
+      .eq("urgent", true)
+      .is("phone", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (urgentLead) {
+      const { error } = await admin
+        .from("leads")
+        .update({ name: lead.name, phone: lead.phone, email: lead.email, contact_id: contactId })
+        .eq("id", urgentLead.id)
+        .eq("tenant_id", tenantId);
+      if (error) return toolFailed(call.name, error);
+      await notifyOwnerOfLead(admin, tenantId, businessName, { ...lead, interest: `URGENT: ${lead.interest}` }, conversationId);
+      return "Details passed to the team with the emergency.";
+    }
     const { error } = await admin.from("leads").insert({
       tenant_id: tenantId,
       conversation_id: conversationId,
@@ -204,8 +253,26 @@ export async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall:
 
   if (call.name === "check_availability") {
     const { date } = call.input;
+    const { data: convo } = await admin
+      .from("conversations")
+      .select("urgent")
+      .eq("tenant_id", tenantId)
+      .eq("id", conversationId)
+      .maybeSingle();
+    if (convo?.urgent) {
+      return "This chat is an emergency already handed to the team: don't offer booking times. Tell the visitor the team has been alerted.";
+    }
     const resolved = await resolveService(admin, tenantId, call.input.service);
     if (typeof resolved === "string") return resolved;
+    if (resolved.location === "either" && !call.input.location) {
+      return `${resolved.name} can be done at ${businessName} or at the visitor's place. Ask which they'd like, then check again with location "business" or "customer".`;
+    }
+    if (resolved.location !== "either" && call.input.location && call.input.location !== resolved.location) {
+      return resolved.location === "customer"
+        ? `${resolved.name} is only done at the customer's address. Check again with location "customer".`
+        : `${resolved.name} is only done at ${businessName}. Check again with location "business".`;
+    }
+    const atCustomer = (call.input.location ?? resolved.location) === "customer";
 
     let person: { id: string; name: string } | null = null;
     if (call.input.staff) {
@@ -213,7 +280,7 @@ export async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall:
       if (typeof found === "string") return found;
       person = found;
     }
-    const result = await getOpenSlots(admin, tenantId, resolved.id, date, { staffId: person?.id });
+    const result = await getOpenSlots(admin, tenantId, resolved.id, date, { staffId: person?.id, location: call.input.location });
     const day = formatLocalDate(date);
     const forWhom = person ? ` with ${person.name}` : "";
     if (!result || result.slots.length === 0) {
@@ -222,7 +289,12 @@ export async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall:
     // With many open times the model tends to say "lots of slots" and offer
     // none; ask it to name a few, spread across the day.
     const offer = result.slots.length > 4 ? " Offer the visitor 3 or 4 of these, spread across the day, and ask which suits." : "";
-    const times = `Available times on ${day} (${date}) for ${resolved.name}${forWhom}: ${result.slots.join(", ")}.${offer}`;
+    const extra = `${priceFor(resolved, atCustomer)}${atCustomer && resolved.callout_fee_cents ? " State the call-out fee before booking." : ""}`;
+    const times = result.windows
+      ? `Available arrival windows on ${day} (${date}) for ${resolved.name}${forWhom}: ${result.windows
+          .map((w) => timeRangeLabel(w.start, w.end))
+          .join(", ")}. Offer them as windows ("between 08:00 and 10:00") and book with the window's start time.${offer}${extra}`
+      : `Available times on ${day} (${date}) for ${resolved.name}${forWhom}: ${result.slots.join(", ")}.${offer}${extra}`;
     if (person) return times;
     const who = await staffFor(admin, tenantId, resolved.name);
     return who.length > 1 ? `${times} (Anyone free. Staff who do it: ${who.join(", ")}; only ask if the visitor has a preference.)` : times;
@@ -307,6 +379,14 @@ export async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall:
     person = found;
   }
 
+  if (resolved.location === "either" && !call.input.location) {
+    return `Ask whether they'd like ${resolved.name} at ${businessName} or at their place, then book with location "business" or "customer".`;
+  }
+  const atCustomer = (call.input.location ?? resolved.location) === "customer";
+  if (atCustomer && (!call.input.address_line || !call.input.suburb)) {
+    return "A call-out needs the street address and suburb. Ask for whichever is missing (one question at a time), then call create_booking again.";
+  }
+
   const contactId = await rememberCustomer(admin, ctx, { name, phone, email });
   // createBooking re-checks the time against the live calendar, so a stale
   // or made-up time is refused here too.
@@ -319,19 +399,43 @@ export async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall:
     customer: { name, phone, email, contactId },
     conversationId,
     source: ctx.channel,
-    lead: { source: "booking", summary: `Booked ${resolved.name} on ${date} at ${time}` },
+    lead: { source: "booking", summary: `${atCustomer ? "Call-out:" : "Booked"} ${resolved.name} on ${date} at ${time}` },
     actor: "ai",
     channel: ctx.channel,
+    location: call.input.location,
+    address: atCustomer
+      ? {
+          line: call.input.address_line ?? "",
+          suburb: call.input.suburb ?? "",
+          city: call.input.city,
+          postalCode: call.input.postal_code,
+          accessNotes: call.input.access_notes,
+        }
+      : null,
   });
   if (!booked.ok) {
     if (booked.reason === "unavailable") {
       return `That time isn't available. Call check_availability again for ${date} and pick one of the returned times.`;
     }
     if (booked.reason === "slot_taken") return "That slot was just taken by someone else — please pick a different time.";
+    if (booked.reason === "address_required") return "A call-out needs the street address and suburb. Ask for them, then try again.";
+    if (booked.reason === "invalid_location") return `${resolved.name} can't be done there. Ask the visitor where they'd like it.`;
     return toolFailed(call.name, booked.reason);
   }
-  const when = formatLocalDateTime(booked.startsAt);
+  const when = formatBookingWhen(booked.startsAt, booked.windowEnd);
   const pending = booked.status === "pending";
+  const address = booked.location === "customer" ? `${call.input.address_line}, ${call.input.suburb}` : null;
+  const where = address ? ` at ${address}` : "";
+  const fee = calloutFeeNotice(booked.calloutFeeCents, businessName);
+  const policy = ctx.cancellationPolicy?.trim();
+  const after = [
+    fee ? `${fee}.` : "",
+    booked.outsideArea ? "Their suburb isn't in the listed areas: say the business will confirm whether they cover it." : "",
+    policy ? `Mention the cancellation policy: ${policy}` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const callout = booked.location === "customer";
   // Who it's with: the person asked for, or whoever "anyone" went to.
   const withWhom = await staffName(admin, tenantId, booked.staffId);
   const withText = withWhom ? ` with ${withWhom}` : "";
@@ -339,15 +443,25 @@ export async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall:
     admin,
     tenantId,
     businessName,
-    { name, phone, email, serviceName: resolved.name, startsAtLabel: when, pending, bookingId: booked.bookingId },
+    {
+      name,
+      phone,
+      email,
+      serviceName: resolved.name,
+      startsAtLabel: when,
+      pending,
+      bookingId: booked.bookingId,
+      address,
+      outsideArea: booked.outsideArea,
+    },
     conversationId,
   );
   if (!booked.repeat) await emailCustomerAboutBooking(admin, tenantId, booked.bookingId, pending ? "requested" : "confirmed");
 
   if (pending) {
-    return `Booking requested (not yet confirmed): ${resolved.name} on ${when}${withText} (reference ${booked.ref}). The business approves bookings first and will confirm soon; the time is held meanwhile. Tell the visitor exactly this, and don't call it confirmed.`;
+    return `${callout ? "Call-out requested" : "Booking requested"} (not yet confirmed): ${resolved.name} on ${when}${withText}${where} (reference ${booked.ref}). The business approves ${callout ? "call-outs" : "bookings"} first and will confirm soon; the time is held meanwhile. Tell the visitor exactly this, and don't call it confirmed. ${after}`.trim();
   }
-  return `Booking confirmed: ${resolved.name} on ${when}${withText} (reference ${booked.ref}). Tell the visitor exactly this date, time and person.`;
+  return `Booking confirmed: ${resolved.name} on ${when}${withText}${where} (reference ${booked.ref}). Tell the visitor exactly this date, time and person. ${after}`.trim();
 }
 
 function formatNotice(minutes: number): string {
@@ -377,7 +491,9 @@ export async function* runAgent(params: {
 
   const { data: agentConfig, error: configError } = await admin
     .from("agent_configs")
-    .select("business_name, tone, greeting, system_prompt_extra, handoff_contact, booking_change_cutoff_minutes")
+    .select(
+      "business_name, tone, greeting, system_prompt_extra, handoff_contact, booking_change_cutoff_minutes, service_areas, cancellation_policy, emergency_callouts, emergency_note",
+    )
     .eq("tenant_id", params.tenantId)
     .single();
 
@@ -436,7 +552,7 @@ export async function* runAgent(params: {
     for await (const event of runAgentTurn({
       system,
       messages,
-      tools: toolsFor(takesBookings),
+      tools: toolsFor(takesBookings, agentConfig.emergency_callouts),
       maxTokens: MAX_TOKENS,
       signal: AbortSignal.timeout(TURN_TIMEOUT_MS),
       executeTool: (call) =>
@@ -450,6 +566,9 @@ export async function* runAgent(params: {
             whatsappAvailable: params.whatsappAvailable ?? false,
             cutoffMinutes: agentConfig.booking_change_cutoff_minutes ?? 120,
             takesBookings,
+            emergencyCallouts: agentConfig.emergency_callouts,
+            emergencyNote: agentConfig.emergency_note,
+            cancellationPolicy: agentConfig.cancellation_policy,
           },
           call,
         ),
@@ -462,7 +581,7 @@ export async function* runAgent(params: {
         // totals across iterations are summed, not overwritten.
         tokensIn += event.promptTokens;
         tokensOut += event.completionTokens;
-      } else if (event.type === "tool-executed" && event.call.name === "request_human") {
+      } else if (event.type === "tool-executed" && (event.call.name === "request_human" || event.call.name === EMERGENCY_TOOL)) {
         handedOff = true;
       }
     }

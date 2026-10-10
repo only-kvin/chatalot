@@ -9,9 +9,9 @@ export type BusinessType = { slug: string; name: string };
 export type BusinessGroup = {
   slug: BusinessGroupSlug;
   name: string;
-  // Trades take callouts, not appointments, so their pages leave out booking
-  // features (as the plan switches do for a plumber).
-  bookings: boolean;
+  // How the group books: appointments at the business, or call-outs to the
+  // customer's address (trades).
+  kind: "appointments" | "callouts";
   types: BusinessType[];
 };
 
@@ -19,7 +19,7 @@ export const BUSINESS_GROUPS: BusinessGroup[] = [
   {
     slug: "beauty",
     name: "Beauty",
-    bookings: true,
+    kind: "appointments",
     types: [
       { slug: "hair-salon", name: "Hair salon" },
       { slug: "barbershop", name: "Barbershop" },
@@ -31,7 +31,7 @@ export const BUSINESS_GROUPS: BusinessGroup[] = [
   {
     slug: "wellness",
     name: "Wellness",
-    bookings: true,
+    kind: "appointments",
     types: [
       { slug: "day-spa", name: "Day spa" },
       { slug: "hotel-spa", name: "Hotel spa" },
@@ -45,7 +45,7 @@ export const BUSINESS_GROUPS: BusinessGroup[] = [
   {
     slug: "fitness",
     name: "Fitness",
-    bookings: true,
+    kind: "appointments",
     types: [
       { slug: "gym", name: "Gym" },
       { slug: "personal-training", name: "Personal training" },
@@ -60,7 +60,7 @@ export const BUSINESS_GROUPS: BusinessGroup[] = [
   {
     slug: "trades",
     name: "Trades and home services",
-    bookings: false,
+    kind: "callouts",
     types: [
       { slug: "plumbers", name: "Plumbers" },
       { slug: "electricians", name: "Electricians" },
@@ -72,7 +72,7 @@ export const BUSINESS_GROUPS: BusinessGroup[] = [
   {
     slug: "clinics",
     name: "Clinics and professional services",
-    bookings: true,
+    kind: "appointments",
     types: [
       { slug: "dental-practice", name: "Dental practice" },
       { slug: "optometrist", name: "Optometrist" },

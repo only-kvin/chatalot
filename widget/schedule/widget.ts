@@ -6,6 +6,8 @@ import { dayLong } from "../booking/calendar";
 import { createPicker } from "../booking/picker";
 import { createShell } from "../booking/shell";
 import { createDetails, renderDone, summaryList } from "../booking/steps";
+import { createWhere } from "../booking/where";
+import { timeRangeLabel } from "../../lib/bookings/price-label";
 
 // The schedule widget: date first. Pick a day on the month calendar, a
 // time, fill in the business's form, confirm. Service and person are chosen
@@ -18,6 +20,7 @@ export function mountSchedule(host: HTMLElement, ctx: MountContext): void {
   const api = createApi(ctx.apiOrigin, ctx.key);
   const shell = createShell(host, ctx, "schedule");
   const details = createDetails(shell);
+  const where = createWhere(shell);
 
   let config: ScheduleConfig | null = null;
   let services: Service[] = [];
@@ -27,11 +30,23 @@ export function mountSchedule(host: HTMLElement, ctx: MountContext): void {
   let step: Step = "pick";
   let fatal: string | null = null;
   let alert: string | null = null;
-  let chosen: { date: string; time: string } | null = null;
+  let chosen: { date: string; time: string; end?: string } | null = null;
   let submitting = false;
-  let result: { status: "confirmed" | "pending"; ref: string; startsAt: string; endsAt: string; staffName: string | null; email: string } | null = null;
+  let result: {
+    status: "confirmed" | "pending";
+    ref: string;
+    startsAt: string;
+    endsAt: string;
+    staffName: string | null;
+    email: string;
+    calloutFeeCents?: number | null;
+    outsideArea?: boolean;
+  } | null = null;
 
   const service = () => services.find((s) => s.id === serviceId) ?? null;
+  const atCustomer = () => where.location(service()) === "customer";
+  const whenLabel = (c: { date: string; time: string; end?: string }) =>
+    c.end ? `${dayLong(c.date)}, between ${c.time} and ${c.end}` : `${dayLong(c.date)} at ${c.time}`;
   const contactLine = () => (config?.contact ? ` You can also contact ${config.businessName} on ${config.contact}.` : "");
 
   const picker = createPicker({
@@ -39,27 +54,30 @@ export function mountSchedule(host: HTMLElement, ctx: MountContext): void {
     fetch: api.availability,
     rerender: render,
     contactLine,
-    onChoose(date, time) {
-      chosen = { date, time };
+    onChoose(date, time, end) {
+      chosen = { date, time, end };
       step = "details";
       alert = null;
       details.start(config!.fields);
       render();
       emit(host, { widget: "schedule", action: "step", step: "details" });
-      shell.announce(`Booking ${service()?.name} on ${dayLong(date)} at ${time}. Enter your details.`);
+      shell.announce(`Booking ${service()?.name} on ${whenLabel({ date, time, end })}. Enter your details.`);
       shell.focusFirst("input, select, textarea");
     },
   });
 
   function useQuery() {
-    picker.setQuery(serviceId, staffId);
+    // A service done at either place starts at the business; the customer
+    // can switch to "At your place".
+    if (where.needsChoice(service()) && !where.location(service())) where.choose("business");
+    picker.setQuery(serviceId, staffId, where.location(service()));
     render();
     picker.load();
   }
 
   async function submit() {
     if (submitting || !chosen) return;
-    const problem = details.check();
+    const problem = where.check(service()) ?? details.check();
     if (problem) {
       alert = problem;
       render();
@@ -68,7 +86,14 @@ export function mountSchedule(host: HTMLElement, ctx: MountContext): void {
     submitting = true;
     alert = null;
     render();
-    const res = await api.book("schedule", { serviceId, staffId: staffId || null, date: chosen.date, time: chosen.time, ...details.payload() });
+    const res = await api.book("schedule", {
+      serviceId,
+      staffId: staffId || null,
+      date: chosen.date,
+      time: chosen.time,
+      ...where.payload(service()),
+      ...details.payload(),
+    });
     submitting = false;
     if (res.ok) {
       result = { ...res, email: details.email() };
@@ -80,11 +105,11 @@ export function mountSchedule(host: HTMLElement, ctx: MountContext): void {
       return;
     }
     if (res.slotTaken) {
-      const { date, time } = chosen;
+      const { date, time, end } = chosen;
       const nearest = await picker.refreshAfterTaken(date, time);
       step = "pick";
       chosen = null;
-      alert = `Sorry, ${time} was just taken.${nearest.length ? " These are the nearest free times:" : " Please pick another time."}`;
+      alert = `Sorry, ${timeRangeLabel(time, end)} was just taken.${nearest.length ? " These are the nearest free times:" : " Please pick another time."}`;
       render();
       shell.announce(alert);
       return;
@@ -96,18 +121,20 @@ export function mountSchedule(host: HTMLElement, ctx: MountContext): void {
 
   function pickers() {
     const showStaff = config!.settings.allowStaffChoice && staff.length > 0;
-    if (services.length < 2 && !showStaff) return null;
+    const choosePlace = where.needsChoice(service());
+    if (services.length < 2 && !showStaff && !choosePlace) return null;
     const svcSelect = h(
       "select",
       { id: `${shell.id}-service`, "data-k": "service" },
       services.map((s) => {
-        const o = h("option", { value: s.id }, [s.name, `${s.durationMinutes} min`, price(s.priceCents)].filter(Boolean).join(" · "));
+        const o = h("option", { value: s.id }, [s.name, `${s.durationMinutes} min`, price(s)].filter(Boolean).join(" · "));
         o.selected = s.id === serviceId;
         return o;
       }),
     );
     svcSelect.addEventListener("change", () => {
       serviceId = svcSelect.value;
+      where.reset();
       if (staffId && !service()?.staffIds.includes(staffId)) staffId = "";
       useQuery();
     });
@@ -129,10 +156,24 @@ export function mountSchedule(host: HTMLElement, ctx: MountContext): void {
         useQuery();
       });
     }
+    let placeSelect: HTMLSelectElement | null = null;
+    if (choosePlace) {
+      placeSelect = h(
+        "select",
+        { id: `${shell.id}-where`, "data-k": "where" },
+        h("option", { value: "business", selected: !atCustomer() }, `At ${config!.businessName || "our place"}`),
+        h("option", { value: "customer", selected: atCustomer() }, "At your place"),
+      );
+      placeSelect.addEventListener("change", () => {
+        where.choose(placeSelect!.value === "customer" ? "customer" : "business");
+        useQuery();
+      });
+    }
     return h(
       "div",
       { class: "pickers" },
       services.length > 1 ? h("label", { for: `${shell.id}-service` }, "Service", svcSelect) : null,
+      placeSelect ? h("label", { for: `${shell.id}-where` }, "Where?", placeSelect) : null,
       staffSelect ? h("label", { for: `${shell.id}-staff` }, "With", staffSelect) : null,
     );
   }
@@ -142,9 +183,10 @@ export function mountSchedule(host: HTMLElement, ctx: MountContext): void {
     return summaryList([
       ["Service", svc?.name],
       ["With", result?.staffName ?? (staffId ? staff.find((p) => p.id === staffId)?.name : null)],
-      ["When", chosen ? `${dayLong(chosen.date)} at ${chosen.time}` : null],
+      ["When", chosen ? whenLabel(chosen) : null],
       ["Duration", svc ? `${svc.durationMinutes} min` : null],
-      ["Price", svc ? price(svc.priceCents) : null],
+      ["Price", svc ? price(svc, atCustomer()) : null],
+      ...where.rows(svc, config?.businessName ?? "", result?.calloutFeeCents),
       ...extra,
     ]);
   }
@@ -174,7 +216,12 @@ export function mountSchedule(host: HTMLElement, ctx: MountContext): void {
           renderDone(shell, {
           pending,
           title: pending ? cfg.copy.requestedTitle : cfg.copy.successTitle,
-          message: pending ? cfg.copy.requestedMessage : cfg.copy.successMessage,
+          message: [
+            pending ? cfg.copy.requestedMessage : cfg.copy.successMessage,
+            r.outsideArea ? "Your suburb isn't in our listed areas, so we'll confirm whether we can come." : "",
+          ]
+            .filter(Boolean)
+            .join(" "),
           email: r.email,
           summary: summary([["Reference", r.ref || null]]),
           calendar: { uid: r.ref, title: `${service()?.name ?? "Appointment"} at ${cfg.businessName}`, startsAt: r.startsAt, endsAt: r.endsAt, ref: r.ref },
@@ -205,6 +252,7 @@ export function mountSchedule(host: HTMLElement, ctx: MountContext): void {
         shell.focusFirst('[data-k="slot"]:not(:disabled)');
       }, "back"),
       summary(),
+      where.renderAddress(service()),
       details.render({ businessName: cfg.businessName, confirmLabel: cfg.copy.confirmButton, submitting, onSubmit: submit }),
     ]);
   }
@@ -216,6 +264,7 @@ export function mountSchedule(host: HTMLElement, ctx: MountContext): void {
       config = cfg;
       services = catalogue.services;
       staff = catalogue.staff;
+      where.setBusiness(catalogue.business);
       shell.applyTheme(cfg.theme, cfg.copy.title);
       if (!services.length) {
         fatal = `Online booking isn't available right now.${cfg.contact ? ` Please contact ${cfg.businessName} on ${cfg.contact}.` : ""}`;

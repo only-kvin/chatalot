@@ -78,6 +78,11 @@ export const AGENT_TOOLS: ToolDef[] = [
           type: ["string", "null"],
           description: "A staff member's name from the 'Who works here' list, only if the visitor asked for that person; otherwise null (anyone free)",
         },
+        location: {
+          type: ["string", "null"],
+          description:
+            "Where it happens: \"business\" (at the business) or \"customer\" (at the visitor's address). Required for services done at either place, once the visitor has said which; otherwise null",
+        },
       },
       required: ["service", "date"],
     },
@@ -85,7 +90,7 @@ export const AGENT_TOOLS: ToolDef[] = [
   {
     name: "create_booking",
     description:
-      "Book an appointment for one service. Only call this after confirming the exact date and time with the visitor (from a time check_availability actually returned), and after they've given their name, phone number, and consent to save their details. For several services, book each one separately at back-to-back times, checking availability for each. Afterwards, tell the visitor exactly what the result confirmed — service, date and time — never something else.",
+      "Book an appointment for one service, or request a call-out at the visitor's address. Only call this after confirming the exact date and time (or arrival window start) with the visitor (from a time check_availability actually returned), and after they've given their name, phone number, and consent to save their details. For a call-out, also pass the street address and suburb (and access notes if they gave any), and only after stating the call-out fee and arrival window. For several services, book each one separately at back-to-back times, checking availability for each. Afterwards, tell the visitor exactly what the result confirmed — service, date and time — never something else.",
     parameters: {
       type: "object",
       properties: {
@@ -105,6 +110,16 @@ export const AGENT_TOOLS: ToolDef[] = [
           type: ["string", "null"],
           description: "A staff member's name from the 'Who works here' list, only if the visitor asked for that person; otherwise null (anyone free)",
         },
+        location: {
+          type: ["string", "null"],
+          description:
+            "Where it happens: \"business\" (at the business) or \"customer\" (at the visitor's address). Required for services done at either place, once the visitor has said which; otherwise null",
+        },
+        address_line: { type: ["string", "null"], description: "Call-outs only: street address, e.g. \"12 Oak Street\"; otherwise null" },
+        suburb: { type: ["string", "null"], description: "Call-outs only: suburb or town; otherwise null" },
+        city: { type: ["string", "null"], description: "Call-outs only: city, if given; otherwise null" },
+        postal_code: { type: ["string", "null"], description: "Call-outs only: postal code, if given; otherwise null" },
+        access_notes: { type: ["string", "null"], description: "Call-outs only: gate code, parking or how to get in, if given; otherwise null" },
       },
       required: ["service", "date", "time", "name", "phone"],
     },
@@ -157,6 +172,21 @@ export const AGENT_TOOLS: ToolDef[] = [
       required: [],
     },
   },
+  {
+    name: "report_emergency",
+    description:
+      "An urgent job (burst pipe, no power, flooding, a blocked toilet on a weekend...): alerts the owner straight away and hands the chat to them. Call it as soon as the visitor describes an emergency, instead of offering booking times. Then follow the instructions in the result.",
+    parameters: {
+      type: "object",
+      properties: {
+        problem: { type: "string", description: "What's wrong, in a few words, e.g. 'burst geyser, water through ceiling'" },
+        name: { type: ["string", "null"], description: "The visitor's name, if given; otherwise null" },
+        phone: { type: ["string", "null"], description: "The visitor's phone number, if given; otherwise null" },
+        address: { type: ["string", "null"], description: "Where the emergency is, if given; otherwise null" },
+      },
+      required: ["problem"],
+    },
+  },
 ];
 
 // `input` is whatever the model produced — untrusted until parseToolInput accepts it.
@@ -174,13 +204,29 @@ const optionalText = z
 const dateText = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "must be YYYY-MM-DD");
 const timeText = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "must be 24-hour HH:MM");
 
+// Models sometimes say "home"; anything unexpected counts as not given.
+const locationText = z
+  .string()
+  .nullish()
+  .transform((v) => {
+    const t = v?.trim().toLowerCase();
+    if (t === "customer" || t === "home") return "customer" as const;
+    if (t === "business") return "business" as const;
+    return null;
+  });
+
 // Tools that work without online bookings on the business's plan.
 export const CORE_TOOL_NAMES = ["save_lead", "request_human"];
+export const EMERGENCY_TOOL = "report_emergency";
 
 // The tools offered to the model: the booking ones only when the business
-// takes bookings, so it never offers what the business can't do.
-export function toolsFor(takesBookings: boolean): ToolDef[] {
-  return takesBookings ? AGENT_TOOLS : AGENT_TOOLS.filter((t) => CORE_TOOL_NAMES.includes(t.name));
+// takes bookings, and the emergency one only when it takes emergency
+// call-outs, so it never offers what the business can't do.
+export function toolsFor(takesBookings: boolean, emergencyCallouts = false): ToolDef[] {
+  return AGENT_TOOLS.filter((t) => {
+    if (t.name === EMERGENCY_TOOL) return emergencyCallouts;
+    return takesBookings || CORE_TOOL_NAMES.includes(t.name);
+  });
 }
 
 // Zod mirrors of AGENT_TOOLS' JSON schemas above — model output is an API
@@ -194,7 +240,7 @@ export const TOOL_INPUT_SCHEMAS = {
     summary: requiredText,
   }),
   request_human: z.object({ reason: requiredText }),
-  check_availability: z.object({ service: requiredText, date: dateText, staff: optionalText }),
+  check_availability: z.object({ service: requiredText, date: dateText, staff: optionalText, location: locationText }),
   create_booking: z.object({
     service: requiredText,
     date: dateText,
@@ -203,11 +249,18 @@ export const TOOL_INPUT_SCHEMAS = {
     phone: requiredText,
     email: optionalText,
     staff: optionalText,
+    location: locationText,
+    address_line: optionalText,
+    suburb: optionalText,
+    city: optionalText,
+    postal_code: optionalText,
+    access_notes: optionalText,
   }),
   my_bookings: z.object({}).passthrough(),
   cancel_booking: z.object({ booking_ref: requiredText, reason: optionalText }),
   reschedule_booking: z.object({ booking_ref: requiredText, date: dateText, time: timeText }),
   send_booking_link: z.object({ service: optionalText }),
+  report_emergency: z.object({ problem: requiredText, name: optionalText, phone: optionalText, address: optionalText }),
 };
 
 export type ToolName = keyof typeof TOOL_INPUT_SCHEMAS;

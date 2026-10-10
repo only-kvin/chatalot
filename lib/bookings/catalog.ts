@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { PriceType, ServiceLocation } from "./price-label";
 
 // Finding services by name — what the AI does when a visitor says "a cut".
 // The widgets pick services by id instead.
@@ -24,13 +25,21 @@ export function matchService<T extends { name: string }>(services: T[], query: s
   return partial.length === 1 ? partial[0] : null;
 }
 
-export async function listActiveServices(
-  supabase: SupabaseClient,
-  tenantId: string,
-): Promise<{ id: string; name: string; duration_minutes: number }[]> {
+export type ActiveService = {
+  id: string;
+  name: string;
+  duration_minutes: number;
+  location: ServiceLocation;
+  price_type: PriceType;
+  price_cents: number | null;
+  callout_fee_cents: number | null;
+  arrival_window_minutes: number | null;
+};
+
+export async function listActiveServices(supabase: SupabaseClient, tenantId: string): Promise<ActiveService[]> {
   const { data } = await supabase
     .from("services")
-    .select("id, name, duration_minutes")
+    .select("id, name, duration_minutes, location, price_type, price_cents, callout_fee_cents, arrival_window_minutes")
     .eq("tenant_id", tenantId)
     .eq("active", true)
     .order("name");
@@ -41,7 +50,7 @@ export async function findServiceByName(
   supabase: SupabaseClient,
   tenantId: string,
   name: string,
-): Promise<{ id: string; name: string; duration_minutes: number } | null> {
+): Promise<ActiveService | null> {
   return matchService(await listActiveServices(supabase, tenantId), name);
 }
 

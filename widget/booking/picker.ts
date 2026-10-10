@@ -12,6 +12,7 @@ import {
   type Slot,
 } from "./calendar";
 import type { Shell } from "./shell";
+import { timeRangeLabel, type BookingLocation } from "../../lib/bookings/price-label";
 
 // The date-and-time picker shared by every booking widget: a month calendar
 // (days with free times marked with a dot), and the chosen day's times
@@ -23,7 +24,7 @@ import type { Shell } from "./shell";
 export type Picker = {
   // Which service (and optionally person) to show times for. Resets the
   // chosen day when it changes.
-  setQuery: (serviceId: string, staffId: string) => void;
+  setQuery: (serviceId: string, staffId: string, location?: BookingLocation) => void;
   load: () => Promise<void>;
   // The calendar and times, plus any loading error or alert above them.
   render: (alert: string | null) => Node[];
@@ -38,7 +39,8 @@ const DOWS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 export function createPicker(opts: {
   shell: Shell;
   fetch: (q: AvailabilityQuery) => Promise<{ days: { date: string; slots: Slot[] }[] }>;
-  onChoose: (date: string, time: string) => void;
+  // end: the window's end, for arrival windows.
+  onChoose: (date: string, time: string, end?: string) => void;
   rerender: () => void;
   // Times not to offer (e.g. the booking's own current time when moving it).
   hideTime?: (date: string, time: string) => boolean;
@@ -50,6 +52,7 @@ export function createPicker(opts: {
   const thisMonth = `${today.slice(0, 7)}-01`;
   let serviceId = "";
   let staffId = "";
+  let location: BookingLocation | undefined;
   let month = thisMonth;
   let selectedDate: string | null = null;
   let loadError = false;
@@ -61,7 +64,7 @@ export function createPicker(opts: {
   const cache = new Map<string, Slot[]>();
   const inflight = new Set<string>();
 
-  const cacheKey = (date: string) => `${serviceId}|${staffId}|${date}`;
+  const cacheKey = (date: string) => `${serviceId}|${staffId}|${location ?? ""}|${date}`;
   const slotsFor = (date: string) => {
     const slots = cache.get(cacheKey(date));
     return slots && opts.hideTime ? slots.filter((s) => !opts.hideTime!(date, s.time)) : slots;
@@ -81,9 +84,10 @@ export function createPicker(opts: {
     inflight.add(rangeKey);
     const forService = serviceId;
     const forStaff = staffId;
+    const forLocation = location;
     try {
-      const res = await opts.fetch({ service: forService, staff: forStaff, from: start, to });
-      for (const day of res.days) cache.set(`${forService}|${forStaff}|${day.date}`, day.slots);
+      const res = await opts.fetch({ service: forService, staff: forStaff, from: start, to, location: forLocation });
+      for (const day of res.days) cache.set(`${forService}|${forStaff}|${forLocation ?? ""}|${day.date}`, day.slots);
       loadError = false;
     } catch {
       loadError = true;
@@ -232,15 +236,19 @@ export function createPicker(opts: {
     }
     const slots = slotsFor(selectedDate);
     const date = selectedDate;
-    const choose = (t: string) => opts.onChoose(date, t);
+    const endOf = (t: string) => slots?.find((s) => s.time === t)?.end;
+    // Window labels are wider than times.
+    const grid = slots?.some((s) => s.end) ? "slot-grid wide" : "slot-grid";
+    const choose = (t: string) => opts.onChoose(date, t, endOf(t));
     const freeCount = slots?.filter((s) => s.available).length ?? 0;
     const animate = slots !== undefined && animated !== `${cacheKey(date)}|${nearest.join()}`;
     if (animate) animated = `${cacheKey(date)}|${nearest.join()}`;
     let i = 0;
+    // Arrival windows read "08:00–10:00".
     const slotButton = (time: string, available = true) =>
-      shell.button(animate ? "slot in" : "slot", time, () => choose(time), "slot", {
+      shell.button(animate ? "slot in" : "slot", timeRangeLabel(time, endOf(time)), () => choose(time), "slot", {
         disabled: !available,
-        "aria-label": `${time}${available ? "" : ", booked"}`,
+        "aria-label": `${endOf(time) ? `Between ${time} and ${endOf(time)}` : time}${available ? "" : ", booked"}`,
         style: animate ? `--i:${i++}` : false,
       });
     return h(
@@ -258,20 +266,21 @@ export function createPicker(opts: {
             "div",
             { class: "slots", role: "group", "aria-label": `Times on ${dayLong(date)}` },
             nearest.length
-              ? h("div", {}, h("h3", {}, "Nearest free times"), h("div", { class: "slot-grid" }, nearest.map((t) => slotButton(t))))
+              ? h("div", {}, h("h3", {}, "Nearest free times"), h("div", { class: grid }, nearest.map((t) => slotButton(t))))
               : null,
             groupSlots(slots).map((g) =>
-              h("div", {}, h("h3", {}, g.label), h("div", { class: "slot-grid" }, g.slots.map((s) => slotButton(s.time, s.available)))),
+              h("div", {}, h("h3", {}, g.label), h("div", { class: grid }, g.slots.map((s) => slotButton(s.time, s.available)))),
             ),
           ),
     );
   }
 
   return {
-    setQuery(nextService, nextStaff) {
-      if (nextService === serviceId && nextStaff === staffId) return;
+    setQuery(nextService, nextStaff, nextLocation) {
+      if (nextService === serviceId && nextStaff === staffId && nextLocation === location) return;
       serviceId = nextService;
       staffId = nextStaff;
+      location = nextLocation;
       selectedDate = null;
       nearest = [];
     },

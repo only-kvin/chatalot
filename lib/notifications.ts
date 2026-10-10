@@ -9,13 +9,15 @@ export type NotificationType =
   | "reminder_not_sent"
   | "low_rating"
   | "approval_needed"
-  | "contact_message";
+  | "contact_message"
+  // An emergency call-out: shown first, in red.
+  | "urgent";
 
 // Where an alert takes the owner — shared by the dashboard bell and the emails.
 export function notificationPath(type: NotificationType, conversationId?: string | null): string {
   if (conversationId) return `/dashboard/conversations/${conversationId}`;
   if (type === "contact_message") return "/dashboard/messages";
-  return type === "new_lead" || type === "human_requested" ? "/dashboard/leads" : "/dashboard/bookings";
+  return type === "new_lead" || type === "human_requested" || type === "urgent" ? "/dashboard/leads" : "/dashboard/bookings";
 }
 
 // Records an in-app alert for the tenant's dashboard bell. Written by the

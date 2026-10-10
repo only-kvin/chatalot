@@ -2,7 +2,10 @@ import Link from "next/link";
 import { createClient } from "@/lib/db/supabase-server";
 import { getSessionUser } from "@/lib/db/auth";
 import { requireFeaturePage } from "@/lib/dashboard-features";
-import { formatLocalDateTime } from "@/lib/time";
+import { todayLocalISO } from "@/lib/time";
+import { formatBookingWhen } from "@/lib/bookings/when";
+import { addressText, BOOKING_PLACE_COLUMNS, type BookingPlace } from "@/lib/bookings/place";
+import { DayView } from "./day-view";
 import {
   describeEvent,
   formatShortLocal,
@@ -28,6 +31,7 @@ import {
 
 const TABS = [
   { id: "upcoming", label: "Upcoming" },
+  { id: "day", label: "Day view" },
   { id: "pending", label: "To approve" },
   { id: "past", label: "Past" },
   { id: "cancelled", label: "Cancelled" },
@@ -37,7 +41,7 @@ type Tab = (typeof TABS)[number]["id"];
 export default async function BookingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; staff?: string }>;
+  searchParams: Promise<{ tab?: string; staff?: string; date?: string }>;
 }) {
   const tenantId = await requireFeaturePage("bookings");
   const params = await searchParams;
@@ -56,16 +60,18 @@ export default async function BookingsPage({
   const staffNames = new Map((staff ?? []).map((p) => [p.id, p.name]));
   // "none" = bookings nobody has been given yet.
   const staffFilter = params.staff === "none" || staffNames.has(params.staff ?? "") ? params.staff : undefined;
-  const tabHref = (id: Tab, staffId = staffFilter) => {
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(params.date ?? "") ? params.date! : todayLocalISO();
+  const tabHref = (id: Tab, staffId = staffFilter, date?: string) => {
     const q = new URLSearchParams();
     if (id !== "upcoming") q.set("tab", id);
     if (staffId) q.set("staff", staffId);
+    if (id === "day" && date) q.set("date", date);
     return q.size ? `/dashboard/bookings?${q}` : "/dashboard/bookings";
   };
 
   let query = supabase
     .from("bookings")
-    .select("id, name, starts_at, status, source, created_at, contact_id, staff_id, review_rating, services(name)")
+    .select(`id, name, starts_at, status, source, created_at, contact_id, staff_id, review_rating, ${BOOKING_PLACE_COLUMNS}, services(name)`)
     .eq("tenant_id", tenantId)
     .limit(200);
   if (staffFilter === "none") query = query.is("staff_id", null);
@@ -74,7 +80,7 @@ export default async function BookingsPage({
   if (tab === "pending") query = query.eq("status", "pending").order("starts_at");
   if (tab === "past") query = query.neq("status", "cancelled").lt("starts_at", now).order("starts_at", { ascending: false });
   if (tab === "cancelled") query = query.eq("status", "cancelled").order("updated_at", { ascending: false });
-  const { data: bookings } = await query;
+  const { data: bookings } = tab === "day" ? { data: [] } : await query;
 
   // Latest change per booking, for the "Last change" column.
   const ids = (bookings ?? []).map((b) => b.id);
@@ -97,14 +103,14 @@ export default async function BookingsPage({
     <div className="mx-auto max-w-6xl p-8">
       <PageHeader title="Bookings" description="Every booking, how it was made, and every change since." />
 
-      <nav className="mb-4 flex gap-1 border-b" aria-label="Booking views">
+      <nav className="mb-4 flex gap-1 overflow-x-auto border-b [scrollbar-width:none]" aria-label="Booking views">
         {TABS.map((t) => (
           <Link
             key={t.id}
             href={tabHref(t.id)}
             aria-current={tab === t.id ? "page" : undefined}
             className={cn(
-              "-mb-px border-b-2 px-3 py-2 text-sm font-medium",
+              "-mb-px shrink-0 border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap",
               tab === t.id ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
             )}
           >
@@ -131,6 +137,16 @@ export default async function BookingsPage({
         </nav>
       )}
 
+      {tab === "day" ? (
+        <DayView
+          supabase={supabase}
+          tenantId={tenantId}
+          date={day}
+          staffFilter={staffFilter}
+          staffNames={staffNames}
+          hrefFor={(d) => tabHref("day", staffFilter, d)}
+        />
+      ) : (
       <Table>
         <TableHeader>
           <TableRow>
@@ -152,7 +168,7 @@ export default async function BookingsPage({
               <TableRow key={b.id}>
                 <TableCell className="whitespace-nowrap">
                   <Link href={`/dashboard/bookings/${b.id}`} className="font-medium hover:underline">
-                    {formatLocalDateTime(b.starts_at)}
+                    {formatBookingWhen(b.starts_at, b.arrival_window_end)}
                   </Link>
                   {rescheduled.has(b.id) && (
                     <Badge variant="outline" className="ml-2">
@@ -160,7 +176,15 @@ export default async function BookingsPage({
                     </Badge>
                   )}
                 </TableCell>
-                <TableCell>{service}</TableCell>
+                <TableCell>
+                  {service}
+                  {b.location === "customer" && (
+                    <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                      {addressText(b as BookingPlace)}
+                      {b.outside_service_area && <Badge variant="warning">Outside listed area</Badge>}
+                    </div>
+                  )}
+                </TableCell>
                 {staffNames.size > 0 && (
                   <TableCell className={b.staff_id ? "" : "text-muted-foreground"}>
                     {b.staff_id ? (staffNames.get(b.staff_id) ?? "—") : "Not assigned"}
@@ -207,6 +231,7 @@ export default async function BookingsPage({
                   {
                     upcoming: "No upcoming bookings.",
                     pending: "Nothing waiting for approval.",
+                    day: "",
                     past: "No past bookings.",
                     cancelled: "No cancelled bookings.",
                   }[tab]
@@ -216,6 +241,7 @@ export default async function BookingsPage({
           )}
         </TableBody>
       </Table>
+      )}
     </div>
   );
 }

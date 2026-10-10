@@ -77,6 +77,40 @@ export function bookingChat(o: {
   };
 }
 
+// A call-out request: the visitor describes a job, the AI offers arrival
+// windows with the call-out fee, they give their address, and a request
+// lands in the owner's call-outs for the day.
+export function calloutRequestChat(o: {
+  business: string;
+  ask: string;
+  // Must offer `window` and state the call-out fee.
+  answer: string;
+  reply: string;
+  confirm: string;
+  window: string;
+  customer: string;
+  what: string;
+}): DemoChat {
+  return {
+    business: o.business,
+    greeting: `Hi! You've reached ${o.business}. How can we help?`,
+    messages: [
+      { from: "visitor", text: o.ask },
+      { from: "ai", text: o.answer },
+      { from: "visitor", text: o.reply },
+      { from: "ai", text: o.confirm },
+    ],
+    result: { time: o.window, customer: o.customer, what: o.what, label: "Call-out request" },
+    // Whole windows, spaced as the calendar would allow one plumber.
+    day: [
+      { time: "12:00–14:00", customer: "Pieter", what: "Blocked drain · Ferndale" },
+      { time: "16:00–18:00", customer: "Naledi", what: "Tap repair · Blairgowrie" },
+    ],
+    dayTitle: "Tomorrow",
+    dayHeading: "Your call-outs",
+  };
+}
+
 // A callout: the visitor describes a job, the AI takes their details with
 // permission, and the owner gets a lead to call back.
 export function calloutChat(o: {

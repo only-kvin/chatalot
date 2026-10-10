@@ -4,7 +4,10 @@ import { ArrowLeftIcon } from "lucide-react";
 import { createClient } from "@/lib/db/supabase-server";
 import { getSessionUser } from "@/lib/db/auth";
 import { requireFeaturePage } from "@/lib/dashboard-features";
-import { formatLocalDateTime, localDateISO } from "@/lib/time";
+import { formatLocalDateTime, formatLocalTime, localDateISO } from "@/lib/time";
+import { formatBookingWhen } from "@/lib/bookings/when";
+import { calloutFeeNotice } from "@/lib/bookings/price-label";
+import { addressText, BOOKING_PLACE_COLUMNS, mapsUrl, type BookingPlace } from "@/lib/bookings/place";
 import { canonicalPhone, formatPhone } from "@/lib/contacts/phone";
 import {
   describeEvent,
@@ -30,7 +33,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
   const { data: booking } = await supabase
     .from("bookings")
     .select(
-      "id, name, phone, email, starts_at, ends_at, status, source, created_at, contact_id, conversation_id, staff_id, review_rating, services(name), conversations(channel)",
+      `id, name, phone, email, starts_at, ends_at, status, source, created_at, contact_id, conversation_id, staff_id, review_rating, ${BOOKING_PLACE_COLUMNS}, services(name), conversations(channel)`,
     )
     .eq("id", id)
     .eq("tenant_id", tenantId)
@@ -52,6 +55,9 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
   const service = (booking.services as unknown as { name: string } | null)?.name ?? "Booking";
   const chatChannel = (booking.conversations as unknown as { channel: string } | null)?.channel ?? null;
   const started = new Date(booking.starts_at) <= new Date();
+  const place = booking as BookingPlace;
+  const address = addressText(place);
+  const maps = mapsUrl(place);
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
@@ -68,9 +74,13 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
             {STATUS_LABEL[booking.status as BookingStatus] ?? booking.status}
           </Badge>
           {booking.review_rating && <Rating value={booking.review_rating} />}
+          {booking.location === "customer" && <Badge variant="outline">Call-out</Badge>}
+          {booking.outside_service_area && <Badge variant="warning">Outside listed area</Badge>}
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          {formatLocalDateTime(booking.starts_at)} – {formatLocalDateTime(booking.ends_at).split(" at ")[1]}
+          {booking.arrival_window_end
+            ? `Arriving ${formatBookingWhen(booking.starts_at, booking.arrival_window_end).replace(", between", " between")}, about ${Math.round((new Date(booking.ends_at).getTime() - new Date(booking.starts_at).getTime()) / 60000)} min on site`
+            : `${formatLocalDateTime(booking.starts_at)} – ${formatLocalTime(booking.ends_at)}`}
           {staffName && ` · with ${staffName}`}
         </p>
       </div>
@@ -104,6 +114,37 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
           </p>
         </CardContent>
       </Card>
+
+      {address && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Where</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-1 text-sm">
+            <p>
+              {address}
+              {maps && (
+                <>
+                  {" · "}
+                  <a href={maps} target="_blank" rel="noopener noreferrer" className="underline">
+                    Open in Maps
+                  </a>
+                </>
+              )}
+            </p>
+            {booking.access_notes && <p className="text-muted-foreground">Access notes: {booking.access_notes}</p>}
+            <p className="text-muted-foreground">
+              {calloutFeeNotice(booking.callout_fee_cents, "you") ?? "No call-out fee"}
+              {booking.callout_fee_cents ? " (as agreed when booked)" : ""}
+            </p>
+            {booking.outside_service_area && (
+              <p className="text-muted-foreground">
+                Their suburb isn&apos;t in your listed areas. Check you can get there before approving.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

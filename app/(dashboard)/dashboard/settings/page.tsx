@@ -3,6 +3,7 @@ import { createClient } from "@/lib/db/supabase-server";
 import { currentTenantFeatures } from "@/lib/dashboard-features";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { SettingsForm } from "./settings-form";
+import { BookingSettingsCard } from "./booking-settings";
 import { YourWebsite, type ConsentView } from "./your-website";
 import { currentConsents, type ConsentState } from "@/lib/consent/business-consent";
 import { setupComplete } from "@/lib/onboarding";
@@ -15,13 +16,20 @@ export default async function SettingsPage() {
   const { tenantId, features } = current;
 
   const supabase = await createClient();
-  const [{ data: config }, { data: tenant }] = await Promise.all([
+  const [{ data: config }, { data: tenant }, { data: booking }] = await Promise.all([
     supabase
       .from("agent_configs")
       .select("business_name, tone, greeting, system_prompt_extra, handoff_contact, google_review_url, daily_summary_enabled, booking_page_url")
       .eq("tenant_id", tenantId)
       .single(),
     supabase.from("tenants").select("allowed_domains, slug").eq("id", tenantId).single(),
+    supabase
+      .from("agent_configs")
+      .select(
+        "business_address, service_areas, travel_buffer_minutes, cancellation_policy, callouts_confirm_instantly, emergency_callouts, emergency_note, owner_alert_phone",
+      )
+      .eq("tenant_id", tenantId)
+      .single(),
   ]);
   const [consents, { data: brief }, { data: websiteRequest }, setupDone] = await Promise.all([
     currentConsents(supabase, tenantId),
@@ -55,6 +63,11 @@ export default async function SettingsPage() {
           allowed_domains: tenant?.allowed_domains ?? [],
         }}
       />
+      {features.bookings === "on" && booking && (
+        <div id="bookings" className="mt-8 scroll-mt-8">
+          <BookingSettingsCard initial={booking} />
+        </div>
+      )}
       <div className="mt-6">
         <YourWebsite
           consents={{

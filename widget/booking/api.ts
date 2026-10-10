@@ -1,6 +1,7 @@
 import type { FormField } from "../shared/form";
 import type { Theme } from "../shared/theme";
 import type { Slot } from "./calendar";
+import { priceLabel, type BookingLocation, type PriceType, type ServiceLocation } from "../../lib/bookings/price-label";
 
 // Calls to ChatAlot's public widget API. Every call carries the business's
 // public key; the server resolves the business and checks the website.
@@ -31,11 +32,27 @@ export type Service = {
   durationMinutes: number;
   priceCents: number | null;
   staffIds: string[];
+  location: ServiceLocation;
+  priceType: PriceType;
+  calloutFeeCents: number | null;
+  arrivalWindowMinutes: number | null;
 };
+// What customers need to know about where things happen.
+export type BusinessInfo = { serviceAreas: string[]; cancellationPolicy: string; address: string };
 export type Staff = { id: string; name: string; role: string; avatarUrl: string | null };
 
 export type BookingResult =
-  | { ok: true; status: "confirmed" | "pending"; ref: string; startsAt: string; endsAt: string; staffName: string | null }
+  | {
+      ok: true;
+      status: "confirmed" | "pending";
+      ref: string;
+      startsAt: string;
+      endsAt: string;
+      staffName: string | null;
+      windowEnd?: string | null;
+      calloutFeeCents?: number | null;
+      outsideArea?: boolean;
+    }
   | { ok: false; error: string; slotTaken: boolean };
 
 export type AvailabilityQuery = {
@@ -45,6 +62,8 @@ export type AvailabilityQuery = {
   to: string;
   // A manage-link token: that booking's own time counts as free.
   token?: string;
+  // Services done at either place: where the customer chose.
+  location?: BookingLocation;
 };
 
 async function post(url: string, body: unknown): Promise<{ ok: boolean; json: Record<string, unknown> }> {
@@ -63,7 +82,7 @@ export function createApi(apiOrigin: string, key: string) {
 
   return {
     config: <T extends BaseConfig>(widget: BookingWidget) => get<T>("/api/widget/config", { widget }),
-    services: () => get<{ services: Service[]; staff: Staff[] }>("/api/public/services"),
+    services: () => get<{ services: Service[]; staff: Staff[]; business?: BusinessInfo }>("/api/public/services"),
     availability: (q: AvailabilityQuery) =>
       get<{ days: { date: string; slots: Slot[] }[] }>("/api/public/availability", {
         service: q.service,
@@ -71,6 +90,7 @@ export function createApi(apiOrigin: string, key: string) {
         to: q.to,
         ...(q.staff ? { staff: q.staff } : {}),
         ...(q.token ? { token: q.token } : {}),
+        ...(q.location ? { location: q.location } : {}),
       }),
     async book(widget: BookingWidget, body: Record<string, unknown>): Promise<BookingResult> {
       try {
@@ -104,7 +124,7 @@ export function createApi(apiOrigin: string, key: string) {
 
 export type Api = ReturnType<typeof createApi>;
 
-export function price(cents: number | null): string | null {
-  if (cents === null) return null;
-  return `R${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
+// The price line for a service, worded by the shared helper.
+export function price(s: Service, atCustomer = s.location === "customer"): string | null {
+  return priceLabel({ priceType: s.priceType ?? "fixed", priceCents: s.priceCents, calloutFeeCents: s.calloutFeeCents }, atCustomer);
 }

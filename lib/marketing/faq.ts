@@ -28,7 +28,7 @@ export const FAQ: { q: string; a: string }[] = [
     a: "The AI asks before saving anyone's details, and every customer record keeps a history of what they agreed to and when. You can delete a customer's data on request.",
   },
   {
-    q: "What if my business doesn't take bookings?",
-    a: "Bookings are optional. Trades and other callout businesses use the AI and the contact form to capture jobs, and the booking features stay switched off.",
+    q: "What if I go to my customers instead?",
+    a: "Plumbers, electricians and mobile services take call-out requests: customers give their address and choose an arrival window, see your call-out fee before they book, and you confirm each request. Fees are paid to you directly. Bookings are optional too: you can just capture jobs as leads.",
   },
 ];

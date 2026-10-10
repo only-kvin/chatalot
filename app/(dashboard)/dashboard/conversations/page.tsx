@@ -14,21 +14,26 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatShortLocal } from "@/lib/time";
+import { UrgentFilter } from "@/components/dashboard/urgent-filter";
 
-export default async function ConversationsPage() {
+export default async function ConversationsPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
   const tenantId = await getCurrentTenantId();
   if (!tenantId) redirect("/");
+  const urgentOnly = (await searchParams).filter === "urgent";
 
   const supabase = await createClient();
-  const { data: conversations } = await supabase
+  let query = supabase
     .from("conversations")
-    .select("id, channel, status, external_id, last_message_at")
+    .select("id, channel, status, urgent, external_id, last_message_at")
     .eq("tenant_id", tenantId)
     .order("last_message_at", { ascending: false });
+  if (urgentOnly) query = query.eq("urgent", true);
+  const { data: conversations } = await query;
 
   return (
     <div className="mx-auto max-w-4xl p-8">
       <PageHeader title="Conversations" />
+      <UrgentFilter base="/dashboard/conversations" urgentOnly={urgentOnly} />
       <Table>
         <TableHeader>
           <TableRow>
@@ -45,6 +50,11 @@ export default async function ConversationsPage() {
                 <Link href={`/dashboard/conversations/${c.id}`} className="hover:underline">
                   {c.channel}
                 </Link>
+                {c.urgent && (
+                  <Badge variant="danger" className="ml-2">
+                    Urgent
+                  </Badge>
+                )}
               </TableCell>
               <TableCell className="font-mono text-xs text-muted-foreground">
                 {c.external_id.slice(0, 12)}…
@@ -60,7 +70,7 @@ export default async function ConversationsPage() {
           {!conversations?.length && (
             <TableRow>
               <TableCell colSpan={4} className="text-center text-muted-foreground">
-                No conversations yet.
+                {urgentOnly ? "No urgent conversations." : "No conversations yet."}
               </TableCell>
             </TableRow>
           )}

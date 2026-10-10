@@ -1,3 +1,4 @@
+import { BOOKING_PLACE_COLUMNS, customerPlaceLines, type BookingPlace } from "@/lib/bookings/place";
 import { createAdminClient } from "@/lib/db/supabase-admin";
 import { ACTIVE_STATUSES } from "@/lib/bookings/manage";
 import { manageBookingUrl } from "@/lib/email/customer-booking";
@@ -25,10 +26,14 @@ export async function loadCustomerPage(token: string) {
 
   const since = new Date(Date.now() - 90 * DAY_MS).toISOString();
   const [{ data: config }, { data: bookings }, { data: contacts }, registration] = await Promise.all([
-    admin.from("agent_configs").select("business_name, handoff_contact").eq("tenant_id", who.tenantId).maybeSingle(),
+    admin
+      .from("agent_configs")
+      .select("business_name, handoff_contact, business_address, cancellation_policy")
+      .eq("tenant_id", who.tenantId)
+      .maybeSingle(),
     admin
       .from("bookings")
-      .select("id, starts_at, ends_at, status, services(name), staff(name)")
+      .select(`id, starts_at, ends_at, status, ${BOOKING_PLACE_COLUMNS}, services(name), staff(name)`)
       .eq("tenant_id", who.tenantId)
       .ilike("email", exactly(who.email))
       .gte("starts_at", since)
@@ -49,6 +54,13 @@ export async function loadCustomerPage(token: string) {
       status: b.status,
       serviceName: (b.services as unknown as { name: string } | null)?.name ?? "Appointment",
       staffName: (b.staff as unknown as { name: string } | null)?.name ?? null,
+      windowEnd: b.arrival_window_end as string | null,
+      // Where and the agreed fee; the policy is shown once for the page.
+      placeLines: customerPlaceLines(b as BookingPlace, {
+        businessName: config?.business_name || "the business",
+        businessAddress: config?.business_address ?? "",
+        cancellationPolicy: "",
+      }),
       upcoming,
       manageUrl: upcoming && ACTIVE_STATUSES.includes(b.status) ? manageBookingUrl(b.id, b.ends_at) : null,
     };
@@ -60,6 +72,7 @@ export async function loadCustomerPage(token: string) {
     name: contact?.name ?? null,
     businessName: config?.business_name || "the business",
     contact: config?.handoff_contact ?? "",
+    cancellationPolicy: config?.cancellation_policy ?? "",
     bookingUrl: registration.copy.bookingUrl || null,
     bookLinkLabel: registration.copy.bookLinkLabel,
     hasRecord: Boolean(contacts?.length),

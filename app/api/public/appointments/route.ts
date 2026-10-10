@@ -21,6 +21,18 @@ const bodySchema = z.object({
   staffId: z.string().uuid().nullable().optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  // Where it happens; an address is required at the customer's.
+  location: z.enum(["business", "customer"]).nullable().optional(),
+  address: z
+    .object({
+      line: z.string().trim().max(200),
+      suburb: z.string().trim().max(100),
+      city: z.string().trim().max(100).nullable().optional(),
+      postalCode: z.string().trim().max(20).nullable().optional(),
+      accessNotes: z.string().trim().max(500).nullable().optional(),
+    })
+    .nullable()
+    .optional(),
   // Checked against the business's stored form fields below.
   answers: z.record(z.string(), z.unknown()),
   // POPIA: the customer agreed to their details being stored and used for
@@ -92,6 +104,8 @@ export async function POST(request: Request) {
     answers: splitAnswers(answers.data),
     idempotencyKey: body.idempotencyKey,
     widget: body.widget,
+    location: body.location ?? null,
+    address: body.address ?? null,
   });
   if (!booked.ok) {
     if (booked.reason === "slot_taken" || booked.reason === "unavailable") {
@@ -99,6 +113,12 @@ export async function POST(request: Request) {
         { error: "Sorry, that time was just taken. Please pick another.", reason: "slot_taken" },
         { status: 409, headers },
       );
+    }
+    if (booked.reason === "address_required") {
+      return NextResponse.json({ error: "Please give your street address and suburb." }, { status: 400, headers });
+    }
+    if (booked.reason === "invalid_location") {
+      return NextResponse.json({ error: "This service isn't offered there. Please choose again." }, { status: 400, headers });
     }
     return NextResponse.json({ error: "We couldn't make the booking. Please try again." }, { status: 500, headers });
   }
@@ -108,7 +128,17 @@ export async function POST(request: Request) {
     ? await admin.from("staff").select("name").eq("tenant_id", tenantId).eq("id", booked.staffId).maybeSingle()
     : { data: null };
   return NextResponse.json(
-    { ok: true, status: booked.status, ref: booked.ref, startsAt: booked.startsAt, endsAt: booked.endsAt, staffName: person?.name ?? null },
+    {
+      ok: true,
+      status: booked.status,
+      ref: booked.ref,
+      startsAt: booked.startsAt,
+      endsAt: booked.endsAt,
+      staffName: person?.name ?? null,
+      windowEnd: booked.windowEnd,
+      calloutFeeCents: booked.calloutFeeCents,
+      outsideArea: booked.outsideArea,
+    },
     { headers },
   );
 }

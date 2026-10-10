@@ -15,6 +15,13 @@ type Result = { error: string | null };
 const uuid = z.string().uuid();
 const minutes = (label: string) => z.coerce.number().int().min(0, `${label} can't be negative`).max(240, `${label} is at most 240 minutes`);
 
+const rand = (message: string) =>
+  z
+    .string()
+    .trim()
+    .refine((v) => v === "" || (Number.isFinite(Number(v)) && Number(v) >= 0), message);
+const cents = (v: string) => (v ? Math.round(Number(v) * 100) : null);
+
 const serviceSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100),
   description: z.string().trim().max(1000),
@@ -22,10 +29,14 @@ const serviceSchema = z.object({
   duration_minutes: z.coerce.number().int().min(5, "At least 5 minutes").max(1440),
   buffer_before_min: minutes("Time before"),
   buffer_after_min: minutes("Time after"),
-  price_rand: z
+  price_rand: rand("Enter a price like 250 or 250.00"),
+  location: z.enum(["business", "customer", "either"]),
+  price_type: z.enum(["fixed", "from", "on_inspection"]),
+  callout_fee_rand: rand("Enter a call-out fee like 450"),
+  // "" = an exact start time.
+  arrival_window_minutes: z
     .string()
-    .trim()
-    .refine((v) => v === "" || (Number.isFinite(Number(v)) && Number(v) >= 0), "Enter a price like 250 or 250.00"),
+    .refine((v) => v === "" || ["60", "120", "180", "240", "480"].includes(v), "Pick an arrival window"),
   active: z.boolean(),
   online_bookable: z.boolean(),
   // "anyone" = every active staff member; otherwise only those ticked.
@@ -42,6 +53,10 @@ function parseForm(formData: FormData) {
     buffer_before_min: formData.get("buffer_before_min") || 0,
     buffer_after_min: formData.get("buffer_after_min") || 0,
     price_rand: formData.get("price_rand") ?? "",
+    location: formData.get("location") ?? "business",
+    price_type: formData.get("price_type") ?? "fixed",
+    callout_fee_rand: formData.get("callout_fee_rand") ?? "",
+    arrival_window_minutes: formData.get("arrival_window_minutes") ?? "",
     active: formData.get("active") === "on",
     online_bookable: formData.get("online_bookable") === "on",
     staff_mode: formData.get("staff_mode") ?? "anyone",
@@ -57,7 +72,13 @@ function toRecord(d: z.infer<typeof serviceSchema>) {
     duration_minutes: d.duration_minutes,
     buffer_before_min: d.buffer_before_min,
     buffer_after_min: d.buffer_after_min,
-    price_cents: d.price_rand ? Math.round(Number(d.price_rand) * 100) : null,
+    // Quoted on site: no price is stored, so none can be shown.
+    price_cents: d.price_type === "on_inspection" ? null : cents(d.price_rand),
+    location: d.location,
+    price_type: d.price_type,
+    // Fee and window only apply at the customer's address.
+    callout_fee_cents: d.location === "business" ? null : cents(d.callout_fee_rand),
+    arrival_window_minutes: d.location === "business" || !d.arrival_window_minutes ? null : Number(d.arrival_window_minutes),
     active: d.active,
     online_bookable: d.online_bookable,
   };

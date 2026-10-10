@@ -1,4 +1,4 @@
-import { bookingChat, calloutChat, type DemoChat } from "./demo-chat";
+import { bookingChat, calloutChat, calloutRequestChat, type DemoChat } from "./demo-chat";
 
 // Content for the /for/<group> and /for/<type> pages. Server-only in
 // practice: the menus read the light list in business-types.ts instead, so
@@ -23,9 +23,9 @@ export type BusinessGroupPage = {
   name: string;
   headline: string;
   intro: string;
-  // Trades take callouts, not appointments, so their pages leave out booking
-  // features (as the plan switches do for a plumber).
-  bookings: boolean;
+  // Trades book call-outs to the customer's address (arrival windows,
+  // call-out fees, service areas) rather than salon-style appointments.
+  kind: "appointments" | "callouts";
   problems: { title: string; text: string }[];
   highlights: Highlight[];
   types: BusinessTypePage[];
@@ -69,8 +69,8 @@ export const BUSINESS_PAGES: BusinessGroupPage[] = [
     slug: "beauty",
     name: "Beauty",
     headline: "Keep the chair full while your hands are busy",
-    intro: "For salons, barbers and beauty studios: answer every \"how much?\" and \"are you free?\" without putting down the scissors.",
-    bookings: true,
+    intro: "For salons, barbers and beauty studios: answer every \"how much?\" and \"are you free?\" without putting down the scissors. Mobile? Customers can book you to come to them too.",
+    kind: "appointments",
     problems: [
       { title: "Messages arrive mid-appointment", text: "You can't reply with foils in someone's hair, and the person asking books somewhere that answered first." },
       { title: "Late-night price questions", text: "Most enquiries come after hours, when you're finally off your feet." },
@@ -159,8 +159,8 @@ export const BUSINESS_PAGES: BusinessGroupPage[] = [
     slug: "wellness",
     name: "Wellness",
     headline: "Calm for your clients, and for your front desk",
-    intro: "For spas, therapists and practices: answer treatment questions and fill your rooms, without interrupting a session.",
-    bookings: true,
+    intro: "For spas, therapists and practices: answer treatment questions and fill your rooms, without interrupting a session. Home visits work too: customers choose your place or theirs.",
+    kind: "appointments",
     problems: [
       { title: "You can't answer mid-session", text: "A ringing phone breaks the calm, so enquiries wait, and some go elsewhere." },
       { title: "Treatment questions take time", text: "\"Which massage is best for back pain?\" needs a proper answer, not a missed call." },
@@ -280,7 +280,7 @@ export const BUSINESS_PAGES: BusinessGroupPage[] = [
     name: "Fitness",
     headline: "Answer every \"how do I join?\" while you're coaching",
     intro: "For gyms, studios and coaches: handle trial, class and membership questions on your website and WhatsApp, and fill your sessions.",
-    bookings: true,
+    kind: "appointments",
     problems: [
       { title: "Questions arrive mid-class", text: "You're on the floor coaching while prospects wait for a reply about trials and prices." },
       { title: "The same questions every day", text: "Times, prices, what to bring: answered again and again by hand." },
@@ -414,8 +414,8 @@ export const BUSINESS_PAGES: BusinessGroupPage[] = [
     slug: "trades",
     name: "Trades and home services",
     headline: "Never lose a job because you were on another one",
-    intro: "For plumbers, electricians and home services: the AI answers while you're on a roof or under a sink, takes the job details, and sends you the lead.",
-    bookings: false,
+    intro: "For plumbers, electricians and home services: the AI answers while you're on a roof or under a sink, takes the address and books the call-out for you to confirm.",
+    kind: "callouts",
     problems: [
       { title: "Missed calls while you're on a job", text: "You can't answer with your hands in a geyser, and the customer calls the next number on Google." },
       { title: "Quote requests lost in WhatsApp", text: "Requests sink under supplier and family chats, and never get a reply." },
@@ -428,43 +428,45 @@ export const BUSINESS_PAGES: BusinessGroupPage[] = [
         href: "/features/never-miss-a-customer#website-chat",
       },
       {
-        title: "Callout requests captured",
-        text: "The AI takes the customer's name, number, area and what's wrong, with their permission, and files it as a lead.",
-        href: "/features/grow-and-keep-clients#leads",
+        title: "Request a call-out",
+        text: "In chat, on WhatsApp or in your booking widget, customers give their address and pick a time. Requests wait for you to confirm.",
+        href: "/features/fill-your-calendar#booking",
       },
       {
-        title: "An alert for every lead",
-        text: "An email and a dashboard alert the moment a job comes in, so you can call back between jobs.",
-        href: "/features/grow-and-keep-clients#leads",
+        title: "Arrival windows",
+        text: "Offer \"between 08:00 and 10:00\" instead of an exact time, with travel time kept free either side so windows never double-book.",
+        href: "/features/fill-your-calendar#booking",
       },
       {
-        title: "A contact form that files leads",
-        text: "A quote request form on your website, in your colours, that lands in your Messages and your leads.",
-        href: "/features/your-website-upgraded#widgets",
+        title: "Call-out fee shown upfront",
+        text: "Customers hear your call-out fee before they book. Jobs you quote on site are never given a made-up price.",
+        href: "/features/fill-your-calendar#booking",
       },
       {
-        title: "You take over when it matters",
-        text: "Step into any conversation yourself; when a customer asks for a person, you're alerted.",
+        title: "Your service areas",
+        text: "List the suburbs you cover. Requests from further out still come in, marked for you to check before you confirm.",
+        href: "/features/fill-your-calendar#booking",
+      },
+      {
+        title: "Urgent jobs straight to your phone",
+        text: "A burst pipe on a Sunday skips the calendar: it's flagged urgent and sent to you by email, dashboard alert and WhatsApp.",
         href: "/features/never-miss-a-customer#takeover",
-      },
-      {
-        title: "Customer records",
-        text: "Every customer's details and conversations in one place, with their POPIA consent history.",
-        href: "/features/grow-and-keep-clients#customers",
       },
     ],
     types: [
       {
         slug: "plumbers",
         name: "Plumbers",
-        headline: "Catch every burst pipe and geyser job, even while you're on one",
-        chat: calloutChat({
+        headline: "Book every geyser and leak call-out, even while you're on a job",
+        chat: calloutRequestChat({
           business: "FlowFix Plumbing",
-          ask: "My geyser is leaking through the ceiling! Can someone come today?",
-          answer: "Sorry, that sounds stressful. Switch off the geyser at the DB board and close the water supply if you can. Can I take your name, number and suburb so a plumber can call you back?",
+          ask: "My geyser's overflow pipe keeps dripping. Can someone come out tomorrow?",
+          answer: "We can come tomorrow between 08:00 and 10:00 or between 12:00 and 14:00. It's quoted on site, and the call-out fee is R450, payable on arrival. Which window suits you?",
+          reply: "08:00 to 10:00 please. Sipho, 082 555 0142, 14 Vale Ave, Randburg",
+          confirm: "Thanks, Sipho. Call-out requested: tomorrow between 08:00 and 10:00 at 14 Vale Ave, Randburg. FlowFix will confirm shortly.",
+          window: "08:00–10:00",
           customer: "Sipho",
-          area: "Randburg",
-          what: "Leaking geyser · Randburg",
+          what: "Geyser overflow · Randburg",
         }),
       },
       {
@@ -526,7 +528,7 @@ export const BUSINESS_PAGES: BusinessGroupPage[] = [
     name: "Clinics and professional services",
     headline: "A front desk that answers, even when yours is busy",
     intro: "For practices and consultants: answer common questions, book appointments and pass anything clinical or complex to a person.",
-    bookings: true,
+    kind: "appointments",
     problems: [
       { title: "A busy line at reception", text: "Patients can't get through while your front desk helps the person in front of them." },
       { title: "After-hours enquiries", text: "People look for appointments in the evening, when nobody is there to answer." },

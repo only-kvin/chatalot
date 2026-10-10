@@ -19,15 +19,22 @@ export async function notifyOwnerOfBooking(
     pending?: boolean;
     // Opens this booking rather than the chat it came from.
     bookingId?: string;
+    // Call-outs: where, and whether it's outside the listed areas.
+    address?: string | null;
+    outsideArea?: boolean;
   },
   conversationId?: string | null,
 ): Promise<void> {
   const type = booking.pending ? "approval_needed" : "new_booking";
+  const callout = Boolean(booking.address);
+  const kind = callout ? (booking.pending ? "Call-out to approve" : "New call-out") : booking.pending ? "Booking to approve" : "New booking";
   await recordNotification(admin, {
     tenantId,
     type,
-    title: `${booking.pending ? "Booking to approve" : "New booking"}: ${booking.name}`,
-    body: `${booking.serviceName} · ${booking.startsAtLabel}`,
+    title: `${kind}: ${booking.name}`,
+    body: [booking.serviceName, booking.startsAtLabel, booking.address, booking.outsideArea ? "outside your listed areas" : null]
+      .filter(Boolean)
+      .join(" · "),
     conversationId,
   });
 
@@ -35,14 +42,19 @@ export async function notifyOwnerOfBooking(
     ? "A customer just booked on your website."
     : "Your AI receptionist just booked an appointment.";
   await sendOwnerEmail(admin, tenantId, {
-    subject: `${booking.pending ? "Booking to approve" : "New booking"}: ${booking.name} (${businessName})`,
-    intro: booking.pending
-      ? `${made} It's waiting for you to approve or decline it; the time is held until then.`
-      : made,
+    subject: `${kind}: ${booking.name} (${businessName})`,
+    intro: [
+      made,
+      booking.pending ? "It's waiting for you to approve or decline it; the time is held until then." : "",
+      booking.outsideArea ? "Their suburb isn't in your listed service areas: check you cover it before approving." : "",
+    ]
+      .filter(Boolean)
+      .join(" "),
     details: [
       ["Service", booking.serviceName],
       ["When", booking.startsAtLabel],
       ["With", booking.staffName ?? null],
+      ["Address", booking.address ?? null],
       ["Name", booking.name],
       ["Phone", booking.phone],
       ["Email", booking.email],

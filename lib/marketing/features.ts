@@ -93,6 +93,7 @@ export const FEATURE_PAGES: FeaturePage[] = [
           "Staff with their own working hours, breaks, time off and the services they offer",
           "Opening hours, closures and holidays, plus how far ahead and how late people can book",
           "Capacity for group sessions, and optional approval before a booking is confirmed",
+          "Call-outs to the customer's address: arrival windows, travel time, your service areas and the call-out fee shown upfront",
         ],
       },
       {

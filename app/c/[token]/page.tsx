@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { STATUS_LABEL, type BookingStatus } from "@/lib/bookings/labels";
 import { loadCustomerPage } from "@/lib/contacts/customer-page";
-import { formatLocalDateTime } from "@/lib/time";
+import { formatBookingWhen } from "@/lib/bookings/when";
 import { ConsentSwitches } from "./consent-switches";
 
 // Personal links: keep them out of search engines and referrer headers.
@@ -11,7 +11,16 @@ export const metadata: Metadata = {
   referrer: "no-referrer",
 };
 
-type Row = { id: string; startsAt: string; status: string; serviceName: string; staffName: string | null; manageUrl: string | null };
+type Row = {
+  id: string;
+  startsAt: string;
+  windowEnd: string | null;
+  status: string;
+  serviceName: string;
+  staffName: string | null;
+  placeLines: [string, string | null][];
+  manageUrl: string | null;
+};
 
 function BookingList({ rows, empty }: { rows: Row[]; empty: string }) {
   if (!rows.length) return <p className="text-zinc-500">{empty}</p>;
@@ -22,11 +31,18 @@ function BookingList({ rows, empty }: { rows: Row[]; empty: string }) {
           <div>
             <p className="font-medium">{b.serviceName}</p>
             <p className="text-zinc-500">
-              {formatLocalDateTime(b.startsAt)}
+              {formatBookingWhen(b.startsAt, b.windowEnd)}
               {b.staffName && ` · with ${b.staffName}`}
               {" · "}
               {STATUS_LABEL[b.status as BookingStatus] ?? b.status}
             </p>
+            {b.placeLines
+              .filter(([, v]) => v)
+              .map(([label, value]) => (
+                <p key={label} className="text-zinc-500">
+                  {label}: {value}
+                </p>
+              ))}
           </div>
           {b.manageUrl && (
             <a href={b.manageUrl} className="rounded-lg border px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-900">
@@ -87,6 +103,8 @@ export default async function CustomerPage({ params }: { params: Promise<{ token
                 <p className="text-zinc-500">Sign up on the business&apos;s website to choose.</p>
               )}
             </section>
+
+            {page.cancellationPolicy && <p className="text-zinc-500">Cancellation policy: {page.cancellationPolicy}</p>}
 
             {page.contact && (
               <p className="text-xs text-zinc-500">

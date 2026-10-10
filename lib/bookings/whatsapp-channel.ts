@@ -7,6 +7,7 @@ export type TenantWhatsApp = {
   accessToken: string;
   businessName: string;
   googleReviewUrl: string | null;
+  cancellationPolicy?: string;
 };
 
 // Returns a lookup that loads each tenant's active WhatsApp number and
@@ -25,7 +26,7 @@ export function tenantWhatsAppLookup(admin: SupabaseClient): (tenantId: string) 
           .eq("status", "active")
           .limit(1)
           .maybeSingle(),
-        admin.from("agent_configs").select("business_name, google_review_url").eq("tenant_id", tenantId).maybeSingle(),
+        admin.from("agent_configs").select("business_name, google_review_url, cancellation_policy").eq("tenant_id", tenantId).maybeSingle(),
       ]);
       cache.set(
         tenantId,
@@ -35,6 +36,7 @@ export function tenantWhatsAppLookup(admin: SupabaseClient): (tenantId: string) 
               accessToken: decrypt(channel.wa_access_token_encrypted),
               businessName: config?.business_name ?? "",
               googleReviewUrl: config?.google_review_url ?? null,
+              cancellationPolicy: config?.cancellation_policy ?? "",
             }
           : null,
       );
