@@ -7,6 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { pageFrame } from "@/components/dashboard/page-frame";
 
 // Claude Haiku pricing per the project spec ($1 in / $5 out per million tokens) —
 // used as the cost estimate basis regardless of which model is actually live.
@@ -54,7 +55,7 @@ export default async function UsagePage() {
     .sort((a, b) => b.messages - a.messages);
 
   return (
-    <div className="mx-auto max-w-3xl p-8">
+    <div className={pageFrame("wide")}>
       <h1 className="mb-2 text-2xl font-semibold">Usage — this month</h1>
       <p className="mb-6 text-sm text-muted-foreground">
         Estimated cost assumes Claude Haiku pricing ($1 in / $5 out per million

@@ -6,6 +6,7 @@ import { requireFeaturePage } from "@/lib/dashboard-features";
 import { formatShortLocal } from "@/lib/time";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MessageActions } from "./message-actions";
+import { pageFrame } from "@/components/dashboard/page-frame";
 
 export default async function MessagePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -29,7 +30,7 @@ export default async function MessagePage({ params }: { params: Promise<{ id: st
   const details = Object.entries((m.details as Record<string, string | boolean>) ?? {});
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
+    <div className={pageFrame("detail", "flex flex-col gap-6")}>
       <div>
         <Link href="/dashboard/messages" className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeftIcon className="size-4" /> Messages

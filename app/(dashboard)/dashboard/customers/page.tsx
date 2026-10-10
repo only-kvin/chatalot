@@ -16,6 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatShortLocal } from "@/lib/time";
+import { pageFrame } from "@/components/dashboard/page-frame";
 
 type Count = { count: number }[];
 
@@ -52,7 +53,7 @@ export default async function CustomersPage({
   const { data: customers } = await query;
 
   return (
-    <div className="mx-auto max-w-5xl p-8">
+    <div className={pageFrame("wide")}>
       <PageHeader
         title="Customers"
         description="Everyone who has messaged you on WhatsApp or left their details on your website, with their full history."

@@ -24,6 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { pageFrame } from "@/components/dashboard/page-frame";
 
 export default async function AdminPage() {
   const supabase = await createClient();
@@ -42,7 +43,7 @@ export default async function AdminPage() {
   for (const r of requests ?? []) openRequests.set(r.tenant_id, (openRequests.get(r.tenant_id) ?? 0) + 1);
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-8 p-8">
+    <div className={pageFrame("wide", "flex flex-col gap-8")}>
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Tenants</h1>
         <div className="flex gap-4">

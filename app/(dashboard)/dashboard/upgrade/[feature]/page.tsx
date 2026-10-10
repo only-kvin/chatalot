@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { FeaturePreview } from "../feature-preview";
 import { RequestUpgradeButton } from "../request-upgrade-button";
+import { pageFrame } from "@/components/dashboard/page-frame";
 
 // Where each feature lives once it's unlocked.
 const FEATURE_HOME: Record<Feature, string> = {
@@ -40,7 +41,7 @@ export default async function UpgradePage({ params }: { params: Promise<{ featur
 
   const info = FEATURE_INFO[feature];
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-8">
+    <div className={pageFrame("detail")}>
       <Card className="gap-0 overflow-hidden p-0 md:flex-row">
         <div className="flex flex-1 flex-col gap-5 p-7">
           <Badge variant="new" className="self-start">

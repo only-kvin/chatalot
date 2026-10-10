@@ -2,6 +2,7 @@ import { createClient } from "@/lib/db/supabase-server";
 import { requireFeaturePage } from "@/lib/dashboard-features";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StaffList, type StaffRow } from "./staff-list";
+import { pageFrame } from "@/components/dashboard/page-frame";
 
 export default async function StaffPage() {
   const tenantId = await requireFeaturePage("bookings");
@@ -33,7 +34,7 @@ export default async function StaffPage() {
   });
 
   return (
-    <div className="mx-auto max-w-3xl p-8">
+    <div className={pageFrame("detail")}>
       <PageHeader
         title="Staff"
         description="The people customers can book. Without any staff, the business takes one booking at a time."

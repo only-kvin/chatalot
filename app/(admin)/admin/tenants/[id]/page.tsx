@@ -21,6 +21,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { pageFrame } from "@/components/dashboard/page-frame";
 
 export default async function TenantDetailPage({
   params,
@@ -59,7 +60,7 @@ export default async function TenantDetailPage({
     .maybeSingle();
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-8 p-8">
+    <div className={pageFrame("form", "flex flex-col gap-8")}>
       <div>
         <h1 className="text-2xl font-semibold">{tenant.name}</h1>
         <p className="text-sm text-muted-foreground">/{tenant.slug}</p>

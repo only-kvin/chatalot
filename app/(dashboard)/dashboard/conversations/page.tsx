@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { formatShortLocal } from "@/lib/time";
 import { UrgentFilter } from "@/components/dashboard/urgent-filter";
+import { pageFrame } from "@/components/dashboard/page-frame";
 
 export default async function ConversationsPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
   const tenantId = await getCurrentTenantId();
@@ -31,7 +32,7 @@ export default async function ConversationsPage({ searchParams }: { searchParams
   const { data: conversations } = await query;
 
   return (
-    <div className="mx-auto max-w-4xl p-8">
+    <div className={pageFrame("wide")}>
       <PageHeader title="Conversations" />
       <UrgentFilter base="/dashboard/conversations" urgentOnly={urgentOnly} />
       <Table>

@@ -22,6 +22,7 @@ import { Rating } from "@/components/dashboard/rating";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BookingActions } from "./booking-actions";
 import { AssignStaff } from "./assign-staff";
+import { pageFrame } from "@/components/dashboard/page-frame";
 
 export default async function BookingPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -60,7 +61,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
   const maps = mapsUrl(place);
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
+    <div className={pageFrame("detail", "flex flex-col gap-6")}>
       <div>
         <Link
           href="/dashboard/bookings"

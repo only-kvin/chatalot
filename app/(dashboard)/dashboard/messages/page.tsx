@@ -6,6 +6,7 @@ import { formatShortLocal } from "@/lib/time";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { pageFrame } from "@/components/dashboard/page-frame";
 
 const TABS = [
   { id: "new", label: "New" },
@@ -29,7 +30,7 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
   const { data: messages } = await query;
 
   return (
-    <div className="mx-auto max-w-5xl p-8">
+    <div className={pageFrame("wide")}>
       <PageHeader title="Messages" description="What people sent through the contact form on your website." />
       <nav className="mb-4 flex gap-1 border-b" aria-label="Message views">
         {TABS.map((t) => (

@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { createClient } from "@/lib/db/supabase-server";
 import { BUSINESS_GROUPS } from "@/lib/marketing/business-types";
 import { formatShortLocal } from "@/lib/time";
+import { pageFrame } from "@/components/dashboard/page-frame";
 
 const STATUSES = ["draft", "ready", "in_build", "live", "withdrawn"] as const;
 const GAPS = [
@@ -39,7 +40,7 @@ export default async function SiteBriefsPage({ searchParams }: PageProps<"/admin
 
   const selectClass = "h-8 rounded-lg border border-input bg-card px-2 text-sm";
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 p-8">
+    <div className={pageFrame("wide", "flex flex-col gap-6")}>
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Site briefs</h1>
         <Link href="/admin" className="text-sm text-muted-foreground hover:underline">

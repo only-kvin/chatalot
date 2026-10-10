@@ -2,6 +2,7 @@ import { createClient } from "@/lib/db/supabase-server";
 import { requireFeaturePage } from "@/lib/dashboard-features";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { ServicesEditor } from "./services-editor";
+import { pageFrame } from "@/components/dashboard/page-frame";
 
 export default async function ServicesPage() {
   const tenantId = await requireFeaturePage("bookings");
@@ -22,7 +23,7 @@ export default async function ServicesPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-2xl p-8">
+    <div className={pageFrame("form")}>
       <PageHeader title="Services" description="What customers can book, how long it takes and who does it." />
       <ServicesEditor
         initialServices={(services ?? []).map((svc) => ({

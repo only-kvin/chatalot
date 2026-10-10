@@ -13,6 +13,7 @@ import { parseTheme, THEME_COOKIE } from "@/components/theme/theme";
 import { AiPanel, Kpis, LiveConversations, NewLeads, TodaysBookings } from "./_overview/sections";
 import { OnboardingChecklist } from "./_overview/onboarding";
 import { KpisSkeleton, PeopleSkeleton, RowsSkeleton, TableSkeleton } from "./_overview/skeletons";
+import { pageFrame } from "@/components/dashboard/page-frame";
 
 const TODAY = new Intl.DateTimeFormat("en-GB", {
   timeZone: "Africa/Johannesburg",
@@ -43,7 +44,7 @@ export default async function OverviewPage() {
   const name = config?.business_name;
 
   return (
-    <div className="mx-auto flex max-w-[1240px] flex-col gap-6 px-4 pt-7 pb-12 sm:px-[clamp(16px,3vw,40px)]">
+    <div className={pageFrame("wide", "flex flex-col gap-6")}>
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1.5">
           <span className="text-[13px] font-medium text-muted-foreground">{TODAY.format(now)}</span>

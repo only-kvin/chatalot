@@ -9,6 +9,7 @@ import { currentConsents, type ConsentState } from "@/lib/consent/business-conse
 import { setupComplete } from "@/lib/onboarding";
 import { briefIsStale } from "@/lib/site-brief/generate";
 import { appUrl } from "@/lib/app-url";
+import { pageFrame } from "@/components/dashboard/page-frame";
 
 export default async function SettingsPage() {
   const current = await currentTenantFeatures();
@@ -45,7 +46,7 @@ export default async function SettingsPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-2xl p-8">
+    <div className={pageFrame("form")}>
       <PageHeader title="Settings" />
       <SettingsForm
         hostedBookingUrl={appUrl(`/book/${tenant?.slug ?? ""}`)}

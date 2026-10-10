@@ -8,6 +8,7 @@ import { WeeklyHours } from "@/components/dashboard/weekly-hours";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DeleteStaff, HoursMode, StaffDetailsForm, StaffPhoto, StaffServices, TimeOff } from "./staff-editor";
+import { pageFrame } from "@/components/dashboard/page-frame";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -62,7 +63,7 @@ export default async function StaffMemberPage({ params }: { params: Promise<{ id
   const ownHours = (rules ?? []).length > 0;
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
+    <div className={pageFrame("detail", "flex flex-col gap-6")}>
       <div>
         <Link href="/dashboard/staff" className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeftIcon className="size-4" /> Staff

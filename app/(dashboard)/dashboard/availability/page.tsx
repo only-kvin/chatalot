@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { WeeklyHours } from "@/components/dashboard/weekly-hours";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BookingRulesForm, ExceptionsEditor } from "./availability-editor";
+import { pageFrame } from "@/components/dashboard/page-frame";
 
 export default async function AvailabilityPage() {
   const tenantId = await requireFeaturePage("bookings");
@@ -30,7 +31,7 @@ export default async function AvailabilityPage() {
   ]);
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-8 p-8">
+    <div className={pageFrame("form", "flex flex-col gap-8")}>
       <PageHeader title="Availability" description="When customers can book, and the rules for booking." />
 
       <Card>

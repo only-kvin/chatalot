@@ -10,6 +10,7 @@ import { CONVERSATION_LABEL, conversationTone } from "@/lib/ui/status-tones";
 import { Badge } from "@/components/ui/badge";
 import { isWithinServiceWindow } from "@/lib/channels/whatsapp";
 import { ReplyBox } from "./reply-box";
+import { pageFrame } from "@/components/dashboard/page-frame";
 
 export default async function ConversationPage({
   params,
@@ -53,7 +54,7 @@ export default async function ConversationPage({
   }
 
   return (
-    <div className="mx-auto max-w-2xl p-8">
+    <div className={pageFrame("form")}>
       {conversation.urgent && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
           <span>

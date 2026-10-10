@@ -18,6 +18,7 @@ const CONSENT_SOURCE: Record<string, string> = {
 import { CustomerForm } from "./customer-form";
 import { DeleteCustomer } from "./delete-customer";
 import { formatShortLocal } from "@/lib/time";
+import { pageFrame } from "@/components/dashboard/page-frame";
 
 const NAME_SOURCE_LABEL: Record<string, string> = {
   whatsapp_profile: "from their WhatsApp profile",
@@ -71,7 +72,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   const displayName = customer.name || customer.email || "Unnamed customer";
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
+    <div className={pageFrame("detail", "flex flex-col gap-6")}>
       <div>
         <Link
           href="/dashboard/customers"

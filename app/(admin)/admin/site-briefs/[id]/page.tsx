@@ -6,6 +6,7 @@ import { createClient } from "@/lib/db/supabase-server";
 import { briefIsStale } from "@/lib/site-brief/generate";
 import { formatLocalDateTime } from "@/lib/time";
 import { BriefFields, CopyPromptButton } from "./brief-controls";
+import { pageFrame } from "@/components/dashboard/page-frame";
 
 export default async function SiteBriefPage({ params }: PageProps<"/admin/site-briefs/[id]">) {
   const { id } = await params;
@@ -21,7 +22,7 @@ export default async function SiteBriefPage({ params }: PageProps<"/admin/site-b
   const conflicts = brief.conflicts as { field: string; ownerValue: string; websiteValue: string }[];
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6 p-8">
+    <div className={pageFrame("detail", "flex flex-col gap-6")}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <Link href="/admin/site-briefs" className="text-sm text-muted-foreground hover:underline">

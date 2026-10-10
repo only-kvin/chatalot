@@ -28,6 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { pageFrame } from "@/components/dashboard/page-frame";
 
 const TABS = [
   { id: "upcoming", label: "Upcoming" },
@@ -100,7 +101,7 @@ export default async function BookingsPage({
   }
 
   return (
-    <div className="mx-auto max-w-6xl p-8">
+    <div className={pageFrame("wide")}>
       <PageHeader title="Bookings" description="Every booking, how it was made, and every change since." />
 
       <nav className="mb-4 flex gap-1 overflow-x-auto border-b [scrollbar-width:none]" aria-label="Booking views">

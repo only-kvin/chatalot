@@ -9,6 +9,7 @@ import { loadWidget, loadWidgetTheme } from "@/lib/widgets/config";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { WidgetEditor } from "./widget-editor";
 import { BookingWidgetTab, WidgetSnippet } from "./booking-widget-editor";
+import { pageFrame } from "@/components/dashboard/page-frame";
 
 const TABS = [
   { id: "chat", label: "Chat" },
@@ -28,7 +29,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
   const tab = (tabs.find((t) => t.id === requested) ?? tabs[0])?.id;
   if (!tab) {
     return (
-      <div className="mx-auto max-w-5xl p-8">
+      <div className={pageFrame("wide")}>
         <PageHeader title="Widgets" description="No website widgets are included in your plan." />
       </div>
     );
@@ -59,7 +60,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
   if (tab !== "chat") {
     const [theme, instance] = await Promise.all([loadWidgetTheme(supabase, tenantId), loadWidget(supabase, tenantId, tab)]);
     return (
-      <div className="mx-auto max-w-6xl p-8">
+      <div className={pageFrame("wide")}>
         <PageHeader title="Widgets" description="What customers see on your website." />
         {nav}
         <div className="flex flex-col gap-8">
@@ -88,7 +89,7 @@ ${script}`} />
     .single();
 
   return (
-    <div className="mx-auto max-w-5xl p-8">
+    <div className={pageFrame("wide")}>
       <PageHeader title="Widgets" description="What customers see on your website." />
       {nav}
       <WidgetEditor

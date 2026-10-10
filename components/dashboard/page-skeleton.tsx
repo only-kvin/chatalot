@@ -1,11 +1,13 @@
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { pageFrame, type PageWidth } from "./page-frame";
 
 // Generic page placeholder shown by loading.tsx the instant a link is clicked,
-// while the server fetches the real page: a heading, then a card of rows.
-export function PageSkeleton({ width = "max-w-5xl" }: { width?: string }) {
+// while the server fetches the real page: a heading, then a card of rows. Uses
+// the same frame as the pages, so nothing jumps sideways when they arrive.
+export function PageSkeleton({ width = "wide" }: { width?: PageWidth }) {
   return (
-    <div role="status" aria-label="Loading" className={`mx-auto ${width} p-8`}>
+    <div role="status" aria-label="Loading" className={pageFrame(width)}>
       <div className="mb-6 flex flex-col gap-2.5">
         <Skeleton className="h-[30px] w-48" />
         <Skeleton className="h-3.5 w-72 max-w-full" />

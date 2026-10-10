@@ -4,6 +4,7 @@ import { getCurrentTenantId } from "@/lib/db/current-tenant";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { LeadsTable } from "./leads-table";
 import { UrgentFilter } from "@/components/dashboard/urgent-filter";
+import { pageFrame } from "@/components/dashboard/page-frame";
 
 export default async function LeadsPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
   const tenantId = await getCurrentTenantId();
@@ -20,7 +21,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   const { data: leads } = await query;
 
   return (
-    <div className="mx-auto max-w-4xl p-8">
+    <div className={pageFrame("wide")}>
       <PageHeader title="Leads" />
       <UrgentFilter base="/dashboard/leads" urgentOnly={urgentOnly} />
       <LeadsTable leads={leads ?? []} />

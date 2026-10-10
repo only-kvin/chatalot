@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { KnowledgeEditor } from "./knowledge-editor";
 import { WebsiteSection } from "./website-section";
 import { importableHosts } from "@/lib/website/urls";
+import { pageFrame } from "@/components/dashboard/page-frame";
 
 export default async function KnowledgePage() {
   const tenantId = await getCurrentTenantId();
@@ -35,7 +36,7 @@ export default async function KnowledgePage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-2xl p-8">
+    <div className={pageFrame("form")}>
       <PageHeader
         title="Knowledge base"
         description="FAQs, services, prices and policies your AI receptionist answers from."
