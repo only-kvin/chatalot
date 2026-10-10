@@ -13,13 +13,11 @@ export const FEATURE_GROUPS: NavGroup[] = FEATURE_PAGES.map((p) => ({
   links: p.sections.map((sec) => ({ label: sec.label, href: `/features/${p.slug}#${sec.id}` })),
 }));
 
-export const BUSINESS_TYPE_GROUPS: NavGroup[] = BUSINESS_GROUPS.map((g) => ({
-  title: g.name,
+// One page per group; the kinds of business it covers are named underneath.
+export const BUSINESS_TYPE_LINKS: NavLink[] = BUSINESS_GROUPS.map((g) => ({
+  label: g.name,
   href: `/for/${g.slug}`,
-  links: [
-    ...g.types.map((t) => ({ label: t.name, href: `/for/${t.slug}` })),
-    { label: `All ${g.name.toLowerCase()}`, href: `/for/${g.slug}` },
-  ],
+  description: g.types.map((t) => t.name).join(", "),
 }));
 
 export const RESOURCE_LINKS: NavLink[] = [

@@ -9,7 +9,7 @@ export function publicPaths(): string[] {
     "/",
     "/features",
     ...FEATURE_PAGES.map((p) => `/features/${p.slug}`),
-    ...BUSINESS_GROUPS.flatMap((g) => [`/for/${g.slug}`, ...g.types.map((t) => `/for/${t.slug}`)]),
+    ...BUSINESS_GROUPS.map((g) => `/for/${g.slug}`),
     "/pricing",
     "/resources",
     ...GUIDES.map((g) => `/resources/${g.slug}`),

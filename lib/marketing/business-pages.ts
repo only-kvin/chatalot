@@ -1,6 +1,8 @@
 import { bookingChat, calloutChat, calloutRequestChat, type DemoChat } from "./demo-chat";
 
-// Content for the /for/<group> and /for/<type> pages. Server-only in
+// Content for the /for/<group> pages (one per group; each kind of business
+// in it is a section with its own example, and the old /for/<type> URLs
+// redirect there). Server-only in
 // practice: the menus read the light list in business-types.ts instead, so
 // this text never ships in the header's JavaScript. Slugs and names must
 // match that list (tests/marketing-content.test.ts checks). Example
@@ -472,11 +474,11 @@ export const BUSINESS_PAGES: BusinessGroupPage[] = [
       {
         slug: "electricians",
         name: "Electricians",
-        headline: "Take every callout request, even from the top of a ladder",
+        headline: "Take every call-out request, even from the top of a ladder",
         chat: calloutChat({
           business: "Bright Spark Electrical",
           ask: "Half my plugs stopped working and the trip switch won't stay up",
-          answer: "That needs an electrician to check safely, so please leave that circuit off for now. Can I take your name, number and suburb so we can call you back?",
+          answer: "That needs an electrician to check in person, and we can come out to you. If you smell burning or see sparks, keep away from it and call 10111. Can I take your name, number and suburb so we can call you back?",
           customer: "Anele",
           area: "Durbanville",
           what: "Tripping circuit · Durbanville",
@@ -613,11 +615,12 @@ export const BUSINESS_PAGES: BusinessGroupPage[] = [
   },
 ];
 
-export function findBusinessPage(slug: string): { group: BusinessGroupPage; type?: BusinessTypePage } | undefined {
-  for (const group of BUSINESS_PAGES) {
-    if (group.slug === slug) return { group };
-    const type = group.types.find((t) => t.slug === slug);
-    if (type) return { group, type };
-  }
-  return undefined;
+export function findBusinessGroup(slug: string): BusinessGroupPage | undefined {
+  return BUSINESS_PAGES.find((g) => g.slug === slug);
+}
+
+// "plumbers, electricians, handymen, cleaners and pest control".
+export function typeNames(group: Pick<BusinessGroupPage, "types">): string {
+  const names = group.types.map((t) => t.name.toLowerCase());
+  return names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : (names[0] ?? "");
 }

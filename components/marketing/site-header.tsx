@@ -7,7 +7,7 @@ import { cn } from "cn";
 import { buttonVariants } from "@/components/ui/button";
 import { Logo } from "./logo";
 import {
-  BUSINESS_TYPE_GROUPS,
+  BUSINESS_TYPE_LINKS,
   FEATURE_GROUPS,
   RESOURCE_LINKS,
   type NavGroup,
@@ -209,11 +209,13 @@ function MenuPanel({ id }: { id: MenuId }) {
   }
   if (id === "types") {
     return (
-      <div className="grid grid-cols-5 gap-6">
-        {BUSINESS_TYPE_GROUPS.map((g) => (
-          <GroupColumn key={g.title} group={g} compact />
+      <ul className="grid grid-cols-3 gap-2">
+        {BUSINESS_TYPE_LINKS.map((l) => (
+          <li key={l.href}>
+            <ResourceLink link={l} />
+          </li>
         ))}
-      </div>
+      </ul>
     );
   }
   return (
@@ -227,7 +229,7 @@ function MenuPanel({ id }: { id: MenuId }) {
   );
 }
 
-function GroupColumn({ group, compact = false }: { group: NavGroup; compact?: boolean }) {
+function GroupColumn({ group }: { group: NavGroup }) {
   return (
     <div className="flex flex-col gap-3">
       {group.href ? (
@@ -237,7 +239,7 @@ function GroupColumn({ group, compact = false }: { group: NavGroup; compact?: bo
       ) : (
         <p className="text-[13px] font-semibold">{group.title}</p>
       )}
-      <ul className={cn("flex flex-col", compact ? "gap-1.5" : "gap-2")}>
+      <ul className="flex flex-col gap-2">
         {group.links.map((l) => (
           <li key={l.href + l.label}>
             <Link
@@ -315,7 +317,7 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
 
   const groups: Record<MenuId, NavGroup[]> = {
     features: FEATURE_GROUPS,
-    types: BUSINESS_TYPE_GROUPS,
+    types: [{ title: "", links: BUSINESS_TYPE_LINKS }],
     resources: [{ title: "", links: RESOURCE_LINKS }],
   };
 

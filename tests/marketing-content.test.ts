@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { publicPaths } from "../lib/marketing/paths";
-import { BUSINESS_PAGES } from "../lib/marketing/business-pages";
+import { BUSINESS_PAGES, typeNames } from "../lib/marketing/business-pages";
+import nextConfig from "../next.config";
 import { BUSINESS_GROUPS } from "../lib/marketing/business-types";
 import { FEATURE_PAGES } from "../lib/marketing/features";
-import { BUSINESS_TYPE_GROUPS, FEATURE_GROUPS, FOOTER_COLUMNS, RESOURCE_LINKS } from "../lib/marketing/nav";
+import { BUSINESS_TYPE_LINKS, FEATURE_GROUPS, FOOTER_COLUMNS, RESOURCE_LINKS } from "../lib/marketing/nav";
 
 // The marketing site's content lives in a few data files; these checks keep
 // them in step, and make sure no menu link points at a page that doesn't exist.
@@ -64,6 +65,30 @@ describe("business type content", () => {
   });
 });
 
+describe("business type pages", () => {
+  it("has one page per group, and none per type", () => {
+    const forPaths = publicPaths().filter((p) => p.startsWith("/for/"));
+    expect(forPaths).toEqual(BUSINESS_GROUPS.map((g) => `/for/${g.slug}`));
+  });
+
+  it("redirects every old type page, permanently, to its example on the group page", async () => {
+    const redirects = await nextConfig.redirects!();
+    const types = BUSINESS_GROUPS.flatMap((g) => g.types.map((t) => ({ group: g.slug, type: t.slug })));
+    expect(redirects).toHaveLength(types.length);
+    for (const { group, type } of types) {
+      expect(redirects).toContainEqual({ source: `/for/${type}`, destination: `/for/${group}#${type}`, permanent: true });
+      // The anchor exists: the group page renders a section per type.
+      expect(BUSINESS_PAGES.find((g) => g.slug === group)!.types.some((t) => t.slug === type)).toBe(true);
+    }
+  });
+
+  it("names the kinds of business on each group page", () => {
+    expect(typeNames(BUSINESS_PAGES.find((g) => g.slug === "trades")!)).toBe(
+      "plumbers, electricians, handymen, cleaners and pest control",
+    );
+  });
+});
+
 describe("menu links", () => {
   const paths = new Set(publicPaths());
   const anchors = new Set(FEATURE_PAGES.flatMap((p) => p.sections.map((s) => `/features/${p.slug}#${s.id}`)));
@@ -71,7 +96,7 @@ describe("menu links", () => {
 
   const allLinks = [
     ...FEATURE_GROUPS.flatMap((g) => [g.href!, ...g.links.map((l) => l.href)]),
-    ...BUSINESS_TYPE_GROUPS.flatMap((g) => [g.href!, ...g.links.map((l) => l.href)]),
+    ...BUSINESS_TYPE_LINKS.map((l) => l.href),
     ...RESOURCE_LINKS.map((l) => l.href),
     ...FOOTER_COLUMNS.flatMap((c) => c.links.map((l) => l.href)),
     ...BUSINESS_PAGES.flatMap((g) => g.highlights.map((h) => h.href)),
