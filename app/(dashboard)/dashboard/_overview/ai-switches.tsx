@@ -25,7 +25,7 @@ const ROWS: Row[] = [
     on: "Answering visitors",
     off: "Paused — visitors see your contact details",
     icon: GlobeIcon,
-    tile: "from-[#6d67f5] to-[#4338ca]",
+    tile: "from-[#17785f] to-[#0e5c4b]",
   },
   {
     key: "whatsapp_ai_enabled",

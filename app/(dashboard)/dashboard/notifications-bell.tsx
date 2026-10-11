@@ -179,7 +179,7 @@ export function NotificationsBell() {
             <button
               type="button"
               onClick={enableDesktopAlerts}
-              className="border-b bg-indigo-50 px-4 py-2 text-left text-xs text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-950 dark:text-indigo-300"
+              className="border-b bg-accent px-4 py-2 text-left text-xs text-accent-foreground hover:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_5%)]"
             >
               Turn on desktop alerts, so you hear about new ones while this tab is in the background.
             </button>
@@ -196,13 +196,13 @@ export function NotificationsBell() {
                   onClick={() => openItem(item)}
                   className={cn(
                     "flex w-full flex-col gap-0.5 border-b px-4 py-3 text-left hover:bg-muted/60",
-                    !item.read && "bg-indigo-50/60 dark:bg-indigo-950/40",
+                    !item.read && "bg-accent/60",
                     item.type === "urgent" && !item.read && "border-l-4 border-l-red-600 bg-red-50 dark:bg-red-950/50",
                   )}
                 >
                   <span className={cn("flex items-center gap-2 text-sm font-medium", item.type === "urgent" && "text-red-700 dark:text-red-300")}>
                     {!item.read && (
-                      <span className={cn("size-2 shrink-0 rounded-full", item.type === "urgent" ? "bg-red-600" : "bg-indigo-600")} aria-hidden />
+                      <span className={cn("size-2 shrink-0 rounded-full", item.type === "urgent" ? "bg-destructive" : "bg-primary")} aria-hidden />
                     )}
                     {item.title}
                   </span>

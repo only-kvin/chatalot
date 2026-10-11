@@ -3,6 +3,7 @@ import { renderOwnerEmail } from "../lib/email/send";
 import { safeNextPath } from "../lib/safe-next";
 import { appUrl } from "../lib/app-url";
 import { notificationPath } from "../lib/notifications";
+import { BRAND_NAME } from "../lib/brand";
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -22,7 +23,7 @@ describe("renderOwnerEmail", () => {
     vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "chatalot.vercel.app");
     const html = renderOwnerEmail({ subject: "s", intro: "i", details: [], path: "/dashboard/conversations/abc" });
     expect(html).toContain('href="https://chatalot.vercel.app/dashboard/conversations/abc"');
-    expect(html).toContain("Open in ChatAlot");
+    expect(html).toContain(`Open in ${BRAND_NAME}`);
   });
 
   it("skips empty details", () => {

@@ -11,7 +11,7 @@ import { MARKETING_WIDGET_KEY, SIGNUP_OPEN } from "@/lib/marketing/site";
 export const stagger = (i: number) => ({ "--i": i }) as React.CSSProperties;
 
 const GLOW =
-  "bg-[radial-gradient(900px_480px_at_80%_-10%,rgb(99_102_241/0.45),transparent_60%),radial-gradient(700px_420px_at_0%_110%,rgb(52_199_89/0.16),transparent_60%)]";
+  "bg-[radial-gradient(900px_480px_at_80%_-10%,rgb(95_199_169/0.2),transparent_60%),radial-gradient(700px_420px_at_0%_110%,rgb(14_92_75/0.40),transparent_60%)]";
 
 export function PageHero({
   eyebrow,
@@ -31,7 +31,7 @@ export function PageHero({
   actions?: boolean;
 }) {
   return (
-    <section className="relative overflow-hidden bg-[#0b0b14] text-white">
+    <section className="relative overflow-hidden bg-[#0c1412] text-white">
       <div aria-hidden className={cn("pointer-events-none absolute inset-0", GLOW)} />
       <div
         className={cn(
@@ -54,7 +54,7 @@ export function PageHero({
               </ol>
             </nav>
           )}
-          {eyebrow && <p className="text-[13px] font-semibold tracking-wide text-indigo-300 uppercase">{eyebrow}</p>}
+          {eyebrow && <p className="text-[13px] font-semibold tracking-wide text-[#5fc7a9] uppercase">{eyebrow}</p>}
           <h1 className="max-w-2xl text-4xl leading-[1.05] font-semibold tracking-[-0.03em] text-balance md:text-[56px]">{title}</h1>
           <div className="max-w-xl text-lg text-pretty text-white/70">{intro}</div>
           {actions && (
@@ -79,10 +79,10 @@ export function PageHero({
 
 export function CtaBand({ title = "Stop missing customers." }: { title?: string }) {
   return (
-    <section className="relative overflow-hidden bg-[#0b0b14] text-white">
+    <section className="relative overflow-hidden bg-[#0c1412] text-white">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(700px_360px_at_50%_120%,rgb(99_102_241/0.45),transparent_65%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(700px_360px_at_50%_120%,rgb(95_199_169/0.2),transparent_65%)]"
       />
       <div data-reveal className="relative mx-auto flex max-w-3xl flex-col items-center gap-6 px-4 py-24 text-center">
         <h2 className="text-3xl leading-tight font-semibold tracking-[-0.025em] text-balance md:text-5xl">{title}</h2>

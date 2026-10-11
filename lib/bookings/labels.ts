@@ -1,5 +1,6 @@
 import { formatLocalDateTime } from "@/lib/time";
 import { NOT_SENT_REASON, type NotSentReason } from "./reminders";
+import { BRAND_NAME } from "@/lib/brand";
 
 // Human wording for the booking history and status badges. Pure, so both
 // server pages and tests use it.
@@ -48,7 +49,7 @@ export type BookingEvent = {
 
 function who(e: BookingEvent, currentUserId: string | null): string {
   if (e.actor === "team") return e.created_by && e.created_by === currentUserId ? "you" : "your team";
-  if (e.actor === "system") return "ChatAlot";
+  if (e.actor === "system") return BRAND_NAME;
   if (e.actor === "customer") return e.channel === "web" ? "the customer on your website" : "the customer";
   const via = e.channel === "whatsapp" ? "on WhatsApp" : e.channel === "web" ? "in the website chat" : "";
   return `the customer ${via}`.trim();

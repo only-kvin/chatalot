@@ -59,10 +59,10 @@ const onDark = "text-white hover:bg-white/10 hover:text-white";
 
 function Hero() {
   return (
-    <section className="relative overflow-hidden bg-[#0b0b14] text-white">
+    <section className="relative overflow-hidden bg-[#0c1412] text-white">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_480px_at_80%_-10%,rgb(99_102_241/0.45),transparent_60%),radial-gradient(700px_420px_at_0%_110%,rgb(52_199_89/0.16),transparent_60%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_480px_at_80%_-10%,rgb(95_199_169/0.2),transparent_60%),radial-gradient(700px_420px_at_0%_110%,rgb(14_92_75/0.40),transparent_60%)]"
       />
       <div className="relative mx-auto grid max-w-7xl items-center gap-14 px-4 pt-16 pb-20 md:px-6 md:pt-24 md:pb-28 lg:grid-cols-[1fr_1.05fr]">
         <div className="flex flex-col items-start gap-6">
@@ -251,7 +251,7 @@ function HowItWorks() {
         {steps.map((s, i) => (
           <li key={s.title} data-reveal style={stagger(i)}>
             <Card className="h-full px-6">
-              <span className="flex size-9 items-center justify-center rounded-full bg-linear-to-b from-[#5b53f0] to-[#4338ca] text-sm font-semibold text-white shadow-[0_6px_14px_-6px_rgb(67_56_202/0.6)]">
+              <span className="flex size-9 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground shadow-raised">
                 {i + 1}
               </span>
               <h3 className="text-lg font-semibold tracking-[-0.01em]">{s.title}</h3>

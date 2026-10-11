@@ -2,6 +2,7 @@ import { Resend } from "resend";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getTenantOwnerEmails } from "@/lib/db/tenant-owners";
 import { appUrl } from "@/lib/app-url";
+import { BRAND_NAME } from "@/lib/brand";
 
 // Lazy: the Resend constructor throws synchronously if the key is missing,
 // and these modules are imported at Next.js build time (page-data collection)
@@ -15,7 +16,7 @@ function getResend(): Resend {
 // Resend's default sender, works with no domain verification — but can only
 // deliver to the Resend account's own verified email until a real sending
 // domain is set up (see docs/SETUP.md). Swap once the platform has a domain.
-const FROM = "ChatAlot <onboarding@resend.dev>";
+const FROM = `${BRAND_NAME} <onboarding@resend.dev>`;
 
 // Names, messages and reasons come from customers or the AI, so everything
 // interpolated into the HTML is escaped.
@@ -61,7 +62,7 @@ export function renderOwnerEmail(email: OwnerEmail): string {
     ${details ? `<p>${details}</p>` : ""}
     ${sections}
     <p>
-      <a href="${escapeHtml(url)}" style="display:inline-block;padding:10px 18px;border-radius:6px;background:#4f46e5;color:#ffffff;text-decoration:none;font-weight:600">Open in ChatAlot</a>
+      <a href="${escapeHtml(url)}" style="display:inline-block;padding:10px 18px;border-radius:6px;background:#0e5c4b;color:#ffffff;text-decoration:none;font-weight:600">Open in ${BRAND_NAME}</a>
     </p>
     <p style="font-size:12px;color:#71717a">Or paste this link into your browser: ${escapeHtml(url)}</p>
     ${email.footer ? `<p style="font-size:12px;color:#71717a">${escapeHtml(email.footer)}</p>` : ""}

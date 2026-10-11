@@ -116,7 +116,7 @@ export async function Kpis({ tenantId, bookings: showBookings }: { tenantId: str
       value: String(convToday),
       href: "/dashboard/conversations",
       icon: MessageSquareIcon,
-      tile: "from-[#7c76f7] to-[#4338ca] shadow-[0_6px_14px_-6px_rgb(67_56_202/0.55)]",
+      tile: "from-[#17785f] to-[#0e5c4b] shadow-[0_6px_14px_-6px_rgb(14_92_75/0.5)]",
       line: "text-chart-1",
       chip: { text: `${signed(convToday - convTrend[5])} vs yesterday`, tone: convToday >= convTrend[5] ? "success" : "neutral" },
       trend: convTrend,
@@ -183,7 +183,7 @@ export async function Kpis({ tenantId, bookings: showBookings }: { tenantId: str
 // Today's bookings
 // ---------------------------------------------------------------------------
 
-const STAFF_COLOURS = ["#6366f1", "#14b8a6", "#f97316", "#ec4899", "#0ea5e9", "#a855f7"];
+const STAFF_COLOURS = ["#0e5c4b", "#14b8a6", "#f97316", "#ec4899", "#0ea5e9", "#a855f7"];
 
 export async function TodaysBookings({ tenantId }: { tenantId: string }) {
   const supabase = await createClient();
@@ -294,7 +294,7 @@ export async function LiveConversations({ tenantId }: { tenantId: string }) {
               {contact ? contact.replace(/[^A-Za-z0-9]/g, "").charAt(0).toUpperCase() || "?" : c.channel === "whatsapp" ? "#" : "W"}
               <span
                 className="absolute -right-0.5 -bottom-0.5 size-4 rounded-full border-2 border-card"
-                style={{ background: c.channel === "whatsapp" ? "#25d366" : "#6366f1" }}
+                style={{ background: c.channel === "whatsapp" ? "#25d366" : "#1d5fa8" }}
                 title={c.channel === "whatsapp" ? "WhatsApp" : "Website chat"}
               />
             </span>

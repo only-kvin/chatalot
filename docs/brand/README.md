@@ -9,6 +9,28 @@ surfaces with pill controls (A + B), the centred editorial hero (B), summary-car
 dashboard (A), coloured-header widget (A), logo option 4 (the crescent-cut
 door). The AI front desk is called **Kaya**.
 
+## Status
+
+Applied in the app: tokens (light, dark, system), fonts, the logo
+(`components/brand/symbol.tsx`), favicon and Apple icon, the link-preview
+image, buttons, the "Powered by" line and the brand name (`lib/brand.ts`).
+
+Deliberately still "ChatAlot", to change only when you decide:
+
+- `lib/legal.ts` and the `/privacy` and `/data-deletion` page titles. Meta
+  links to these from the WhatsApp app, so the operator name should match the
+  Meta app's name. Change both together.
+- Technical names client sites rely on: `window.ChatAlot`, the
+  `ChatAlotBot` crawler user agent (site owners may block it by name), the
+  `data-chatalot` widget attribute, the calendar `PRODID`, and the
+  `chatalot.vercel.app` domain.
+- The default widget colour `#4f46e5` for businesses that never picked one.
+  It is the client's colour, not ours, so changing it would restyle live
+  widgets.
+
+Not yet built: the Step 3 screens' new layouts (marketing pages, Kaya page,
+dashboard redesign). The rebrand restyles the existing screens.
+
 ## Files
 
 | File | What it is |

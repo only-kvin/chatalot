@@ -23,12 +23,12 @@ export function Section({
     <section
       id={id}
       aria-labelledby={id ? `${id}-title` : undefined}
-      className={cn("scroll-mt-20 py-20 md:py-28", dark && "bg-[#0b0b14] text-white", className)}
+      className={cn("scroll-mt-20 py-20 md:py-28", dark && "bg-[#0c1412] text-white", className)}
     >
       <div className="mx-auto max-w-7xl px-4 md:px-6">
         <div data-reveal className="mx-auto max-w-2xl text-center">
           {eyebrow && (
-            <p className={cn("text-[13px] font-semibold tracking-wide uppercase", dark ? "text-indigo-300" : "text-link")}>
+            <p className={cn("text-[13px] font-semibold tracking-wide uppercase", dark ? "text-[#5fc7a9]" : "text-link")}>
               {eyebrow}
             </p>
           )}

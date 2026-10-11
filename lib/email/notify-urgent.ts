@@ -4,6 +4,7 @@ import { canonicalPhone, formatPhone } from "@/lib/contacts/phone";
 import { isWithinServiceWindow, sendWhatsAppTemplate, sendWhatsAppText } from "@/lib/channels/whatsapp";
 import { tenantWhatsAppLookup } from "@/lib/bookings/whatsapp-channel";
 import { sendOwnerEmail } from "./send";
+import { BRAND_NAME } from "@/lib/brand";
 
 // An emergency call-out: the bell (shown first and in red), an email, and a
 // WhatsApp message to the owner's own mobile when they've set one in
@@ -26,7 +27,7 @@ export function urgentAlertText(businessName: string, job: UrgentJob): string {
     `URGENT call-out for ${businessName}: ${job.problem}.`,
     who ? `Customer: ${who}.` : "",
     job.address ? `Where: ${job.address}.` : "",
-    "The chat is waiting for you in ChatAlot.",
+    `The chat is waiting for you in ${BRAND_NAME}.`,
   ]
     .filter(Boolean)
     .join(" ");

@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LockIcon, MessageCircleIcon } from "lucide-react";
+import { LockIcon } from "lucide-react";
 import { cn } from "cn";
+import { BRAND_NAME } from "@/lib/brand";
+import { BrandSymbol } from "@/components/brand/symbol";
 import { ThemeSwitcher } from "@/components/theme/theme-switcher";
 import type { Theme } from "@/components/theme/theme";
 import type { Features } from "@/lib/plans";
@@ -52,7 +54,7 @@ export function DashboardNav({
         <item.icon
           className={cn(
             "size-[18px] shrink-0 transition-transform duration-200 ease-[cubic-bezier(.2,.8,.2,1)] group-hover/nav:translate-x-px group-hover/nav:scale-105",
-            active && "text-primary dark:text-[#a5b4fc]",
+            active && "text-primary",
           )}
         />
         <span className="flex-1">{item.label}</span>
@@ -130,11 +132,9 @@ export function DashboardNav({
 function Brand({ businessName }: { businessName: string }) {
   return (
     <Link href="/dashboard" className="flex min-w-0 items-center gap-2.5">
-      <span className="flex size-[34px] shrink-0 items-center justify-center rounded-[10px] bg-linear-145 from-[#6d67f5] to-[#3f35c4] shadow-[0_1px_0_rgb(255_255_255/0.35)_inset,0_6px_14px_-4px_rgb(67_56_202/0.55)]">
-        <MessageCircleIcon className="size-[18px] text-white" strokeWidth={2.2} />
-      </span>
+      <BrandSymbol className="size-[34px]" />
       <span className="flex min-w-0 flex-col gap-0.5">
-        <span className="text-[15px] leading-none font-bold tracking-[-0.01em]">ChatAlot</span>
+        <span className="font-heading text-[17px] leading-none font-bold tracking-[-0.03em] lowercase">{BRAND_NAME}</span>
         <span className="truncate text-xs text-muted-foreground">{businessName}</span>
       </span>
     </Link>

@@ -32,7 +32,7 @@ export function SignupForm() {
   if (state.status === "sent") {
     return (
       <div role="status" className="flex flex-col items-center gap-3 py-8 text-center">
-        <span className="feedback-enter flex size-14 items-center justify-center rounded-full bg-linear-to-b from-[#5b53f0] to-[#4338ca] text-white shadow-[0_10px_24px_-8px_rgb(67_56_202/0.6)]">
+        <span className="feedback-enter flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-raised">
           <MailCheckIcon className="size-7" strokeWidth={2.2} />
         </span>
         <h2 className="text-xl font-semibold tracking-[-0.01em]">Check your email</h2>

@@ -124,7 +124,7 @@ function MoreWithPlan({ locked }: { locked: (typeof FEATURES)[number][] }) {
   const plan = planFor(locked[0]);
   return (
     <Card className="gap-4 px-[22px] py-[22px] sm:flex-row sm:items-center">
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-linear-145 from-[#7c76f7] to-[#4338ca] shadow-[0_6px_14px_-6px_rgb(67_56_202/0.55)]">
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-linear-145 from-[#17785f] to-[#0e5c4b] shadow-[0_6px_14px_-6px_rgb(14_92_75/0.5)]">
         <SparklesIcon className="size-5 text-white" />
       </span>
       <div className="flex flex-1 flex-col gap-1">
