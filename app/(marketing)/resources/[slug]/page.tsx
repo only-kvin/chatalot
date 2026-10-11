@@ -45,14 +45,14 @@ export default async function GuidePage({ params }: PageProps<"/resources/[slug]
         <ol className="flex flex-col gap-10">
           {guide.steps.map((step, i) => (
             <li key={step.title} className="grid grid-cols-[auto_1fr] gap-x-5">
-              <span className="flex size-9 items-center justify-center rounded-full bg-linear-to-b from-[#5b53f0] to-[#4338ca] text-sm font-semibold text-white shadow-[0_6px_14px_-6px_rgb(67_56_202/0.6)]">
+              <span className="flex size-9 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground shadow-raised">
                 {i + 1}
               </span>
               <div className="flex min-w-0 flex-col gap-3 pt-1">
                 <h2 className="text-xl font-semibold tracking-[-0.015em]">{step.title}</h2>
                 <p className="leading-relaxed text-muted-foreground">{step.text}</p>
                 {step.code && (
-                  <pre className="overflow-x-auto rounded-xl bg-[#0f0f1a] p-4 font-mono text-[13px] leading-relaxed text-indigo-100">
+                  <pre className="overflow-x-auto rounded-xl bg-[#0c1412] p-4 font-mono text-[13px] leading-relaxed text-[#d6f0e7]">
                     <code>{step.code}</code>
                   </pre>
                 )}

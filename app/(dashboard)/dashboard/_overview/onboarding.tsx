@@ -24,7 +24,7 @@ export async function OnboardingChecklist({ tenantId, bookings }: { tenantId: st
         </div>
         <div className="h-1.5 w-40 overflow-hidden rounded-full bg-track" aria-hidden>
           <div
-            className="h-full rounded-full bg-linear-to-r from-[#6d67f5] to-[#4338ca] transition-[width] duration-500"
+            className="h-full rounded-full bg-primary transition-[width] duration-500"
             style={{ width: `${(doneCount / steps.length) * 100}%` }}
           />
         </div>

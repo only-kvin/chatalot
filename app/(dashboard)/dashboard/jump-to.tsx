@@ -50,7 +50,7 @@ export function JumpTo({ items }: { items: NavItem[] }) {
       <button
         type="button"
         onClick={() => openChange(true)}
-        className="flex min-h-11 w-full items-center gap-2.5 rounded-xl bg-white/70 px-3.5 text-sm text-muted-foreground shadow-[0_0_0_1px_var(--border)] transition-shadow hover:shadow-[0_0_0_1px_rgb(99_102_241/0.45),0_0_0_4px_rgb(99_102_241/0.12)] dark:bg-white/[0.04]"
+        className="flex min-h-11 w-full items-center gap-2.5 rounded-xl bg-white/70 px-3.5 text-sm text-muted-foreground shadow-[0_0_0_1px_var(--border)] transition-shadow hover:shadow-[0_0_0_1px_rgb(14_92_75/0.4),0_0_0_4px_rgb(14_92_75/0.12)] dark:bg-white/[0.04]"
       >
         <SearchIcon className="size-4" />
         <span className="flex-1 text-left">Jump to…</span>

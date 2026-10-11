@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { BRAND_NAME } from "@/lib/brand";
 
 type Settings = {
   business_name: string;
@@ -118,7 +119,7 @@ export function SettingsForm({
             <CardTitle>Online booking page</CardTitle>
             <CardDescription>
               Where the AI sends customers who&apos;d rather book by clicking. By default it&apos;s your page on
-              ChatAlot, with your appointment widget: {" "}
+              {BRAND_NAME}, with your appointment widget: {" "}
               <a href={hostedBookingUrl} target="_blank" rel="noreferrer" className="underline">
                 {hostedBookingUrl}
               </a>

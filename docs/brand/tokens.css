@@ -1,0 +1,207 @@
+/* ===========================================================================
+   Bookfront design tokens (Step 4 handoff from the Claude Design canvas
+   "Bookfront Brand Directions").
+
+   This file is a reference, not imported anywhere yet. To apply the rebrand,
+   replace the matching blocks in app/globals.css with these. Variable names
+   are the ones globals.css and the shadcn components already use, so most
+   components restyle with no class changes. See docs/brand/README.md.
+   =========================================================================== */
+
+/* ---- 1. Tailwind v4 @theme additions ------------------------------------
+   Merge into the existing `@theme inline { ... }` block in globals.css. */
+@theme inline {
+  /* Fonts: loaded with next/font in app/layout.tsx (see README). */
+  --font-sans: var(--font-instrument-sans), system-ui, sans-serif;
+  --font-heading: var(--font-bricolage), var(--font-instrument-sans), system-ui, sans-serif;
+
+  /* New semantic colours (the rest already exist in globals.css). */
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-tone-won: var(--tone-won);
+  --color-tone-won-foreground: var(--tone-won-fg);
+  --color-tone-done: var(--tone-done);
+  --color-tone-done-foreground: var(--tone-done-fg);
+
+  /* Radii: soft-square surfaces, pill controls (use rounded-full for pills). */
+  --radius-xs: 6px;   /* checkbox, kbd */
+  --radius-sm: 10px;  /* small inputs, inner chips */
+  --radius-md: 12px;  /* inputs, selects, list rows */
+  --radius-lg: 16px;  /* cards, panels */
+  --radius-xl: 20px;  /* dialogs, sheets, widget panel */
+  --radius-2xl: 24px; /* hero media */
+  --radius-3xl: 28px;
+  --radius-4xl: 32px;
+
+  /* Elevation: soft and green-tinted. Dark mode swaps the shadow colours. */
+  --shadow-card: 0 1px 2px var(--shadow-soft);
+  --shadow-card-hover: 0 6px 16px -4px var(--shadow);
+  --shadow-raised: 0 1px 2px var(--shadow-soft), 0 0 0 1px var(--shadow-soft);
+  --shadow-overlay: 0 6px 16px -4px var(--shadow), 0 0 0 1px var(--shadow-soft);
+  --shadow-modal: 0 16px 40px -8px var(--shadow-strong), 0 0 0 1px var(--shadow-soft);
+
+  /* Easing utilities: ease-move, ease-drawer (ease-out already overridden in :root). */
+  --ease-move: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* ---- 2. Light (default) --------------------------------------------------
+   Replace the colour variables in the `:root { ... }` block. */
+:root {
+  /* Motion. Use as duration-(--dur-fast) ease-out, etc. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);     /* enter, press, menus */
+  --ease-lift: cubic-bezier(0.2, 0.8, 0.2, 1);    /* marketing reveals only */
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1); /* booking-confirmed tick only */
+  --dur-press: 120ms;
+  --dur-fast: 180ms;
+  --dur-base: 240ms;
+  --dur-exit: 160ms;
+  --dur-story: 500ms;
+
+  --background: #f6f7f5;
+  --foreground: #13201c;
+  --card: #ffffff;
+  --card-foreground: #13201c;
+  --surface-2: #fbfcfb;
+  --raised: #ffffff;
+  --hover: #f1f4f2;
+  --popover: #ffffff;
+  --popover-foreground: #13201c;
+  --primary: #0e5c4b;            /* Bottle Green, 7.9:1 with white */
+  --primary-foreground: #ffffff;
+  --secondary: #eef2f0;
+  --secondary-foreground: #13201c;
+  --muted: #eef2f0;
+  --muted-foreground: #5a6662;   /* 5.5:1 on background */
+  --accent: #e3efea;            /* primary-soft: selected nav, quiet highlights */
+  --accent-foreground: #0a4538;
+  --destructive: #c0352b;
+  --success: #1f7a3d;
+  --warning: #a65f00;
+  --border: #dde3e0;
+  --input: #c9d2ce;
+  --ring: #0e5c4b;
+  --link: #0e5c4b;
+  --track: #c9d2ce;
+  --hi: rgb(255 255 255 / 1);
+  --shadow-soft: rgb(19 32 28 / 0.06);
+  --shadow: rgb(19 32 28 / 0.12);
+  --shadow-strong: rgb(19 32 28 / 0.2);
+  --glow: rgb(14 92 75 / 0.1);
+  --glow-strong: rgb(14 92 75 / 0.18);
+  --glow-1: rgb(14 92 75 / 0.08);
+  --glow-2: rgb(95 199 169 / 0.06);
+
+  /* Status chips. Leads: new, contacted=warn, booked=ok, won, lost=gray.
+     Bookings: pending=warn, confirmed=ok, completed=done, cancelled=gray
+     (+ line-through), no-show=bad. Always pair with a dot/icon + label. */
+  --tone-new: #e3edf8;
+  --tone-new-fg: #1d5fa8;
+  --tone-warn: #fbefd9;
+  --tone-warn-fg: #8a4f00;
+  --tone-ok: #e3efea;
+  --tone-ok-fg: #0e5c4b;
+  --tone-won: #1f7a3d;
+  --tone-won-fg: #ffffff;
+  --tone-done: #e8ecea;
+  --tone-done-fg: #13201c;
+  --tone-gray: #eef1ef;
+  --tone-gray-fg: #5a6662;
+  --tone-bad: #fbe5e2;
+  --tone-bad-fg: #b02a20;
+
+  --chart-1: #0e5c4b;
+  --chart-2: #1d5fa8;
+  --chart-3: #a65f00;
+  --chart-4: #b02a20;
+  --chart-5: #5a6662;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #13201c;
+  --sidebar-primary: #0e5c4b;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e3efea;
+  --sidebar-accent-foreground: #0e5c4b;
+  --sidebar-border: #dde3e0;
+  --sidebar-ring: #0e5c4b;
+}
+
+/* ---- 3. Dark -------------------------------------------------------------
+   Replace BOTH dark blocks in globals.css with this list:
+   `[data-theme="dark"] { ... }` and the `[data-theme="system"]` block inside
+   `@media (prefers-color-scheme: dark)`. Keep the two identical. */
+[data-theme="dark"] {
+  --background: #0c1412;
+  --foreground: #ecf1ef;          /* 16.4:1 */
+  --card: #131d1a;
+  --card-foreground: #ecf1ef;
+  --surface-2: #101916;
+  --raised: #1a2622;
+  --hover: rgb(236 241 239 / 0.04);
+  --popover: #1a2622;
+  --popover-foreground: #ecf1ef;
+  --primary: #5fc7a9;             /* Mint, 7.9:1 with its foreground */
+  --primary-foreground: #06261e;
+  --secondary: #1a2622;
+  --secondary-foreground: #ecf1ef;
+  --muted: #1a2622;
+  --muted-foreground: #9daaa5;    /* 7.0:1 on card */
+  --accent: #12302a;
+  --accent-foreground: #8edcc4;
+  --destructive: #f07a6e;
+  --success: #5bc489;
+  --warning: #e8a64a;
+  --border: #26332f;
+  --input: #33423d;
+  --ring: #5fc7a9;
+  --link: #5fc7a9;
+  --track: #33423d;
+  --hi: rgb(255 255 255 / 0.04);
+  --shadow-soft: rgb(0 0 0 / 0.3);
+  --shadow: rgb(0 0 0 / 0.5);
+  --shadow-strong: rgb(0 0 0 / 0.65);
+  --glow: rgb(95 199 169 / 0.08);
+  --glow-strong: rgb(95 199 169 / 0.16);
+  --glow-1: rgb(95 199 169 / 0.1);
+  --glow-2: rgb(14 92 75 / 0.12);
+
+  --tone-new: #16263a;
+  --tone-new-fg: #8dbbf0;
+  --tone-warn: #33260f;
+  --tone-warn-fg: #f0be6e;
+  --tone-ok: #12302a;
+  --tone-ok-fg: #5fc7a9;
+  --tone-won: #5bc489;
+  --tone-won-fg: #0c1412;
+  --tone-done: #26332f;
+  --tone-done-fg: #ecf1ef;
+  --tone-gray: #1f2926;
+  --tone-gray-fg: #9daaa5;
+  --tone-bad: #3a1916;
+  --tone-bad-fg: #f59a90;
+
+  --chart-1: #5fc7a9;
+  --chart-2: #8dbbf0;
+  --chart-3: #f0be6e;
+  --chart-4: #f59a90;
+  --chart-5: #9daaa5;
+
+  --sidebar: #131d1a;
+  --sidebar-foreground: #ecf1ef;
+  --sidebar-primary: #5fc7a9;
+  --sidebar-primary-foreground: #06261e;
+  --sidebar-accent: #12302a;
+  --sidebar-accent-foreground: #8edcc4;
+  --sidebar-border: #26332f;
+  --sidebar-ring: #5fc7a9;
+  color-scheme: dark;
+}
+
+/* ---- 4. Reduced motion ---------------------------------------------------
+   Fewer and gentler, not none: drop movement, keep short fades. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-base: 150ms;
+    --dur-exit: 150ms;
+  }
+}

@@ -27,7 +27,7 @@ function Stage({ children, className }: { children: React.ReactNode; className?:
 function Notification({ title, body, className, style }: { title: string; body: string; className?: string; style?: React.CSSProperties }) {
   return (
     <div className={cn("flex items-start gap-2.5 rounded-2xl bg-white/90 p-3 shadow-raised backdrop-blur", className)} style={style}>
-      <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-linear-145 from-[#6d67f5] to-[#3f35c4]">
+      <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary">
         <MessageCircleIcon className="size-3.5 text-white" strokeWidth={2.4} />
       </span>
       <span className="min-w-0">
@@ -130,10 +130,10 @@ export function TakeOverMoment() {
         </div>
         <p className="mt-1.5 text-[12px] text-zinc-600">Can I bring my own colour for the nails?</p>
         <div className="relative mt-3 inline-flex">
-          <span className="rounded-lg bg-linear-to-b from-[#5b53f0] to-[#4338ca] px-3 py-1.5 text-[12px] font-semibold text-white">
+          <span className="rounded-lg bg-primary px-3 py-1.5 text-[12px] font-semibold text-primary-foreground">
             Take over
           </span>
-          <span className="loop-tap absolute inset-[-6px] rounded-xl border-2 border-[#6366f1]" />
+          <span className="loop-tap absolute inset-[-6px] rounded-xl border-2 border-primary" />
         </div>
       </div>
     </Stage>
@@ -179,7 +179,7 @@ export function GrowMoment() {
 export function InstallMoment() {
   return (
     <Stage>
-      <pre className="overflow-hidden rounded-xl bg-[#0f0f1a] p-3 font-mono text-[11px] leading-relaxed break-all whitespace-pre-wrap text-indigo-100">
+      <pre className="overflow-hidden rounded-xl bg-[#0c1412] p-3 font-mono text-[11px] leading-relaxed break-all whitespace-pre-wrap text-[#d6f0e7]">
         {`<script src="https://${BRAND_DOMAIN}/widget.js"\n  data-key="pk_…" async></script>`}
       </pre>
       <span

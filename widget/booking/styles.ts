@@ -70,7 +70,8 @@ textarea { resize: vertical; }
 .day .num {
   position: relative; overflow: hidden; width: 38px; height: 38px; border-radius: 999px;
   display: flex; align-items: center; justify-content: center; font-weight: 600; font-variant-numeric: tabular-nums;
-  transition: background-color .2s ease, color .2s ease, transform .35s cubic-bezier(.34,1.4,.64,1), box-shadow .2s ease;
+  /* Tapped many times while choosing a date: quick and calm, no bounce. */
+  transition: background-color .2s ease, color .2s ease, transform .16s cubic-bezier(.23,1,.32,1), box-shadow .2s ease;
 }
 /* A dot under days with free times. */
 .day.free .num::after { content: ""; position: absolute; bottom: 4px; width: 4px; height: 4px; border-radius: 999px; background: var(--ca-primary); }
@@ -187,9 +188,14 @@ fieldset.address legend { font-weight: 600; font-size: 14px; padding: 0; margin-
   .cal { padding: 8px 4px 10px; }
   .day .num { width: 34px; height: 34px; font-size: 14px; }
 }
+/* Reduced motion means fewer and gentler, not none: nothing moves, but
+   things still fade in so changes are easy to follow. */
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
+  .in, .alert, .done .tick, .float-panel { animation: fade .15s ease both !important; }
+  button:active:not(:disabled), .slot:active:not(:disabled), .day:active:not(:disabled) .num, .launcher:active { transform: none; }
 }
+@keyframes fade { from { opacity: 0; } }
 `;
 
 // The appointment widget's extra pieces: a step indicator, service cards,

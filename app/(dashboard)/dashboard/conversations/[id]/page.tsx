@@ -106,8 +106,9 @@ export default async function ConversationPage({
             <div key={m.id} className="flex max-w-[80%] flex-col items-end gap-1 self-end">
               <span className="text-xs text-muted-foreground">{senderLabel(m.sent_by)}</span>
               <div
-                className={`rounded-lg px-4 py-2 text-sm text-white ${
-                  m.sent_by ? "bg-emerald-600" : "bg-indigo-600"
+                className={`rounded-lg px-4 py-2 text-sm ${
+                  // The owner's own replies in solid green; Kaya's in the soft tint.
+                  m.sent_by ? "bg-primary text-primary-foreground" : "bg-accent text-accent-foreground"
                 }`}
               >
                 {m.content}

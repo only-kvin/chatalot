@@ -21,7 +21,7 @@ export default function DemoPage() {
     <section className="relative overflow-hidden bg-surface-2">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-[radial-gradient(800px_380px_at_20%_-20%,rgb(99_102_241/0.16),transparent_70%)]"
+        className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-[radial-gradient(800px_380px_at_20%_-20%,rgb(14_92_75/0.1),transparent_70%)]"
       />
       <div className="relative mx-auto grid max-w-6xl gap-12 px-4 py-16 md:px-6 md:py-24 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="flex flex-col gap-6">

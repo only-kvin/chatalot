@@ -29,7 +29,7 @@ export default function BotPage() {
 
       <h2>How to block it</h2>
       <p>Add this to your website&apos;s robots.txt:</p>
-      <pre className="overflow-x-auto rounded-xl bg-[#0f0f1a] p-4 font-mono text-[13px] text-indigo-100">
+      <pre className="overflow-x-auto rounded-xl bg-[#0c1412] p-4 font-mono text-[13px] text-[#d6f0e7]">
         {"User-agent: ChatAlotBot\nDisallow: /"}
       </pre>
 

@@ -49,10 +49,10 @@ export default function LoginPage() {
   return (
     <div className="grid min-h-screen bg-white lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
       {/* Brand panel: the site's dark hero look. Desktop only. */}
-      <aside className="relative hidden overflow-hidden bg-[#0b0b14] p-12 text-white lg:flex lg:flex-col lg:justify-between">
+      <aside className="relative hidden overflow-hidden bg-[#0c1412] p-12 text-white lg:flex lg:flex-col lg:justify-between">
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(700px_420px_at_90%_-10%,rgb(99_102_241/0.45),transparent_60%),radial-gradient(600px_380px_at_-10%_110%,rgb(52_199_89/0.16),transparent_60%)]"
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(700px_420px_at_90%_-10%,rgb(95_199_169/0.2),transparent_60%),radial-gradient(600px_380px_at_-10%_110%,rgb(14_92_75/0.40),transparent_60%)]"
         />
         <Logo inverted className="relative" />
         <div className="relative flex flex-col gap-4">

@@ -12,7 +12,9 @@ import type { DemoChat } from "@/lib/marketing/demo-chat";
 // day. Plays while on screen, loops, and shows the finished state with
 // reduced motion.
 
-const PRIMARY = "#4f46e5";
+// A sample client's own colour (salon berry): widgets wear the business's
+// brand, not ours.
+const PRIMARY = "#7a2e4a";
 
 // Layout for the static frame around the widget's own classes. The panel
 // itself is position: fixed in the widget, so the demo lays it out here.
@@ -201,7 +203,7 @@ function OwnerPhone({ chat, showResult }: { chat: DemoChat; showResult: boolean 
                 {/* The empty slot, which the new card lands on. */}
                 <div className="absolute inset-0 rounded-xl border border-dashed border-zinc-300" />
                 {showResult && (
-                  <div className="snap-in absolute inset-0 rounded-xl bg-white p-2 shadow-[0_0_0_1.5px_#6366f1,0_10px_20px_-10px_rgb(79_70_229/0.6)]">
+                  <div className="snap-in absolute inset-0 rounded-xl bg-white p-2 shadow-[0_0_0_1.5px_#0e5c4b,0_10px_20px_-10px_rgb(14_92_75/0.5)]">
                     <div className="flex items-center justify-between gap-1">
                       <span className="text-[11px] font-semibold text-zinc-900 tabular-nums">{r.time}</span>
                       <span className="rounded-full bg-tone-new px-1.5 py-px text-[9px] font-semibold text-tone-new-foreground">

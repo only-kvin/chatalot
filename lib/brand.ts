@@ -1,7 +1,7 @@
 // The product's public identity, in one place. The name and domain may change
 // before launch, so marketing pages, metadata and structured data read them
 // from here — never hard-code the name in copy.
-export const BRAND_NAME = "ChatAlot";
+export const BRAND_NAME = "Bookfront";
 // Bare host, no protocol. Swap for the custom domain once it's bought.
 export const BRAND_DOMAIN = "chatalot.vercel.app";
 export const BRAND_URL = `https://${BRAND_DOMAIN}`;

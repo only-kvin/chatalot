@@ -1,5 +1,6 @@
 import type { SiteProfile } from "./profile";
 import type { WidgetSnippet } from "./widgets";
+import { BRAND_NAME } from "@/lib/brand";
 
 // The ready-to-paste Lovable prompt, rendered from the profile by a fixed
 // template (never free-form), so every brief is consistent and testable.
@@ -90,7 +91,7 @@ export function renderLovablePrompt(p: SiteProfile, widgets: WidgetSnippet[]): s
     );
   }
 
-  out.push("## ChatAlot widgets (paste as given)");
+  out.push(`## ${BRAND_NAME} widgets (paste as given)`);
   out.push("These connect the site to the business's AI receptionist and booking system. Paste the code exactly; don't rebuild these features.");
   for (const w of widgets) {
     out.push(`### ${w.name}\n${w.placement}\n\n\`\`\`html\n${w.code}\n\`\`\``);
