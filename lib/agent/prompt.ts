@@ -12,6 +12,8 @@ export type AgentConfig = {
   cancellation_policy?: string;
   emergency_callouts?: boolean;
   emergency_note?: string;
+  // The chatbot's own name from the widget settings ("Lindi"), if set.
+  assistant_name?: string | null;
 };
 
 // Constant across every tenant. Kept separate from the tenant layer so it can be
@@ -113,6 +115,7 @@ function buildTenantLayer(
 ): string {
   const lines = [
     `You are the receptionist for ${config.business_name}.`,
+    ...assistantNameLines(config),
     `Tone: ${config.tone}.`,
     `Today's date is ${todayLocalLabel()}.`,
   ];
@@ -162,6 +165,16 @@ function buildTenantLayer(
     );
   }
   return lines.join("\n");
+}
+
+// A named chatbot introduces itself by name, but stays honest that it's an AI.
+function assistantNameLines(config: AgentConfig): string[] {
+  const name = config.assistant_name?.trim();
+  if (!name) return [];
+  return [
+    `Your name is ${name}. Use it when you introduce yourself or are asked your name.`,
+    `You are ${config.business_name}'s AI assistant, not a person: if anyone asks whether they're talking to a human, say you're an AI assistant and offer to put them in touch with the team.`,
+  ];
 }
 
 export const KNOWLEDGE_BEGIN = "--- BEGIN BUSINESS INFORMATION ---";

@@ -66,3 +66,16 @@ describe("buildSystemPrompt services", () => {
     expect(buildSystemPrompt(config, "")).not.toContain("Bookable services");
   });
 });
+
+describe("buildSystemPrompt chatbot name", () => {
+  it("gives a named chatbot its name and keeps it honest about being an AI", () => {
+    const prompt = buildSystemPrompt({ ...config, assistant_name: "  Lindi " }, "");
+    expect(prompt).toContain("Your name is Lindi.");
+    expect(prompt).toContain("Demo Salon's AI assistant, not a person");
+  });
+
+  it("adds nothing when no name is set", () => {
+    expect(buildSystemPrompt({ ...config, assistant_name: null }, "")).not.toContain("Your name is");
+    expect(buildSystemPrompt({ ...config, assistant_name: "   " }, "")).not.toContain("Your name is");
+  });
+});

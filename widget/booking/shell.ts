@@ -1,5 +1,6 @@
 import { h } from "../shared/dom";
 import type { MountContext } from "../shared/loader-contract";
+import { POWERED_CSS, poweredBy } from "../shared/powered";
 import { loadFont, themeCss, type Theme } from "../shared/theme";
 import { BOOKING_CSS } from "./styles";
 
@@ -29,7 +30,9 @@ export function createShell(host: HTMLElement, ctx: MountContext, name: string, 
   // Announcements live outside the re-rendered card.
   const live = h("div", { class: "sr", "aria-live": "polite" });
   const card = h("section", { class: "card", "aria-labelledby": `${id}-title` });
-  shadow.append(h("style", {}, BOOKING_CSS + extraCss), themeStyle, live);
+  // "Powered by" stays the card's last line through every re-render.
+  const powered = poweredBy();
+  shadow.append(h("style", {}, BOOKING_CSS + extraCss + POWERED_CSS + ".card > .powered { margin-top: -6px; }"), themeStyle, live);
 
   let launcher: HTMLButtonElement | null = null;
   if (ctx.mode === "float") {
@@ -56,7 +59,7 @@ export function createShell(host: HTMLElement, ctx: MountContext, name: string, 
     const focusKey = active?.dataset?.k;
     const nodes = build();
     card.className = `card${opts.done ? " done" : ""}`;
-    card.replaceChildren(...nodes.filter((n): n is Node => Boolean(n)));
+    card.replaceChildren(...nodes.filter((n): n is Node => Boolean(n)), powered);
     // Re-inserting nodes drops focus: put it back on the same element (form
     // fields persist across renders), or its re-created twin.
     if (active?.isConnected) active.focus();

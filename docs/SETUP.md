@@ -405,3 +405,9 @@ Defaults: Groq `openai/gpt-oss-120b`, Gemini `gemini-flash-latest`, Cerebras `gp
 **Compare models before switching:** `pnpm eval-models groq gemini` runs 22 scripted conversations (prices, hours, bookings with staff, rescheduling, off-topic requests, prompt injection, Afrikaans, safety) through the real prompt and tools with simulated tool results, so no database or real bookings are touched, and prints pass/fail per conversation plus a summary. Options: `--only=price,booking-complete`, `--delay=15` (seconds between conversations; free tiers have low per-minute limits), `--verbose`. A provider can be given as `provider:model`. Results vary between runs, so run it more than once before deciding.
 
 **Privacy:** Gemini's free tier may use requests to improve Google's models. Use it for this comparison (made-up data only), never for real customers. To switch production, set `LLM_PROVIDER`/`LLM_MODEL` and the key in Vercel and redeploy.
+
+## Chatbot name and icon, and "Powered by" on widgets (2026-10-11)
+
+- Migration `20261011155427_chatbot_identity.sql` (**applied to the live DB**): `widget_settings.assistant_name` (optional, up to 40 characters), `widget_settings.icon_on_launcher` (default on), and a public `widget-icons` storage bucket (JPEG/PNG/WebP, 2 MB). Uploads go through the dashboard's server actions with the service role, like staff photos, so the bucket has no user policies.
+- Owners set both in **Widgets → Chat**: upload an icon (shown in the chat header and, unless switched off, on the round chat button) and an optional chatbot name. The AI introduces itself by that name and still says it's an AI assistant if asked.
+- Every widget (chat, schedule, appointment, reschedule, contact, registration) ends with a small "Powered by <brand>" line linking to the site with `?ref=widget`. The name and URL come from `lib/brand.ts` at widget build time (`widget/shared/powered.ts`), so renaming means editing `lib/brand.ts` and deploying.

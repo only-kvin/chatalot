@@ -17,8 +17,9 @@ export function imageKind(bytes: Uint8Array): ImageKind | null {
 
 // The storage path of a photo we host, from its public URL; null for a
 // link to somewhere else (owners can still paste their own https link).
-export function storedPhotoPath(url: string | null, publicBase: string): string | null {
+// Also used for the chatbot icon, in its own bucket.
+export function storedPhotoPath(url: string | null, publicBase: string, bucket = PHOTO_BUCKET): string | null {
   if (!url) return null;
-  const prefix = `${publicBase.replace(/\/$/, "")}/storage/v1/object/public/${PHOTO_BUCKET}/`;
+  const prefix = `${publicBase.replace(/\/$/, "")}/storage/v1/object/public/${bucket}/`;
   return url.startsWith(prefix) ? decodeURIComponent(url.slice(prefix.length)) : null;
 }

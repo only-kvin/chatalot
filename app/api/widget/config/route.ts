@@ -45,7 +45,7 @@ export async function GET(request: Request) {
   const [{ data: widgetSettings }, { data: agentConfig }] = await Promise.all([
     admin
       .from("widget_settings")
-      .select("primary_color, position, avatar_url, launcher_text, teaser_text, quick_replies, whatsapp_link")
+      .select("primary_color, position, avatar_url, assistant_name, icon_on_launcher, launcher_text, teaser_text, quick_replies, whatsapp_link")
       .eq("tenant_id", tenantId)
       .single(),
     admin.from("agent_configs").select("business_name, greeting, web_ai_enabled").eq("tenant_id", tenantId).single(),
@@ -58,6 +58,9 @@ export async function GET(request: Request) {
       primaryColor: widgetSettings?.primary_color ?? "#4f46e5",
       position: widgetSettings?.position ?? "bottom-right",
       avatarUrl: widgetSettings?.avatar_url ?? null,
+      // The chatbot's own name ("Lindi"); null = show the business name.
+      assistantName: widgetSettings?.assistant_name ?? null,
+      iconOnLauncher: widgetSettings?.icon_on_launcher ?? true,
       launcherText: widgetSettings?.launcher_text ?? "Chat with us",
       teaserText: widgetSettings?.teaser_text ?? null,
       quickReplies: widgetSettings?.quick_replies ?? [],

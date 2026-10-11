@@ -1,3 +1,4 @@
+import { poweredBy } from "./shared/powered";
 import { buildStyles } from "./styles";
 
 export type WidgetConfig = {
@@ -6,6 +7,9 @@ export type WidgetConfig = {
   primaryColor: string;
   position: "bottom-right" | "bottom-left";
   avatarUrl: string | null;
+  // The chatbot's own name ("Lindi"). Older API responses lack these.
+  assistantName?: string | null;
+  iconOnLauncher?: boolean;
   launcherText: string;
   teaserText: string | null;
   quickReplies: string[];
@@ -39,6 +43,10 @@ export function createWidget(
 ): WidgetApi {
   const side = config.position === "bottom-left" ? "left" : "right";
   const sessionId = sessionIdFor(publicKey);
+  // Only icons over https are shown (tenant-controlled URL).
+  const iconUrl = config.avatarUrl?.startsWith("https://") ? config.avatarUrl : null;
+  const assistantName = config.assistantName?.trim() || null;
+  const displayName = assistantName ?? config.businessName;
 
   const host = document.createElement("div");
   document.body.appendChild(host);
@@ -51,7 +59,15 @@ export function createWidget(
   const launcher = document.createElement("button");
   launcher.className = `launcher ${side}`;
   launcher.setAttribute("aria-label", config.launcherText);
-  launcher.innerHTML = LAUNCHER_ICON;
+  if (iconUrl && config.iconOnLauncher !== false) {
+    const img = document.createElement("img");
+    img.src = iconUrl;
+    img.alt = "";
+    launcher.classList.add("has-icon");
+    launcher.appendChild(img);
+  } else {
+    launcher.innerHTML = LAUNCHER_ICON;
+  }
   shadow.appendChild(launcher);
 
   let teaser: HTMLDivElement | null = null;
@@ -65,22 +81,22 @@ export function createWidget(
   const panel = document.createElement("div");
   panel.className = `panel ${side}`;
   panel.setAttribute("role", "dialog");
-  panel.setAttribute("aria-label", `Chat with ${config.businessName}`);
+  panel.setAttribute("aria-label", `Chat with ${displayName}`);
   panel.hidden = true;
 
   const header = document.createElement("div");
   header.className = "header";
-  // The business's avatar, or its first letter.
+  // The chatbot's icon, or the first letter of its name.
   let avatar: HTMLElement;
-  if (config.avatarUrl?.startsWith("https://")) {
+  if (iconUrl) {
     const img = document.createElement("img");
-    img.src = config.avatarUrl;
+    img.src = iconUrl;
     img.alt = "";
     avatar = img;
   } else {
     avatar = document.createElement("span");
     avatar.setAttribute("aria-hidden", "true");
-    avatar.textContent = (config.businessName.trim()[0] ?? "?").toUpperCase();
+    avatar.textContent = (displayName.trim()[0] ?? "?").toUpperCase();
   }
   avatar.className = "avatar";
   header.appendChild(avatar);
@@ -88,14 +104,19 @@ export function createWidget(
   const who = document.createElement("div");
   who.className = "who";
   const title = document.createElement("strong");
-  title.textContent = config.businessName;
+  title.textContent = displayName;
   who.append(title);
-  // Only promise instant replies while the AI is actually answering.
-  if (config.aiOnline !== false) {
+  // With a chatbot name, the business name goes underneath. Only promise
+  // instant replies while the AI is actually answering.
+  const online = config.aiOnline !== false;
+  if (online || assistantName) {
     const status = document.createElement("span");
-    const live = document.createElement("i");
-    live.className = "live";
-    status.append(live, "Online · replies instantly");
+    if (online) {
+      const live = document.createElement("i");
+      live.className = "live";
+      status.append(live);
+    }
+    status.append(assistantName ? `${config.businessName}${online ? " · online" : ""}` : "Online · replies instantly");
     who.append(status);
   }
   header.appendChild(who);
@@ -156,6 +177,7 @@ export function createWidget(
   inputRow.appendChild(textarea);
   inputRow.appendChild(sendBtn);
   panel.appendChild(inputRow);
+  panel.appendChild(poweredBy());
 
   shadow.appendChild(panel);
 

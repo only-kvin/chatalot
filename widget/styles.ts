@@ -1,3 +1,4 @@
+import { POWERED_CSS } from "./shared/powered";
 import { onColor } from "./shared/theme";
 
 // The chat widget's look, in the ChatAlot dashboard's style: a top-lit
@@ -47,6 +48,9 @@ export function buildStyles(primaryColor: string): string {
     .launcher.left { left: 20px; }
     .launcher.right { right: 20px; }
     .launcher svg { width: 26px; height: 26px; }
+    /* The chatbot's own icon on the button: fills the circle, keeps the glow. */
+    .launcher.has-icon { padding: 0; overflow: hidden; background: #fff; }
+    .launcher.has-icon img { width: 100%; height: 100%; object-fit: cover; border-radius: 999px; }
 
     .teaser {
       position: fixed;
@@ -261,6 +265,11 @@ export function buildStyles(primaryColor: string): string {
     @keyframes pop { from { opacity: 0; transform: scale(.5); } to { opacity: 1; transform: none; } }
     @keyframes ping { 0% { transform: scale(.6); opacity: .7; } 100% { transform: scale(1.6); opacity: 0; } }
     @keyframes typing { 50% { opacity: .35; } }
+
+    /* "Powered by" sits under the message box, on the panel's white. */
+    .input-row { padding-bottom: 6px; }
+    .panel > .powered { background: #fff; padding: 0 0 8px; }
+    ${POWERED_CSS}
 
     @media (prefers-reduced-motion: reduce) {
       * { animation: none !important; transition: none !important; }

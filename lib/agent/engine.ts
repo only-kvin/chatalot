@@ -540,7 +540,19 @@ export async function* runAgent(params: {
   const [services, staff] = takesBookings
     ? await Promise.all([listActiveServices(admin, params.tenantId), listActiveStaff(admin, params.tenantId)])
     : [[], []];
-  const system = buildSystemPrompt(agentConfig as AgentConfig, knowledgeText, services, staff, takesBookings);
+  // The chatbot's own name lives with the widget's look; null = none set.
+  const { data: widgetIdentity } = await admin
+    .from("widget_settings")
+    .select("assistant_name")
+    .eq("tenant_id", params.tenantId)
+    .maybeSingle();
+  const system = buildSystemPrompt(
+    { ...(agentConfig as AgentConfig), assistant_name: widgetIdentity?.assistant_name ?? null },
+    knowledgeText,
+    services,
+    staff,
+    takesBookings,
+  );
 
   let fullText = "";
   let tokensIn = 0;
