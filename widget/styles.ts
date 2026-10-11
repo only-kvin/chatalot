@@ -3,8 +3,9 @@ import { onColor } from "./shared/theme";
 
 // The chat widget's look, in the ChatAlot dashboard's style: a top-lit
 // gradient in the business's colour with a soft glow, layered shadows, a
-// panel that springs open, bubbles that ease in and a typing indicator
-// while the reply is on its way.
+// panel that slides open from the launcher, bubbles that ease in and a
+// typing indicator while the reply is on its way. Motion is calm and quick:
+// UI under 300ms, closing faster than opening (see docs/brand/README.md).
 export function buildStyles(primaryColor: string): string {
   return `
     :host {
@@ -19,7 +20,8 @@ export function buildStyles(primaryColor: string): string {
       --muted: #6b6b72;
       --line: rgba(17,17,26,.08);
       --ease: cubic-bezier(.2,.8,.2,1);
-      --spring: cubic-bezier(.34,1.4,.64,1);
+      --ease-out: cubic-bezier(.23,1,.32,1);
+      --drawer: cubic-bezier(.32,.72,0,1);
     }
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
     button { cursor: pointer; transition: transform .12s ease, box-shadow .2s ease, background-color .2s ease; }
@@ -40,10 +42,14 @@ export function buildStyles(primaryColor: string): string {
       justify-content: center;
       box-shadow: 0 1px 0 rgba(255,255,255,.3) inset, 0 12px 28px -10px var(--glow), 0 4px 12px rgba(0,0,0,.14);
       z-index: 2147483000;
-      /* backwards: once in, hover and press control the transform again. */
-      animation: pop .5s var(--spring) backwards;
+      /* Seen on every page load, so a calm fade-and-grow, no bounce.
+         backwards: once in, hover and press control the transform again. */
+      animation: pop .28s var(--ease-out) backwards;
     }
-    .launcher:hover { transform: translateY(-2px) scale(1.04); box-shadow: 0 1px 0 rgba(255,255,255,.3) inset, 0 16px 34px -10px var(--glow), 0 6px 16px rgba(0,0,0,.16); }
+    /* Mouse only: on phones a tap triggers hover and the lift would stick. */
+    @media (hover: hover) and (pointer: fine) {
+      .launcher:hover { transform: translateY(-2px) scale(1.04); box-shadow: 0 1px 0 rgba(255,255,255,.3) inset, 0 16px 34px -10px var(--glow), 0 6px 16px rgba(0,0,0,.16); }
+    }
     .launcher:active { transform: scale(.94); }
     .launcher.left { left: 20px; }
     .launcher.right { right: 20px; }
@@ -83,8 +89,10 @@ export function buildStyles(primaryColor: string): string {
       flex-direction: column;
       overflow: hidden;
       z-index: 2147483001;
-      animation: open .32s var(--ease) both;
+      animation: open .24s var(--drawer) both;
     }
+    /* Closing is quicker than opening; panel.ts hides it once this ends. */
+    .panel.closing { animation: close .16s var(--ease-out) both; pointer-events: none; }
     .panel.left { left: 20px; transform-origin: bottom left; }
     .panel.right { right: 20px; transform-origin: bottom right; }
     .panel[hidden] { display: none; }
@@ -118,9 +126,9 @@ export function buildStyles(primaryColor: string): string {
     .who { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
     .who strong { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .who span { font-size: 12px; opacity: .85; display: flex; align-items: center; gap: 6px; }
-    /* "Online" pulse. */
+    /* "Online" dot. Steady on purpose: constant motion beside the
+       conversation is distracting. */
     .live { position: relative; width: 7px; height: 7px; border-radius: 999px; background: #34c759; box-shadow: 0 0 0 2px rgba(255,255,255,.5); }
-    .live::after { content: ""; position: absolute; inset: -4px; border-radius: 999px; border: 2px solid #34c759; opacity: 0; animation: ping 1.8s cubic-bezier(0,0,.2,1) infinite; }
     .close-btn {
       background: rgba(255,255,255,.14);
       border: none;
@@ -149,7 +157,7 @@ export function buildStyles(primaryColor: string): string {
       font-size: 14px;
       line-height: 1.45;
       white-space: pre-wrap;
-      animation: up .3s var(--ease) both;
+      animation: up .2s var(--ease-out) both;
     }
     .msg.assistant {
       background: #fff;
@@ -191,7 +199,7 @@ export function buildStyles(primaryColor: string): string {
       font-weight: 600;
       text-decoration: none;
       box-shadow: 0 1px 0 rgba(255,255,255,.25) inset, 0 6px 14px -6px rgba(37,211,102,.6);
-      animation: up .3s var(--ease) both;
+      animation: up .2s var(--ease-out) both;
     }
     .msg-action:focus-visible { outline: 2px solid var(--p); outline-offset: 2px; }
 
@@ -261,9 +269,11 @@ export function buildStyles(primaryColor: string): string {
     .send-btn:disabled { opacity: 0.5; cursor: default; }
 
     @keyframes up { from { opacity: 0; translate: 0 6px; } to { opacity: 1; translate: none; } }
-    @keyframes open { from { opacity: 0; transform: translateY(10px) scale(.96); } to { opacity: 1; transform: none; } }
-    @keyframes pop { from { opacity: 0; transform: scale(.5); } to { opacity: 1; transform: none; } }
-    @keyframes ping { 0% { transform: scale(.6); opacity: .7; } 100% { transform: scale(1.6); opacity: 0; } }
+    @keyframes open { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
+    @keyframes close { to { opacity: 0; transform: translateY(8px) scale(.96); } }
+    @keyframes pop { from { opacity: 0; transform: scale(.9); } to { opacity: 1; transform: none; } }
+    @keyframes fade { from { opacity: 0; } }
+    @keyframes fade-out { to { opacity: 0; } }
     @keyframes typing { 50% { opacity: .35; } }
 
     /* "Powered by" sits under the message box, on the panel's white. */
@@ -271,8 +281,13 @@ export function buildStyles(primaryColor: string): string {
     .panel > .powered { background: #fff; padding: 0 0 8px; }
     ${POWERED_CSS}
 
+    /* Reduced motion means fewer and gentler, not none: nothing moves or
+       scales, but the launcher, panel and new messages still fade. */
     @media (prefers-reduced-motion: reduce) {
       * { animation: none !important; transition: none !important; }
+      .launcher, .teaser, .panel, .msg, .msg-action { animation-name: fade !important; animation-duration: .15s !important; animation-timing-function: ease !important; animation-fill-mode: both !important; }
+      .panel.closing { animation-name: fade-out !important; }
+      button:active:not(:disabled), .launcher:active { transform: none; }
     }
   `;
 }

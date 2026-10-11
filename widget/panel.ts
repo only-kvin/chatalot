@@ -276,17 +276,32 @@ export function createWidget(
     }
   }
 
+  // The close animation (160ms in styles.ts) plays before the panel is
+  // hidden. A timer rather than animationend, so it still hides when
+  // animations are off.
+  const CLOSE_MS = 160;
+  let closeTimer: ReturnType<typeof setTimeout> | undefined;
+  const isOpen = () => !panel.hidden && !panel.classList.contains("closing");
+
   function open() {
+    clearTimeout(closeTimer);
+    panel.classList.remove("closing");
     panel.hidden = false;
     if (teaser) teaser.style.display = "none";
     textarea.focus();
+    document.removeEventListener("keydown", onKeydown);
     document.addEventListener("keydown", onKeydown);
   }
 
   function close() {
-    panel.hidden = true;
+    if (!isOpen()) return;
+    panel.classList.add("closing");
     document.removeEventListener("keydown", onKeydown);
     launcher.focus();
+    closeTimer = setTimeout(() => {
+      panel.hidden = true;
+      panel.classList.remove("closing");
+    }, CLOSE_MS);
   }
 
   function onKeydown(e: KeyboardEvent) {
@@ -314,7 +329,7 @@ export function createWidget(
     }
   }
 
-  launcher.addEventListener("click", () => (panel.hidden ? open() : close()));
+  launcher.addEventListener("click", () => (isOpen() ? close() : open()));
   closeBtn.addEventListener("click", close);
   teaser?.addEventListener("click", open);
   sendBtn.addEventListener("click", () => sendMessage(textarea.value));
