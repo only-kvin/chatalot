@@ -6,6 +6,7 @@ import { todayLocalISO } from "@/lib/time";
 import { formatBookingWhen } from "@/lib/bookings/when";
 import { addressText, BOOKING_PLACE_COLUMNS, type BookingPlace } from "@/lib/bookings/place";
 import { DayView } from "./day-view";
+import { BookingsCalendar, type CalendarView } from "./calendar";
 import {
   describeEvent,
   formatShortLocal,
@@ -32,7 +33,7 @@ import { pageFrame } from "@/components/dashboard/page-frame";
 
 const TABS = [
   { id: "upcoming", label: "Upcoming" },
-  { id: "day", label: "Day view" },
+  { id: "calendar", label: "Calendar" },
   { id: "pending", label: "To approve" },
   { id: "past", label: "Past" },
   { id: "cancelled", label: "Cancelled" },
@@ -42,11 +43,15 @@ type Tab = (typeof TABS)[number]["id"];
 export default async function BookingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; staff?: string; date?: string }>;
+  searchParams: Promise<{ tab?: string; staff?: string; date?: string; view?: string }>;
 }) {
   const tenantId = await requireFeaturePage("bookings");
   const params = await searchParams;
-  const tab: Tab = TABS.some((t) => t.id === params.tab) ? (params.tab as Tab) : "upcoming";
+  // "day" was the old name of the day list, now the calendar's List view.
+  const legacyDay = params.tab === "day";
+  const tab: Tab = legacyDay ? "calendar" : TABS.some((t) => t.id === params.tab) ? (params.tab as Tab) : "upcoming";
+  const view: CalendarView | "list" =
+    legacyDay ? "list" : params.view === "week" || params.view === "list" ? params.view : "day";
 
   const supabase = await createClient();
   const user = await getSessionUser();
@@ -54,7 +59,7 @@ export default async function BookingsPage({
 
   const { data: staff } = await supabase
     .from("staff")
-    .select("id, name")
+    .select("id, name, avatar_url, active")
     .eq("tenant_id", tenantId)
     .order("sort_order")
     .order("name");
@@ -62,11 +67,12 @@ export default async function BookingsPage({
   // "none" = bookings nobody has been given yet.
   const staffFilter = params.staff === "none" || staffNames.has(params.staff ?? "") ? params.staff : undefined;
   const day = /^\d{4}-\d{2}-\d{2}$/.test(params.date ?? "") ? params.date! : todayLocalISO();
-  const tabHref = (id: Tab, staffId = staffFilter, date?: string) => {
+  const tabHref = (id: Tab, staffId = staffFilter, date?: string, calView: CalendarView | "list" = view) => {
     const q = new URLSearchParams();
     if (id !== "upcoming") q.set("tab", id);
     if (staffId) q.set("staff", staffId);
-    if (id === "day" && date) q.set("date", date);
+    if (id === "calendar" && calView !== "day") q.set("view", calView);
+    if (id === "calendar" && date) q.set("date", date);
     return q.size ? `/dashboard/bookings?${q}` : "/dashboard/bookings";
   };
 
@@ -81,7 +87,7 @@ export default async function BookingsPage({
   if (tab === "pending") query = query.eq("status", "pending").order("starts_at");
   if (tab === "past") query = query.neq("status", "cancelled").lt("starts_at", now).order("starts_at", { ascending: false });
   if (tab === "cancelled") query = query.eq("status", "cancelled").order("updated_at", { ascending: false });
-  const { data: bookings } = tab === "day" ? { data: [] } : await query;
+  const { data: bookings } = tab === "calendar" ? { data: [] } : await query;
 
   // Latest change per booking, for the "Last change" column.
   const ids = (bookings ?? []).map((b) => b.id);
@@ -108,7 +114,7 @@ export default async function BookingsPage({
         {TABS.map((t) => (
           <Link
             key={t.id}
-            href={tabHref(t.id)}
+            href={tabHref(t.id, staffFilter, tab === "calendar" ? day : undefined)}
             aria-current={tab === t.id ? "page" : undefined}
             className={cn(
               "-mb-px shrink-0 border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap",
@@ -125,7 +131,7 @@ export default async function BookingsPage({
           {[{ id: undefined, name: "Everyone" }, ...(staff ?? []), { id: "none", name: "Not assigned" }].map((p) => (
             <Link
               key={p.id ?? "all"}
-              href={tabHref(tab, p.id)}
+              href={tabHref(tab, p.id, tab === "calendar" ? day : undefined)}
               aria-current={staffFilter === p.id ? "page" : undefined}
               className={cn(
                 "rounded-full border px-3 py-1",
@@ -138,14 +144,30 @@ export default async function BookingsPage({
         </nav>
       )}
 
-      {tab === "day" ? (
+      {tab === "calendar" && view !== "list" ? (
+        <BookingsCalendar
+          supabase={supabase}
+          tenantId={tenantId}
+          view={view}
+          date={day}
+          staff={staff ?? []}
+          staffFilter={staffFilter}
+          hrefFor={(v, d) => tabHref("calendar", staffFilter, d, v)}
+          listHref={tabHref("calendar", staffFilter, day, "list")}
+        />
+      ) : tab === "calendar" ? (
         <DayView
           supabase={supabase}
           tenantId={tenantId}
           date={day}
           staffFilter={staffFilter}
           staffNames={staffNames}
-          hrefFor={(d) => tabHref("day", staffFilter, d)}
+          hrefFor={(d) => tabHref("calendar", staffFilter, d, "list")}
+          viewHrefs={{
+            day: tabHref("calendar", staffFilter, day, "day"),
+            week: tabHref("calendar", staffFilter, day, "week"),
+            list: tabHref("calendar", staffFilter, day, "list"),
+          }}
         />
       ) : (
       <Table>
@@ -232,7 +254,7 @@ export default async function BookingsPage({
                   {
                     upcoming: "No upcoming bookings.",
                     pending: "Nothing waiting for approval.",
-                    day: "",
+                    calendar: "",
                     past: "No past bookings.",
                     cancelled: "No cancelled bookings.",
                   }[tab]

@@ -34,7 +34,7 @@ export function ConsentSwitches({ token, initial }: { token: string; initial: { 
         <label key={o.kind} className="flex min-h-11 items-center gap-3">
           <input
             type="checkbox"
-            className="size-5"
+            className="size-5 accent-[var(--primary)]"
             checked={values[o.kind]}
             disabled={pending}
             onChange={(e) => toggle(o.kind, e.target.checked)}
@@ -42,7 +42,7 @@ export function ConsentSwitches({ token, initial }: { token: string; initial: { 
           {o.label}
         </label>
       ))}
-      {message && <p className="text-xs text-zinc-500">{message}</p>}
+      {message && <p className="text-xs text-muted-foreground">{message}</p>}
     </div>
   );
 }

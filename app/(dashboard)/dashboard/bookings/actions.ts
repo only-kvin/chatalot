@@ -8,6 +8,7 @@ import { formatLocalDateTime } from "@/lib/time";
 import { getOpenSlots } from "@/lib/bookings/availability";
 import { assignStaff, cancelBooking, decidePendingBooking, logBookingEvent, rescheduleBooking } from "@/lib/bookings/manage";
 import { emailCustomerAboutBooking } from "@/lib/email/customer-booking";
+import { notifyStaffAboutBooking, notifyStaffAfterChange } from "@/lib/email/notify-staff";
 import { sendTeamWhatsApp } from "@/lib/channels/team-whatsapp";
 import { formatPhone, canonicalPhone } from "@/lib/contacts/phone";
 import { isOptedOut } from "@/lib/contacts/consent";
@@ -39,7 +40,7 @@ type Session = NonNullable<Awaited<ReturnType<typeof session>>>;
 async function loadBooking(s: Session, bookingId: string) {
   const { data } = await s.supabase
     .from("bookings")
-    .select("id, name, phone, starts_at, status, service_id, conversation_id, contact_id, services(name)")
+    .select("id, name, phone, starts_at, status, service_id, staff_id, conversation_id, contact_id, services(name)")
     .eq("id", bookingId)
     .eq("tenant_id", s.tenantId)
     .maybeSingle();
@@ -127,6 +128,7 @@ export async function cancelBookingAction(input: {
     createdBy: s.userId,
   });
   if (!result.ok) return { error: result.error };
+  await notifyStaffAboutBooking(s.supabase, s.tenantId, booking.id, "cancelled");
 
   const when = formatLocalDateTime(booking.starts_at);
   const notice = await tellCustomer(
@@ -170,6 +172,7 @@ export async function rescheduleBookingAction(input: {
     createdBy: s.userId,
   });
   if (!moved.ok) return { error: moved.error };
+  await notifyStaffAfterChange(s.supabase, s.tenantId, booking.id, booking.staff_id, "rescheduled");
 
   const notice = await tellCustomer(
     s,
@@ -190,6 +193,8 @@ export async function assignStaffAction(bookingId: string, staffId: string): Pro
   if (!s) return { error: "Not authorized." };
   if (!uuid.safeParse(bookingId).success || !uuid.safeParse(staffId).success) return { error: "Invalid request." };
 
+  const booking = await loadBooking(s, bookingId);
+  if (!booking) return { error: "Booking not found." };
   const result = await assignStaff(s.supabase, {
     tenantId: s.tenantId,
     bookingId,
@@ -199,6 +204,7 @@ export async function assignStaffAction(bookingId: string, staffId: string): Pro
     createdBy: s.userId,
   });
   if (!result.ok) return { error: result.error };
+  await notifyStaffAfterChange(s.supabase, s.tenantId, bookingId, booking.staff_id, "assigned");
   revalidate(bookingId);
   return { error: null };
 }
@@ -224,7 +230,10 @@ export async function decideBookingAction(input: { bookingId: string; approve: b
   });
   if (!result.ok) return { error: result.error };
 
-  await emailCustomerAboutBooking(s.supabase, s.tenantId, input.bookingId, input.approve ? "approved" : "declined", { reason });
+  await Promise.all([
+    emailCustomerAboutBooking(s.supabase, s.tenantId, input.bookingId, input.approve ? "approved" : "declined", { reason }),
+    input.approve ? notifyStaffAboutBooking(s.supabase, s.tenantId, input.bookingId, "approved") : null,
+  ]);
   revalidate(input.bookingId);
   return { error: null };
 }

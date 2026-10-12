@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/db/supabase-admin";
 import { rescheduleBooking } from "@/lib/bookings/manage";
 import { loadBookingFromToken } from "@/lib/bookings/manage-link";
 import { emailCustomerAboutBooking } from "@/lib/email/customer-booking";
+import { bookingStaffId, notifyStaffAfterChange } from "@/lib/email/notify-staff";
 import { notifyOwnerOfBookingChange } from "@/lib/email/notify-booking-change";
 import { checkWidgetBookingLimit } from "@/lib/security/rate-limit";
 import { formatLocalDateTime } from "@/lib/time";
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient();
+  const staffBefore = await bookingStaffId(admin, booking.tenantId, booking.id);
   const moved = await rescheduleBooking(admin, {
     tenantId: booking.tenantId,
     bookingId: booking.id,
@@ -77,6 +79,7 @@ export async function POST(request: Request) {
       ),
       // Still awaiting approval: it stays a request, at its new time.
       emailCustomerAboutBooking(admin, booking.tenantId, booking.id, booking.status === "pending" ? "requested" : "rescheduled"),
+      notifyStaffAfterChange(admin, booking.tenantId, booking.id, staffBefore, "rescheduled"),
     ]),
   );
   return NextResponse.json({ ok: true, startsAt: after?.starts_at ?? moved.to, endsAt: after?.ends_at ?? moved.to });

@@ -7,7 +7,7 @@ import { StaffAvatar } from "@/components/dashboard/staff-avatar";
 import { WeeklyHours } from "@/components/dashboard/weekly-hours";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { DeleteStaff, HoursMode, StaffDetailsForm, StaffPhoto, StaffServices, TimeOff } from "./staff-editor";
+import { DeleteStaff, HoursMode, StaffAccess, StaffDetailsForm, StaffPhoto, StaffServices, TimeOff } from "./staff-editor";
 import { pageFrame } from "@/components/dashboard/page-frame";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -19,7 +19,7 @@ export default async function StaffMemberPage({ params }: { params: Promise<{ id
   const supabase = await createClient();
   const { data: person } = await supabase
     .from("staff")
-    .select("id, name, role, avatar_url, active, max_concurrent")
+    .select("id, name, role, avatar_url, active, max_concurrent, email, notify_email, invited_at, user_id")
     .eq("tenant_id", tenantId)
     .eq("id", id)
     .maybeSingle();
@@ -101,6 +101,25 @@ export default async function StaffMemberPage({ params }: { params: Promise<{ id
             staff={person}
             upcomingBookings={upcoming ?? 0}
             bookingsHref={`/dashboard/bookings?staff=${person.id}`}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Alerts and login</CardTitle>
+          <CardDescription>Tell {person.name} about their bookings, and let them see their own schedule.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <StaffAccess
+            staff={{
+              id: person.id,
+              name: person.name,
+              email: person.email,
+              notify_email: person.notify_email,
+              invited: !!person.invited_at,
+              signedIn: !!person.user_id,
+            }}
           />
         </CardContent>
       </Card>

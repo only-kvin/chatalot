@@ -411,3 +411,21 @@ Defaults: Groq `openai/gpt-oss-120b`, Gemini `gemini-flash-latest`, Cerebras `gp
 - Migration `20261011155427_chatbot_identity.sql` (**applied to the live DB**): `widget_settings.assistant_name` (optional, up to 40 characters), `widget_settings.icon_on_launcher` (default on), and a public `widget-icons` storage bucket (JPEG/PNG/WebP, 2 MB). Uploads go through the dashboard's server actions with the service role, like staff photos, so the bucket has no user policies.
 - Owners set both in **Widgets → Chat**: upload an icon (shown in the chat header and, unless switched off, on the round chat button) and an optional chatbot name. The AI introduces itself by that name and still says it's an AI assistant if asked.
 - Every widget (chat, schedule, appointment, reschedule, contact, registration) ends with a small "Powered by <brand>" line linking to the site with `?ref=widget`. The name and URL come from `lib/brand.ts` at widget build time (`widget/shared/powered.ts`), so renaming means editing `lib/brand.ts` and deploying.
+
+## Inbox, bookings calendar and staff logins (2026-10-12)
+
+Migrations `20261011213033_staff_access`, `20261011213132_staff_email_lowercase` and
+`20261011213657_conversation_previews` are already applied to the live database.
+
+- **Conversations** is now an inbox: the list on the left, the chat on the right (one at a time on phones).
+- **Bookings → Calendar**: Day (a column per staff member), Week, and List (the old day list, for call-out routes).
+- **Staff alerts**: add a staff member's email on their page; they're emailed when a booking with them is made,
+  approved, moved, cancelled or handed to/from them. Bookings waiting for approval aren't sent until approved.
+- **Staff logins**: "Invite to sign in" on a staff member's page. They sign in with the normal login link using
+  that email and land on `/schedule`: their own bookings only. Staff logins are not business members, so RLS
+  gives them nothing; `/schedule` reads with the service role, filtered to their staff rows
+  (`lib/staff/access.ts`). Removing access, deactivating them or changing their email cuts it off.
+- **Manual step:** staff alert and invite emails come from Resend, so like customer emails they only reach
+  your own address until a sending domain is verified in Resend.
+- Not built yet: staff alerts on WhatsApp (needs an approved template), staff changing bookings themselves,
+  per-seat billing.

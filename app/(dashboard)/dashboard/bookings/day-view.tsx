@@ -8,6 +8,7 @@ import { formatRand, timeRangeLabel } from "@/lib/bookings/price-label";
 import { addressText, BOOKING_PLACE_COLUMNS, mapsUrl, type BookingPlace } from "@/lib/bookings/place";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { ViewToggle } from "./calendar";
 
 // One day's bookings in time order, call-outs with their address, a Maps
 // link and access notes, so the owner can plan the route. No route
@@ -30,6 +31,7 @@ export async function DayView({
   staffFilter,
   staffNames,
   hrefFor,
+  viewHrefs,
 }: {
   supabase: SupabaseClient;
   tenantId: string;
@@ -37,6 +39,7 @@ export async function DayView({
   staffFilter: string | undefined;
   staffNames: Map<string, string>;
   hrefFor: (date: string) => string;
+  viewHrefs: Record<"day" | "week" | "list", string>;
 }) {
   let query = supabase
     .from("bookings")
@@ -62,13 +65,14 @@ export async function DayView({
             {callouts > 0 && `, ${callouts} call-out${callouts === 1 ? "" : "s"}`}, in order of arrival
           </p>
         </div>
-        <div className="flex gap-2 text-sm">
-          <Link href={hrefFor(addDays(date, -1))} className="rounded-md border px-3 py-1.5 hover:bg-muted">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <Link href={hrefFor(addDays(date, -1))} className="rounded-full border bg-card px-3 py-1.5 hover:bg-muted">
             ← Previous day
           </Link>
-          <Link href={hrefFor(addDays(date, 1))} className="rounded-md border px-3 py-1.5 hover:bg-muted">
+          <Link href={hrefFor(addDays(date, 1))} className="rounded-full border bg-card px-3 py-1.5 hover:bg-muted">
             Next day →
           </Link>
+          <ViewToggle current="list" hrefs={viewHrefs} />
         </div>
       </div>
 

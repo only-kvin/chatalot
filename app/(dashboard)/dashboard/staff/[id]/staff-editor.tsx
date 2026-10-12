@@ -13,6 +13,9 @@ import {
   switchToBusinessHoursAction,
   switchToOwnHoursAction,
   updateStaffAction,
+  updateStaffContactAction,
+  inviteStaffAction,
+  removeStaffAccessAction,
 } from "../actions";
 import { describeTimeOff } from "@/lib/bookings/hours";
 import { StaffAvatar } from "@/components/dashboard/staff-avatar";
@@ -348,6 +351,83 @@ export function StaffPhoto({ staffId, name, url }: { staffId: string; name: stri
       </form>
       <p className="w-full text-xs text-muted-foreground">JPEG, PNG or WebP, up to 2 MB. Square photos look best.</p>
       <Feedback error={error} saved={saved} />
+    </div>
+  );
+}
+
+// Their email, booking alerts, and their own login to see their schedule.
+export function StaffAccess({
+  staff,
+}: {
+  staff: { id: string; name: string; email: string | null; notify_email: boolean; invited: boolean; signedIn: boolean };
+}) {
+  const details = useAction();
+  const access = useAction();
+  const [notice, setNotice] = useState<string | null>(null);
+
+  return (
+    <div className="flex flex-col gap-6">
+      <form action={(formData) => details.run(() => updateStaffContactAction(staff.id, formData))} className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="staff_email">Email</Label>
+          <Input id="staff_email" name="email" type="email" defaultValue={staff.email ?? ""} placeholder="nomsa@example.com" />
+        </div>
+        <label className="flex items-center gap-3 text-sm">
+          <Switch name="notify_email" defaultChecked={staff.notify_email} />
+          Email {staff.name} when a booking with them is made, moved or cancelled
+        </label>
+        <Feedback error={details.error} saved={details.saved} />
+        <div>
+          <Button type="submit" variant="outline" disabled={details.pending}>
+            {details.pending ? "Saving…" : "Save"}
+          </Button>
+        </div>
+      </form>
+
+      <div className="flex flex-col gap-3 border-t pt-5">
+        <div>
+          <p className="text-sm font-medium">Their own login</p>
+          <p className="text-sm text-muted-foreground">
+            {staff.signedIn
+              ? `${staff.name} can sign in to see their own bookings. They can't see anything else in your dashboard.`
+              : staff.invited
+                ? `Invited. ${staff.name} hasn't signed in yet; they sign in with ${staff.email}.`
+                : `Let ${staff.name} sign in to see only their own bookings and schedule. They won't see your chats, leads, customers or settings.`}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {!staff.signedIn && (
+            <Button
+              type="button"
+              disabled={access.pending || !staff.email}
+              onClick={() =>
+                access.run(async () => {
+                  const result = await inviteStaffAction(staff.id);
+                  setNotice(result.notice ?? null);
+                  return result;
+                })
+              }
+            >
+              {staff.invited ? "Send the invite again" : "Invite to sign in"}
+            </Button>
+          )}
+          {(staff.invited || staff.signedIn) && (
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={access.pending}
+              onClick={() => {
+                setNotice(null);
+                access.run(() => removeStaffAccessAction(staff.id));
+              }}
+            >
+              Remove access
+            </Button>
+          )}
+        </div>
+        {!staff.email && <p className="text-xs text-muted-foreground">Add their email above first.</p>}
+        {access.error ? <Feedback error={access.error} /> : notice && <p className="feedback-enter text-sm text-green-600">{notice}</p>}
+      </div>
     </div>
   );
 }

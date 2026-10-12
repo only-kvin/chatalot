@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/db/supabase-server";
 import { getSessionUser } from "@/lib/db/auth";
 import { currentTenantFeatures } from "@/lib/dashboard-features";
+import { getStaffSeats } from "@/lib/staff/access";
 import { ThemeScript } from "@/components/theme/theme-script";
 import { parseTheme, THEME_COOKIE } from "@/components/theme/theme";
 import { DashboardNav } from "./dashboard-nav";
@@ -25,7 +26,11 @@ export default async function DashboardLayout({
     currentTenantFeatures(),
     supabase.from("platform_admins").select("user_id").eq("user_id", user.id).maybeSingle(),
   ]);
-  if (!current) redirect("/");
+  if (!current) {
+    // Staff logins aren't business members: their place is their schedule.
+    if ((await getStaffSeats()).length) redirect("/schedule");
+    redirect("/");
+  }
   const { tenantId, features } = current;
 
   const [{ data: config }, { count: needsYou }, { data: tenant }] = await Promise.all([

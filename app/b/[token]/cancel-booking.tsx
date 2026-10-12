@@ -39,7 +39,7 @@ export function CancelBooking({ token }: { token: string }) {
           </Button>
         </div>
       )}
-      {error && <p className="text-red-600">{error}</p>}
+      {error && <p className="text-destructive">{error}</p>}
     </div>
   );
 }

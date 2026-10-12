@@ -85,6 +85,17 @@ export async function sendOwnerEmail(
   }
 }
 
+// Emails one staff member (their booking alerts), in the owner email's
+// layout. Best-effort, like owner emails.
+export async function sendStaffEmail(to: string, email: OwnerEmail): Promise<void> {
+  try {
+    const { error } = await getResend().emails.send({ from: FROM, to, subject: email.subject, html: renderOwnerEmail(email) });
+    if (error) console.error(`Staff email "${email.subject}" failed:`, error);
+  } catch (err) {
+    console.error(`Staff email "${email.subject}" failed:`, err);
+  }
+}
+
 // Emails every platform admin (you, running ChatAlot). Best-effort, like
 // owner emails.
 export async function sendPlatformAdminEmail(admin: SupabaseClient, email: OwnerEmail): Promise<void> {

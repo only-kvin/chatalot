@@ -8,6 +8,9 @@ import { timeOffRange } from "@/lib/bookings/hours";
 import { createAdminClient } from "@/lib/db/supabase-admin";
 import { imageKind, MAX_PHOTO_BYTES, PHOTO_BUCKET, storedPhotoPath } from "@/lib/staff/photo";
 import { featureError } from "@/lib/dashboard-features";
+import { normalEmail } from "@/lib/staff/access";
+import { sendStaffEmail } from "@/lib/email/send";
+import { BRAND_NAME } from "@/lib/brand";
 
 // Staff, their services, hours and time off. The signed-in user's client is
 // used throughout, so RLS keeps every read and write inside their business;
@@ -363,4 +366,107 @@ async function removeStoredPhoto(url: string | null, tenantId: string) {
   if (!path?.startsWith(`${tenantId}/`)) return;
   const { error } = await createAdminClient().storage.from(PHOTO_BUCKET).remove([path]);
   if (error) console.error(`Removing old staff photo ${path} failed:`, error);
+}
+
+// ---------------------------------------------------------------------------
+// Email, booking alerts and their own login (see lib/staff/access.ts).
+// ---------------------------------------------------------------------------
+
+const contactSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .max(254)
+    .refine((v) => v === "" || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v), "That email address doesn't look right."),
+  notify_email: z.boolean(),
+});
+
+export async function updateStaffContactAction(staffId: string, formData: FormData): Promise<Result> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
+  const s = await session();
+  if (!s) return { error: "Not authorized." };
+  if (!uuid.safeParse(staffId).success) return { error: "Invalid request." };
+  const parsed = contactSchema.safeParse({
+    email: formData.get("email") ?? "",
+    notify_email: formData.get("notify_email") === "on",
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
+
+  const { data: person } = await s.supabase
+    .from("staff")
+    .select("email, user_id")
+    .eq("tenant_id", s.tenantId)
+    .eq("id", staffId)
+    .maybeSingle();
+  if (!person) return { error: "Staff member not found." };
+  const email = parsed.data.email ? normalEmail(parsed.data.email) : null;
+  // A new address is a new person as far as logins go: their old login and
+  // any open invite stop working.
+  const changed = email !== person.email;
+  const { error } = await s.supabase
+    .from("staff")
+    .update({
+      email,
+      notify_email: parsed.data.notify_email,
+      ...(changed ? { invited_at: null, user_id: null } : {}),
+    })
+    .eq("id", staffId)
+    .eq("tenant_id", s.tenantId);
+  if (error) return failed("save those details", error);
+  revalidate(staffId);
+  return { error: null };
+}
+
+// Lets them sign in (with the normal login link, using this email) to see
+// their own schedule, and emails them to say so.
+export async function inviteStaffAction(staffId: string): Promise<Result & { notice?: string }> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
+  const s = await session();
+  if (!s) return { error: "Not authorized." };
+  if (!uuid.safeParse(staffId).success) return { error: "Invalid request." };
+
+  const [{ data: person }, { data: config }] = await Promise.all([
+    s.supabase.from("staff").select("name, email, active, user_id").eq("tenant_id", s.tenantId).eq("id", staffId).maybeSingle(),
+    s.supabase.from("agent_configs").select("business_name").eq("tenant_id", s.tenantId).maybeSingle(),
+  ]);
+  if (!person) return { error: "Staff member not found." };
+  if (!person.email) return { error: "Add their email address first." };
+  if (!person.active) return { error: "They're inactive. Make them active first." };
+  if (person.user_id) return { error: null, notice: "They can already sign in." };
+
+  const { error } = await s.supabase
+    .from("staff")
+    .update({ invited_at: new Date().toISOString() })
+    .eq("id", staffId)
+    .eq("tenant_id", s.tenantId);
+  if (error) return failed("invite them", error);
+
+  const business = config?.business_name || "Your workplace";
+  await sendStaffEmail(person.email, {
+    subject: `${business} added you to ${BRAND_NAME}`,
+    intro: `Hi ${person.name}, ${business} uses ${BRAND_NAME} for bookings. Sign in with this email address (${person.email}) to see your schedule. We'll email you a sign-in link; there's no password.`,
+    details: [],
+    path: "/schedule",
+    footer: "You'll also get an email when a booking with you is made, moved or cancelled.",
+  });
+  revalidate(staffId);
+  return { error: null, notice: `Invite sent to ${person.email}.` };
+}
+
+export async function removeStaffAccessAction(staffId: string): Promise<Result> {
+  const blocked = await featureError("bookings");
+  if (blocked) return { error: blocked };
+  const s = await session();
+  if (!s) return { error: "Not authorized." };
+  if (!uuid.safeParse(staffId).success) return { error: "Invalid request." };
+  const { error } = await s.supabase
+    .from("staff")
+    .update({ invited_at: null, user_id: null })
+    .eq("id", staffId)
+    .eq("tenant_id", s.tenantId);
+  if (error) return failed("remove their access", error);
+  revalidate(staffId);
+  return { error: null };
 }

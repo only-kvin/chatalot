@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/db/supabase-admin";
 import { cancelBooking, describeBooking } from "@/lib/bookings/manage";
 import { emailCustomerAboutBooking } from "@/lib/email/customer-booking";
+import { notifyStaffAboutBooking } from "@/lib/email/notify-staff";
 import { notifyOwnerOfBookingChange } from "@/lib/email/notify-booking-change";
 import { loadBookingFromToken } from "@/lib/bookings/manage-link";
 
@@ -42,6 +43,7 @@ export async function cancelByTokenAction(token: string): Promise<{ error: strin
       "email_link",
     ),
     emailCustomerAboutBooking(admin, booking.tenantId, booking.id, "cancelled"),
+    notifyStaffAboutBooking(admin, booking.tenantId, booking.id, "cancelled"),
   ]);
   revalidatePath(`/b/${token}`);
   return { error: null };

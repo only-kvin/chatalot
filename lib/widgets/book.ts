@@ -3,6 +3,7 @@ import { waitUntil } from "@vercel/functions";
 import { createBooking, type BookingFailure, type CreatedBooking } from "@/lib/bookings/create";
 import { upsertContact } from "@/lib/contacts/upsert";
 import { emailCustomerAboutBooking } from "@/lib/email/customer-booking";
+import { notifyStaffAboutBooking } from "@/lib/email/notify-staff";
 import { notifyOwnerOfBooking } from "@/lib/email/notify-booking";
 import { formatBookingWhen } from "@/lib/bookings/labels";
 import type { CustomerAddress } from "@/lib/bookings/callout";
@@ -96,5 +97,6 @@ async function notify(
       bookingId: booked.bookingId,
     }),
     emailCustomerAboutBooking(admin, b.tenantId, booked.bookingId, pending ? "requested" : "confirmed"),
+    notifyStaffAboutBooking(admin, b.tenantId, booked.bookingId, "new"),
   ]);
 }

@@ -15,6 +15,7 @@ import { notifyOwnerOfLead } from "@/lib/email/notify-lead";
 import { notifyOwnerHumanRequested } from "@/lib/email/notify-human-requested";
 import { notifyOwnerOfBooking } from "@/lib/email/notify-booking";
 import { emailCustomerAboutBooking } from "@/lib/email/customer-booking";
+import { bookingStaffId, notifyStaffAboutBooking, notifyStaffAfterChange } from "@/lib/email/notify-staff";
 import { linkConversation, upsertContact } from "@/lib/contacts/upsert";
 import {
   cancelBooking,
@@ -333,11 +334,14 @@ export async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall:
         { kind: "cancelled", customer: booking.customerName, booking: describeBooking(booking), reason: call.input.reason },
         conversationId,
       );
+      await notifyStaffAboutBooking(admin, tenantId, booking.id, "cancelled");
       return `Cancelled: ${describeBooking(booking)}. Tell the visitor exactly this.`;
     }
 
+    const staffBefore = await bookingStaffId(admin, tenantId, booking.id);
     const moved = await rescheduleBooking(admin, { ...actor, date: call.input.date, time: call.input.time });
     if (!moved.ok) return moved.error;
+    await notifyStaffAfterChange(admin, tenantId, booking.id, staffBefore, "rescheduled");
     await notifyOwnerOfBookingChange(
       admin,
       tenantId,
@@ -456,7 +460,12 @@ export async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall:
     },
     conversationId,
   );
-  if (!booked.repeat) await emailCustomerAboutBooking(admin, tenantId, booked.bookingId, pending ? "requested" : "confirmed");
+  if (!booked.repeat) {
+    await Promise.all([
+      emailCustomerAboutBooking(admin, tenantId, booked.bookingId, pending ? "requested" : "confirmed"),
+      notifyStaffAboutBooking(admin, tenantId, booked.bookingId, "new"),
+    ]);
+  }
 
   if (pending) {
     return `${callout ? "Call-out requested" : "Booking requested"} (not yet confirmed): ${resolved.name} on ${when}${withText}${where} (reference ${booked.ref}). The business approves ${callout ? "call-outs" : "bookings"} first and will confirm soon; the time is held meanwhile. Tell the visitor exactly this, and don't call it confirmed. ${after}`.trim();
