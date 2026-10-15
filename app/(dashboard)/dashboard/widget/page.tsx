@@ -44,6 +44,7 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
       {tabs.map((t) => (
         <Link
           key={t.id}
+          data-echo={`widget.tab.${t.id}`}
           href={t.id === "chat" ? "/dashboard/widget" : `/dashboard/widget?tab=${t.id}`}
           aria-current={tab === t.id ? "page" : undefined}
           className={cn(

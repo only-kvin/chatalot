@@ -56,6 +56,7 @@ export function WeeklyHours({
           run(() => createAvailabilityRuleAction(formData));
         }}
         className="flex flex-wrap items-end gap-3"
+        data-echo="hours.form"
       >
         <div className="flex flex-col gap-2">
           <Label htmlFor={`${idPrefix}-weekday`}>Day</Label>
@@ -80,7 +81,7 @@ export function WeeklyHours({
           <Label htmlFor={`${idPrefix}-to`}>To</Label>
           <Input id={`${idPrefix}-to`} name="end_time" type="time" required defaultValue="17:00" />
         </div>
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" disabled={pending} data-echo="hours.add">
           Add hours
         </Button>
       </form>

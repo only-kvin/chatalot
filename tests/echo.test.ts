@@ -1,10 +1,13 @@
-﻿import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import path from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { NAV_GROUPS } from "../app/(dashboard)/dashboard/nav-items";
 import { GUIDE_PAGES, allowedHrefs, guideText, pageForPath, pagesFor } from "../lib/echo/guide";
 import { ECHO_RULES, buildEchoPrompt, setupProgressText } from "../lib/echo/prompt";
 import { parseEchoToolInput, safeDashboardLink } from "../lib/echo/tools";
 import { cleanReply } from "../lib/echo/reply";
+import { TARGETS, onPage, planTour, targetsFor } from "../lib/echo/targets";
 import type { Features } from "../lib/plans";
 
 const ALL_ON: Features = { web_chat: "on", contact_form: "on", whatsapp: "on", bookings: "on", reviews: "on", registration: "on" };
@@ -39,6 +42,105 @@ describe("Echo's dashboard guide", () => {
   });
 });
 
+// Every file of the dashboard's UI, to check the cursor's targets against.
+function sourceFiles(dir: string): string[] {
+  return readdirSync(dir).flatMap((name) => {
+    const full = path.join(dir, name);
+    return statSync(full).isDirectory() ? sourceFiles(full) : full.endsWith(".tsx") ? [full] : [];
+  });
+}
+const UI_SOURCE = [...sourceFiles(path.join(__dirname, "../app/(dashboard)")), ...sourceFiles(path.join(__dirname, "../components"))]
+  .map((f) => readFileSync(f, "utf8"))
+  .join("\n");
+
+describe("Echo's cursor targets", () => {
+  it("each point at something that exists in the dashboard's code", () => {
+    for (const target of TARGETS) {
+      for (const [, name] of target.selector.matchAll(/data-echo="([^"]+)"/g)) {
+        // Menu and tab markers are written from a template: data-echo={`nav:${item.href}`}.
+        const templated = /^(nav:|bookings\.tab\.|widget\.tab\.)/.exec(name)?.[1];
+        const marker = templated ? `data-echo={\`${templated}\${` : `data-echo="${name}"`;
+        expect(UI_SOURCE.includes(marker), `${target.id}: ${marker}`).toBe(true);
+      }
+      for (const [, id] of target.selector.matchAll(/#([a-z_-]+)/g)) {
+        expect(UI_SOURCE.includes(`id="${id}"`), `${target.id}: id="${id}"`).toBe(true);
+      }
+    }
+  });
+
+  it("have unique ids, and a menu target for every page", () => {
+    expect(new Set(TARGETS.map((t) => t.id)).size).toBe(TARGETS.length);
+    for (const page of GUIDE_PAGES) expect(TARGETS.some((t) => t.pages[0] === "*" && t.opens === page.href), page.href).toBe(true);
+  });
+
+  it("only include pages on the business's plan", () => {
+    const ids = targetsFor(STARTER).map((t) => t.id);
+    expect(ids).toContain("nav.knowledge");
+    expect(ids).toContain("settings.domains");
+    expect(ids).not.toContain("nav.services");
+    expect(ids).not.toContain("services.price");
+    expect(ids).not.toContain("staff.time_off_add");
+  });
+
+  it("match pages and detail pages", () => {
+    expect(onPage("/dashboard/staff/*", "/dashboard/staff/abc")).toBe(true);
+    expect(onPage("/dashboard/staff/*", "/dashboard/staff")).toBe(false);
+    expect(onPage("/dashboard/staff/*", "/dashboard/staff/*")).toBe(true);
+    expect(onPage("*", "/dashboard")).toBe(true);
+  });
+});
+
+describe("planTour", () => {
+  const ids = (r: ReturnType<typeof planTour>) => (r.ok ? r.steps.map((s) => s.target) : r.error);
+
+  it("adds the menu click to reach another page", () => {
+    const result = planTour(
+      [
+        { target: "services.edit", say: "Click Edit on the service you want to change." },
+        { target: "services.price", say: "Type the new price here." },
+        { target: "services.save", say: "Now click Save service." },
+      ],
+      { pathname: "/dashboard", features: ALL_ON },
+    );
+    expect(ids(result)).toEqual(["nav.services", "services.edit", "services.price", "services.save"]);
+    expect(result.ok && result.steps[0]).toEqual({
+      target: "nav.services",
+      selector: '[data-echo="nav:/dashboard/services"]',
+      action: "click",
+      say: "Click Services in the menu.",
+    });
+  });
+
+  it("doesn't add a menu step when they're already there, and drops one the model added", () => {
+    expect(ids(planTour([{ target: "services.price", say: "Here." }], { pathname: "/dashboard/services", features: ALL_ON }))).toEqual([
+      "services.price",
+    ]);
+    expect(
+      ids(planTour([{ target: "nav.services", say: "Go." }, { target: "services.price", say: "Here." }], { pathname: "/dashboard/services", features: ALL_ON })),
+    ).toEqual(["services.price"]);
+  });
+
+  it("goes through the list to reach a detail page", () => {
+    expect(ids(planTour([{ target: "staff.time_off_from", say: "Pick the first day off." }], { pathname: "/dashboard/leads", features: ALL_ON }))).toEqual([
+      "nav.staff",
+      "staff.open",
+      "staff.time_off_from",
+    ]);
+    // Already on a person's page: straight there.
+    expect(ids(planTour([{ target: "staff.time_off_add", say: "Add it." }], { pathname: "/dashboard/staff/123", features: ALL_ON }))).toEqual([
+      "staff.time_off_add",
+    ]);
+  });
+
+  it("refuses targets that don't exist or aren't on their plan", () => {
+    expect(planTour([{ target: "services.price", say: "x" }], { pathname: "/dashboard", features: STARTER })).toEqual({
+      ok: false,
+      error: "Not targets you can use: services.price. Use ids from the target list.",
+    });
+    expect(planTour([{ target: "#price_rand", say: "x" }], { pathname: "/dashboard", features: ALL_ON }).ok).toBe(false);
+  });
+});
+
 describe("safeDashboardLink", () => {
   const allowed = allowedHrefs(STARTER);
 
@@ -50,7 +152,7 @@ describe("safeDashboardLink", () => {
   });
 
   it("refuses other sites, locked pages, unknown pages and anything clever", () => {
-    for (const path of [
+    for (const p of [
       "https://evil.example/dashboard",
       "//evil.example",
       "/dashboard/services",
@@ -60,45 +162,50 @@ describe("safeDashboardLink", () => {
       "/dashboard/widget?tab=chat&next=https://evil.example",
       "javascript:alert(1)",
     ]) {
-      expect(safeDashboardLink(path, allowed), path).toBeNull();
+      expect(safeDashboardLink(p, allowed), p).toBeNull();
     }
   });
 });
 
 describe("parseEchoToolInput", () => {
-  it("accepts valid calls and rejects unknown tools and bad input", () => {
-    expect(parseEchoToolInput({ name: "show_page", input: { path: "/dashboard", label: "Open Overview" } }).ok).toBe(true);
-    expect(parseEchoToolInput({ name: "get_setup_progress", input: {} }).ok).toBe(false);
+  const valid = { steps: [{ target: "services.price", say: "Type it here." }], done: "Done." };
+
+  it("accepts a walkthrough and rejects unknown tools and bad input", () => {
+    expect(parseEchoToolInput({ name: "guide_me", input: valid }).ok).toBe(true);
+    expect(parseEchoToolInput({ name: "show_page", input: {} }).ok).toBe(false);
     expect(parseEchoToolInput({ name: "toString", input: {} })).toEqual({ ok: false, error: "Unknown tool: toString" });
-    expect(parseEchoToolInput({ name: "show_page", input: { path: "/dashboard" } }).ok).toBe(false);
-    expect(parseEchoToolInput({ name: "show_page", input: undefined }).ok).toBe(false);
+    expect(parseEchoToolInput({ name: "guide_me", input: { steps: [], done: "Done." } }).ok).toBe(false);
+    expect(parseEchoToolInput({ name: "guide_me", input: { steps: valid.steps } }).ok).toBe(false);
+    expect(parseEchoToolInput({ name: "guide_me", input: { ...valid, steps: Array(9).fill(valid.steps[0]) } }).ok).toBe(false);
+    expect(parseEchoToolInput({ name: "guide_me", input: undefined }).ok).toBe(false);
   });
 });
 
 describe("buildEchoPrompt", () => {
-  it("puts the persona, then the rules, then the owner's page, setup and the fenced guide", () => {
+  it("puts the persona, then the rules, then the owner's page, setup, the fenced guide and the targets", () => {
     const prompt = buildEchoPrompt({
       businessName: "Demo Salon",
       currentPage: pageForPath("/dashboard/services"),
       pathname: "/dashboard/services",
       setup: "SETUP TEXT",
       guide: "GUIDE TEXT",
+      targets: "TARGET LIST",
     });
-    const persona = prompt.indexOf("You are Echo");
-    const rules = prompt.indexOf(ECHO_RULES);
-    const page = prompt.indexOf("They're on: Services (/dashboard/services)");
-    const setup = prompt.indexOf("<setup_progress>\nSETUP TEXT\n</setup_progress>");
-    const guide = prompt.indexOf("<dashboard_guide>\nGUIDE TEXT\n</dashboard_guide>");
-    expect(persona).toBe(0);
-    expect(rules).toBeGreaterThan(persona);
-    expect(page).toBeGreaterThan(rules);
-    expect(setup).toBeGreaterThan(page);
-    expect(guide).toBeGreaterThan(setup);
+    const order = [
+      prompt.indexOf("You are Echo"),
+      prompt.indexOf(ECHO_RULES),
+      prompt.indexOf("They're on: Services (/dashboard/services)"),
+      prompt.indexOf("<setup_progress>\nSETUP TEXT\n</setup_progress>"),
+      prompt.indexOf("<dashboard_guide>\nGUIDE TEXT\n</dashboard_guide>"),
+      prompt.indexOf("TARGET LIST\n</targets>"),
+    ];
+    expect(order[0]).toBe(0);
+    expect(order.every((at, i) => i === 0 || at > order[i - 1])).toBe(true);
     expect(prompt).toContain("<business_name>Demo Salon</business_name>");
   });
 
   it("says when the page isn't in the guide", () => {
-    const prompt = buildEchoPrompt({ businessName: "", currentPage: null, pathname: "/dashboard/upgrade/bookings", setup: "", guide: "" });
+    const prompt = buildEchoPrompt({ businessName: "", currentPage: null, pathname: "/dashboard/upgrade/bookings", setup: "", guide: "", targets: "" });
     expect(prompt).toContain("a page that isn't in the guide (/dashboard/upgrade/bookings)");
   });
 });
@@ -151,9 +258,15 @@ const scripted = vi.hoisted(() => ({
   system: "",
 }));
 vi.mock("../lib/agent/model", () => ({
-  runAgentTurn: async function* (params: { system: string; executeTool: (c: { name: string; input: unknown }) => Promise<string> }) {
+  runAgentTurn: async function* (params: {
+    system: string;
+    executeTool: (c: { name: string; input: unknown }) => Promise<string>;
+    endTurn?: () => boolean;
+  }) {
     scripted.system = params.system;
     for (const call of scripted.calls) scripted.results.push(await params.executeTool(call));
+    // As the real loop does: a turn ended by a tool gets no follow-up reply.
+    if (params.endTurn?.()) return;
     yield { type: "text-delta", text: scripted.reply };
   },
 }));
@@ -169,7 +282,7 @@ describe("runEcho", () => {
     setupSteps.mockResolvedValue([]);
   });
 
-  async function run(features: Features) {
+  async function run(features: Features, pathname = "/dashboard") {
     const { runEcho } = await import("../lib/echo/engine");
     const events = [];
     for await (const e of runEcho({
@@ -177,7 +290,7 @@ describe("runEcho", () => {
       tenantId: "tenant-1",
       businessName: "Demo Salon",
       features,
-      pathname: "/dashboard",
+      pathname,
       messages: [{ role: "user", content: "help" }],
       signal: new AbortController().signal,
     })) {
@@ -186,48 +299,48 @@ describe("runEcho", () => {
     return events;
   }
 
-  it("only turns allowed pages into buttons, after the reply text", async () => {
+  it("ends the turn with the plan's intro and the walkthrough, with no follow-up call or page buttons", async () => {
     scripted.calls = [
-      { name: "show_page", input: { path: "/dashboard/knowledge", label: "Open Knowledge" } },
-      { name: "show_page", input: { path: "https://evil.example", label: "Click me" } },
-      { name: "show_page", input: { path: "/dashboard/services", label: "Open Services" } },
+      { name: "guide_me", input: { steps: [{ target: "services.price", say: "Type the new price." }], intro: "**Sure**, watch my cursor.", done: "All set." } },
     ];
-    const events = await run(STARTER);
+    scripted.reply = "This follow-up should never be asked for. [Services](/dashboard/services)";
+    const events = await run(ALL_ON);
     expect(events).toEqual([
-      { type: "text", text: "Here you go." },
-      { type: "link", href: "/dashboard/knowledge", label: "Open Knowledge" },
+      { type: "text", text: "Sure, watch my cursor." },
+      {
+        type: "tour",
+        done: "All set.",
+        steps: [
+          { target: "nav.services", selector: '[data-echo="nav:/dashboard/services"]', action: "click", say: "Click Services in the menu." },
+          { target: "services.price", selector: "#price_rand", action: "fill", say: "Type the new price." },
+        ],
+      },
     ]);
-    expect(scripted.results[1]).toContain("isn't a page this business can open");
   });
 
-  it("gives the model this tenant's real setup progress, with the business's bookings setting", async () => {
+  it("hands bad walkthroughs back to the model and shows none", async () => {
+    scripted.calls = [
+      { name: "guide_me", input: { steps: [{ target: "services.price", say: "x" }], done: "y" } },
+      { name: "guide_me", input: { steps: [{ target: "services.price" }], done: "y" } },
+    ];
+    const events = await run(STARTER);
+    expect(events).toEqual([{ type: "text", text: "Here you go." }]);
+    expect(scripted.results[0]).toContain("Not targets you can use: services.price");
+    expect(scripted.results[1]).toMatch(/^Invalid input for guide_me/);
+  });
+
+  it("gives the model this tenant's real setup progress and its targets", async () => {
     setupSteps.mockResolvedValue([{ title: "Set your hours", text: "t", href: "/dashboard/availability", done: false }]);
     await run(STARTER);
     expect(setupSteps).toHaveBeenCalledWith(expect.anything(), "tenant-1", false);
     expect(scripted.system).toContain("[to do] Set your hours");
-  });
-
-  it("cleans the reply and doesn't repeat a button the tool already gave", async () => {
-    scripted.calls = [{ name: "show_page", input: { path: "/dashboard/knowledge", label: "Open Knowledge" } }];
-    scripted.reply = "Add **one FAQ** first. [Knowledge](/dashboard/knowledge)";
-    const events = await run(ALL_ON);
-    expect(events).toEqual([
-      { type: "text", text: "Add one FAQ first." },
-      { type: "link", href: "/dashboard/knowledge", label: "Open Knowledge" },
-    ]);
+    expect(scripted.system).toContain("settings.domains (type/choose)");
+    expect(scripted.system).not.toContain("services.price");
   });
 
   it("gives no button to the page they're already on", async () => {
-    scripted.calls = [{ name: "show_page", input: { path: "/dashboard", label: "Open Overview" } }];
-    const events = await run(ALL_ON);
-    expect(events).toEqual([{ type: "text", text: "Here you go." }]);
-    expect(scripted.results[0]).toContain("already on that page");
-  });
-
-  it("hands validation errors back to the model instead of running the tool", async () => {
-    scripted.calls = [{ name: "show_page", input: { label: "No path" } }];
-    const events = await run(ALL_ON);
-    expect(events).toEqual([{ type: "text", text: "Here you go." }]);
-    expect(scripted.results[0]).toMatch(/^Invalid input for show_page/);
+    scripted.reply = "Add one here. [Knowledge](/dashboard/knowledge)";
+    const events = await run(ALL_ON, "/dashboard/knowledge");
+    expect(events).toEqual([{ type: "text", text: "Add one here." }]);
   });
 });

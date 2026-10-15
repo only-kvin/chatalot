@@ -130,7 +130,7 @@ export function KnowledgeEditor({ initialItems }: { initialItems: KnowledgeItem[
             {error && <p className="feedback-enter text-sm text-red-600">{error}</p>}
             {warning && <p className="feedback-enter text-sm text-amber-600">{warning}</p>}
             <div className="flex gap-2">
-              <Button type="submit" disabled={pending}>
+              <Button type="submit" disabled={pending} data-echo="knowledge.save">
                 {pending ? "Saving…" : isEditing ? "Update item" : "Add item"}
               </Button>
               {isEditing && (
@@ -155,7 +155,7 @@ export function KnowledgeEditor({ initialItems }: { initialItems: KnowledgeItem[
                 <p className="text-sm text-muted-foreground">{item.content}</p>
               </div>
               <div className="flex shrink-0 gap-2">
-                <Button variant="outline" size="sm" onClick={() => setEditing(item)}>
+                <Button variant="outline" size="sm" onClick={() => setEditing(item)} data-echo="knowledge.edit">
                   Edit
                 </Button>
                 <Button

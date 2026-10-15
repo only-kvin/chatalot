@@ -208,7 +208,7 @@ export function BookingSettingsCard({ initial }: { initial: BookingSettings }) {
           {error && <p className="feedback-enter text-sm text-red-600">{error}</p>}
           {saved && <p className="feedback-enter text-sm text-green-700">Saved.</p>}
           <div>
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" disabled={pending} data-echo="settings.bookings_save">
               {pending ? "Saving…" : "Save booking settings"}
             </Button>
           </div>

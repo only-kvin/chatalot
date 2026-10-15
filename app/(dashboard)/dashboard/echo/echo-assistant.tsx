@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { ArrowRightIcon, ArrowUpIcon, MicIcon, SquareIcon, Volume2Icon, VolumeXIcon, XIcon } from "lucide-react";
 import { cn } from "cn";
 import { LISTEN_ERRORS, canListen, canSpeak, createSpeaker, listen, type Listener, type Speaker } from "./voice";
+import { EchoCursor, type Tour } from "./echo-cursor";
 
 // Echo, the dashboard's built-in guide: a floating orb that opens a chat
 // panel. It knows which page the owner is on and answers from the dashboard
@@ -73,6 +74,9 @@ export function EchoAssistant() {
   const [voice, setVoice] = useState({ listen: false, speak: false });
   // A short note above the input (mic problems), not part of the conversation.
   const [notice, setNotice] = useState<string | null>(null);
+  // The walkthrough Echo's cursor is running, if any; `spoken` when it was
+  // asked for out loud, so each step is said out loud too.
+  const [tour, setTour] = useState<(Tour & { id: number; spoken: boolean }) | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
   const listenerRef = useRef<Listener | null>(null);
@@ -128,6 +132,8 @@ export function EchoAssistant() {
     if (!message || statusRef.current === "thinking" || statusRef.current === "replying") return;
     stopSpeaking();
     setNotice(null);
+    // A new question replaces any walkthrough under way.
+    setTour(null);
     const current = turnsRef.current;
     const history = [...current.filter((t) => !t.error), { role: "user" as const, content: message }];
     setTurns([...current, { role: "user", content: message }, { role: "assistant", content: "" }]);
@@ -164,6 +170,10 @@ export function EchoAssistant() {
           speaker?.say(event.text);
         } else if (event.type === "link") {
           updateLast((t) => ({ ...t, links: [...(t.links ?? []), { href: event.href, label: event.label }] }));
+        } else if (event.type === "tour") {
+          // The cursor takes over: get the panel out of its way.
+          setTour({ steps: event.steps, done: event.done, id: Date.now(), spoken });
+          setOpen(false);
         } else if (event.type === "error") {
           updateLast((t) => ({ ...t, content: event.error, error: true }));
           speaker?.say(event.error);
@@ -202,6 +212,20 @@ export function EchoAssistant() {
     if (!listener) return;
     listenerRef.current = listener;
     setStatus("listening");
+  }
+
+  // Each walkthrough step, said out loud when the question was spoken.
+  function sayStep(text: string) {
+    if (!tour?.spoken || !talkBackRef.current || !canSpeak()) return;
+    stopSpeaking();
+    const speaker = createSpeaker({ onStart: () => setSpeaking(true), onDone: () => setSpeaking(false) });
+    speakerRef.current = speaker;
+    speaker.say(text);
+  }
+
+  function endTour() {
+    stopSpeaking();
+    setTour(null);
   }
 
   // Stop button: whatever Echo is doing, stop it.
@@ -256,6 +280,7 @@ export function EchoAssistant() {
 
   return (
     <div className="fixed right-4 bottom-4 z-50 flex flex-col items-end gap-3 print:hidden">
+      {tour && <EchoCursor key={tour.id} tour={tour} onSay={sayStep} onEnd={endTour} />}
       {open && (
         <section
           role="dialog"
@@ -461,7 +486,11 @@ function TypingDots() {
   );
 }
 
-type StreamEvent = { type: "text"; text: string } | { type: "link"; href: string; label: string } | { type: "error"; error: string };
+type StreamEvent =
+  | { type: "text"; text: string }
+  | { type: "link"; href: string; label: string }
+  | ({ type: "tour" } & Tour)
+  | { type: "error"; error: string };
 
 async function readStream(body: ReadableStream<Uint8Array>, onEvent: (event: StreamEvent) => void) {
   const reader = body.getReader();

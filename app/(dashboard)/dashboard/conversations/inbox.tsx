@@ -117,6 +117,7 @@ export function Inbox({ items, children }: { items: InboxItem[]; children: React
             return (
               <li key={c.id}>
                 <Link
+                  data-echo="conversations.open"
                   href={`/dashboard/conversations/${c.id}`}
                   aria-current={active === c.id ? "page" : undefined}
                   className={cn(

@@ -241,7 +241,7 @@ export function TimeOff({ staffId, upcoming, past }: { staffId: string; upcoming
             <Label htmlFor="reason">Reason (optional, only you see it)</Label>
             <Input id="reason" name="reason" placeholder="Annual leave" className="w-64" />
           </div>
-          <Button type="submit" disabled={pending}>
+          <Button type="submit" disabled={pending} data-echo="staff.time_off_add">
             Add time off
           </Button>
         </div>

@@ -63,7 +63,7 @@ export function StaffList({ staff }: { staff: StaffRow[] }) {
               <Label htmlFor="new-staff-role">Role (optional)</Label>
               <Input id="new-staff-role" name="role" placeholder="Senior stylist" className="w-48" />
             </div>
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" disabled={pending} data-echo="staff.add">
               Add
             </Button>
           </form>
@@ -118,7 +118,7 @@ export function StaffList({ staff }: { staff: StaffRow[] }) {
                     >
                       <ArrowDownIcon className="size-4" />
                     </Button>
-                    <Link href={`/dashboard/staff/${p.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
+                    <Link href={`/dashboard/staff/${p.id}`} className={buttonVariants({ variant: "outline", size: "sm" })} data-echo="staff.open">
                       Edit
                     </Link>
                   </div>

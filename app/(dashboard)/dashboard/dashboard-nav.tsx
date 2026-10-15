@@ -41,6 +41,7 @@ export function DashboardNav({
       <Link
         key={item.href}
         href={item.href}
+        data-echo={`nav:${item.href}`}
         aria-current={active ? "page" : undefined}
         className={cn(
           "group/nav flex min-h-10 shrink-0 items-center gap-2.5 rounded-[10px] px-3 text-sm font-medium whitespace-nowrap transition-[background-color,color,box-shadow,transform] duration-200 active:scale-[.98]",

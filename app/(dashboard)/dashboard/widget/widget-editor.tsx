@@ -42,7 +42,7 @@ export function CopySnippetButton({ snippet }: { snippet: string }) {
   }
 
   return (
-    <Button type="button" variant="outline" size="sm" onClick={handleCopy}>
+    <Button type="button" variant="outline" size="sm" onClick={handleCopy} data-echo="widget.copy">
       {copied ? "Copied!" : "Copy snippet"}
     </Button>
   );
@@ -251,7 +251,7 @@ export function WidgetEditor({
               </div>
               {error && <p className="feedback-enter text-sm text-red-600">{error}</p>}
               <div>
-                <Button type="submit" disabled={pending}>
+                <Button type="submit" disabled={pending} data-echo="widget.save">
                   {pending ? "Saving…" : "Save appearance"}
                 </Button>
               </div>

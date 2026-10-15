@@ -158,7 +158,7 @@ export function BookingRulesForm({ rules }: { rules: BookingRules }) {
       {error && <p className="feedback-enter text-sm text-red-600">{error}</p>}
       {saved && !error && <p className="feedback-enter text-sm text-green-600">Saved.</p>}
       <div>
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" disabled={pending} data-echo="rules.save">
           {pending ? "Saving…" : "Save booking rules"}
         </Button>
       </div>
@@ -191,7 +191,7 @@ export function ExceptionsEditor({ exceptions }: { exceptions: Exception[] }) {
           <input name="is_closed" type="checkbox" defaultChecked className="size-4" />
           Closed all day
         </label>
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" disabled={pending} data-echo="closure.add">
           Add
         </Button>
       </form>

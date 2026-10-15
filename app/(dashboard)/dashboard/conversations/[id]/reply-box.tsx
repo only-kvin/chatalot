@@ -59,6 +59,7 @@ export function ReplyBox({
     <form action={send} className="flex flex-col gap-1.5">
       <div className="flex items-end gap-2">
         <Textarea
+          data-echo="conversations.reply"
           aria-label="Reply on WhatsApp"
           rows={1}
           value={text}

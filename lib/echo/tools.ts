@@ -1,44 +1,67 @@
 import { z } from "zod";
 import type { ToolDef } from "@/lib/agent/tools";
 
-// ECHO's one tool: a button to a dashboard page. ECHO points the way and the
-// owner makes the change, so nothing here can alter their business. Model
-// output is untrusted, so every call is validated (and every link checked
-// against the pages this business can open) before it's shown.
+// ECHO's one tool: walk the owner through a task with its cursor. Echo points
+// and explains; the owner does the clicking and typing, so nothing here can
+// change their business. Model output is untrusted: steps are validated here
+// and planned against the target catalog (targets.ts) before anything runs.
 
 export const ECHO_TOOLS: ToolDef[] = [
   {
-    name: "show_page",
+    name: "guide_me",
     description:
-      "Give the owner a button that opens a dashboard page. Use a path from the dashboard guide, optionally with a ?tab= or #section from the guide, e.g. /dashboard/bookings?tab=calendar or /dashboard/settings#bookings.",
+      "Show the owner how to do something on screen: Echo's cursor moves to each target in turn with your words beside it, and waits for them to click it (or, for fields, to fill it in and press Next). Use target ids from the target list only. You don't need menu steps to reach a page: they're added for you. Use one step for \"where is...\" questions.",
     parameters: {
       type: "object",
       properties: {
-        path: { type: "string", description: "The page's path from the guide, e.g. /dashboard/availability" },
-        label: { type: "string", description: "Short button text, e.g. \"Open Availability\"" },
+        steps: {
+          type: "array",
+          description: "The steps in order, at most 8",
+          items: {
+            type: "object",
+            properties: {
+              target: { type: "string", description: "A target id from the list, e.g. services.price" },
+              say: {
+                type: "string",
+                description: "What Echo says at this step, short and direct, e.g. \"Click Edit on the service you want to change.\" or \"Type the new price here.\"",
+              },
+            },
+            required: ["target", "say"],
+          },
+        },
+        intro: { type: "string", description: "One short line Echo says first, e.g. \"Let me show you.\"" },
+        done: { type: "string", description: "What Echo says when they've finished, e.g. \"That's it, your new price is live.\"" },
       },
-      required: ["path", "label"],
+      required: ["steps", "intro", "done"],
     },
   },
 ];
 
-const showPageInput = z.object({ path: z.string().trim().min(1).max(200), label: z.string().trim().min(1).max(40) });
+const guideMeInput = z.object({
+  steps: z
+    .array(z.object({ target: z.string().trim().min(1).max(60), say: z.string().trim().min(1).max(160) }))
+    .min(1)
+    .max(8),
+  // Optional to the validator: a missing intro gets a default rather than a retry.
+  intro: z.string().trim().max(160).optional(),
+  done: z.string().trim().min(1).max(160),
+});
 
-export type EchoToolCall = { name: "show_page"; input: z.infer<typeof showPageInput> };
+export type GuideMeInput = z.infer<typeof guideMeInput>;
 
-export function parseEchoToolInput(call: { name: string; input: unknown }): { ok: true; call: EchoToolCall } | { ok: false; error: string } {
-  if (call.name !== "show_page") return { ok: false, error: `Unknown tool: ${call.name}` };
-  const result = showPageInput.safeParse(call.input);
+export function parseEchoToolInput(call: { name: string; input: unknown }): { ok: true; input: GuideMeInput } | { ok: false; error: string } {
+  if (call.name !== "guide_me") return { ok: false, error: `Unknown tool: ${call.name}` };
+  const result = guideMeInput.safeParse(call.input);
   if (!result.success) {
     const problems = result.error.issues.map((i) => `${i.path.join(".") || "input"} ${i.message}`).join("; ");
-    return { ok: false, error: `Invalid input for show_page: ${problems}.` };
+    return { ok: false, error: `Invalid input for guide_me: ${problems}.` };
   }
-  return { ok: true, call: { name: "show_page", input: result.data } };
+  return { ok: true, input: result.data };
 }
 
-// A link ECHO may hand out: an allowed dashboard page, plus at most a simple
-// ?tab= and #section. Anything else (other sites, other params, "..") is
-// refused, so a button can only ever open a page of this dashboard.
+// A link Echo may hand out (from a link the model wrote into its reply): an
+// allowed dashboard page, plus at most a simple ?tab= and #section. Anything
+// else (other sites, other params, "..") is refused.
 export function safeDashboardLink(path: string, allowed: Set<string>): string | null {
   const match = /^(\/dashboard(?:\/[a-z_-]+)*)(\?tab=[a-z_-]+)?(#[a-z_-]+)?$/.exec(path);
   if (!match || !allowed.has(match[1])) return null;

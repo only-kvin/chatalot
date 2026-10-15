@@ -114,6 +114,7 @@ export default async function BookingsPage({
         {TABS.map((t) => (
           <Link
             key={t.id}
+            data-echo={`bookings.tab.${t.id}`}
             href={tabHref(t.id, staffFilter, tab === "calendar" ? day : undefined)}
             aria-current={tab === t.id ? "page" : undefined}
             className={cn(
@@ -190,7 +191,7 @@ export default async function BookingsPage({
             return (
               <TableRow key={b.id}>
                 <TableCell className="whitespace-nowrap">
-                  <Link href={`/dashboard/bookings/${b.id}`} className="font-medium hover:underline">
+                  <Link href={`/dashboard/bookings/${b.id}`} className="font-medium hover:underline" data-echo="bookings.open">
                     {formatBookingWhen(b.starts_at, b.arrival_window_end)}
                   </Link>
                   {rescheduled.has(b.id) && (

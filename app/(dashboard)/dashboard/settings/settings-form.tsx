@@ -209,7 +209,7 @@ export function SettingsForm({
       {error && <p className="feedback-enter text-sm text-red-600">{error}</p>}
       {saved && !error && <p className="feedback-enter text-sm text-green-600">Saved.</p>}
       <div>
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" disabled={pending} data-echo="settings.save">
           {pending ? "Saving…" : "Save settings"}
         </Button>
       </div>

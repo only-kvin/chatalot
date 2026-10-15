@@ -179,6 +179,9 @@ export async function* runAgentTurn(params: {
   executeTool: (call: ToolCall) => Promise<string>;
   // Which provider and model to use; defaults to LLM_PROVIDER / LLM_MODEL.
   target?: LlmTarget;
+  // Checked after each round of tools: true ends the turn there, skipping the
+  // model's follow-up reply (and its tokens) when the tool result is the answer.
+  endTurn?: () => boolean;
 }): AsyncGenerator<AgentTurnEvent> {
   const target = params.target ?? resolveLlm();
   const openAiMessages: OpenAiMessage[] = [
@@ -223,5 +226,6 @@ export async function* runAgentTurn(params: {
       yield { type: "tool-executed", call: toolCall };
       openAiMessages.push({ role: "tool", tool_call_id: call.id, content: result });
     }
+    if (params.endTurn?.()) return;
   }
 }

@@ -299,7 +299,7 @@ function ServiceForm({
 
       {error && <p className="feedback-enter text-sm text-red-600">{error}</p>}
       <div className="flex gap-2">
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" disabled={pending} data-echo="services.save">
           {pending ? "Saving…" : service ? "Save service" : "Add service"}
         </Button>
         {service && (
@@ -414,7 +414,7 @@ export function ServicesEditor({
                 >
                   <ArrowDownIcon className="size-4" />
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => setEditing(service)}>
+                <Button variant="outline" size="sm" onClick={() => setEditing(service)} data-echo="services.edit">
                   Edit
                 </Button>
                 <Button variant="outline" size="sm" disabled={pending} onClick={() => run(() => deleteServiceAction(service.id))}>

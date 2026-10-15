@@ -80,7 +80,7 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex justify-end">
-        <Button variant="outline" size="sm" onClick={() => downloadCsv(leads)}>
+        <Button variant="outline" size="sm" onClick={() => downloadCsv(leads)} data-echo="leads.export">
           Export CSV
         </Button>
       </div>
