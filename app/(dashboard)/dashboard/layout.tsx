@@ -9,6 +9,7 @@ import { parseTheme, THEME_COOKIE } from "@/components/theme/theme";
 import { DashboardNav } from "./dashboard-nav";
 import { PageTransition } from "./page-transition";
 import { DeclinedNotice, PendingBanner } from "./approval-status";
+import { EchoAssistant } from "./echo/echo-assistant";
 
 export default async function DashboardLayout({
   children,
@@ -62,6 +63,7 @@ export default async function DashboardLayout({
         {tenant?.status === "pending" && <PendingBanner />}
         {children}
       </PageTransition>
+      <EchoAssistant />
     </div>
   );
 }

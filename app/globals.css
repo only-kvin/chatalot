@@ -355,6 +355,19 @@
   }
 }
 
+/* Echo's orb at rest: a slow breath, so it reads as present, not static. */
+@keyframes echo-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(1.06);
+    filter: brightness(1.12);
+  }
+}
+
 .page-enter {
   animation: page-enter 180ms var(--ease-out);
 }
