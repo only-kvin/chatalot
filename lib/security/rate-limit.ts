@@ -87,18 +87,6 @@ export async function checkWidgetBookingLimit(ip: string, publicKey: string): Pr
   return ipResult.success && keyResult.success;
 }
 
-// Echo, the dashboard's built-in guide: per signed-in user, generous enough
-// for a real back-and-forth while setting up.
-const echoLimiter = new Ratelimit({
-  redis,
-  prefix: "ratelimit:echo",
-  limiter: Ratelimit.slidingWindow(40, "10 m"),
-});
-
-export async function checkEchoLimit(userId: string): Promise<boolean> {
-  return (await echoLimiter.limit(userId)).success;
-}
-
 // The marketing site's "Get a demo" form. Each request emails the platform
 // admins, so a person gets a few tries and a script gets nowhere.
 const demoRequestLimiter = new Ratelimit({
