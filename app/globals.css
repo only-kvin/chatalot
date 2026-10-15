@@ -368,6 +368,20 @@
   }
 }
 
+/* Echo's orb while it talks: a quick bob, like a voice level. */
+@keyframes echo-speak {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.1);
+  }
+  70% {
+    transform: scale(0.97);
+  }
+}
+
 .page-enter {
   animation: page-enter 180ms var(--ease-out);
 }
