@@ -1,6 +1,6 @@
 // A customer's identity: their phone in one form — country code, digits only
-// (27821234567). WhatsApp sends "27682190818" while customers type
-// "068 219 0818" or "+27 68 219 0818"; all must be the same person.
+// (27821234567). WhatsApp sends "27825550134" while customers type
+// "082 555 0134" or "+27 82 555 0134"; all must be the same person.
 // Must match pg_temp.canonical_phone in the customer_database migration.
 export function canonicalPhone(raw: string | null | undefined): string | null {
   const digits = (raw ?? "").replace(/\D/g, "");
@@ -10,7 +10,7 @@ export function canonicalPhone(raw: string | null | undefined): string | null {
   return null;
 }
 
-// "27682190818" -> "+27 68 219 0818" for display; other numbers get a "+".
+// "27825550134" -> "+27 82 555 0134" for display; other numbers get a "+".
 export function formatPhone(e164: string | null | undefined): string {
   if (!e164) return "";
   const sa = /^27(\d{2})(\d{3})(\d{4})$/.exec(e164);

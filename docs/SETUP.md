@@ -4,7 +4,7 @@ Manual steps the platform owner needs to do. Kept up to date as new phases add n
 
 ## Phase 0 — Foundation
 
-1. **Vercel project**: linked to `cavinmashilangwako-gmailcoms-projects/chatalot`. CLI is already authenticated as you (`vercel whoami`), no login needed.
+1. **Vercel project**: linked to your Vercel team/project. CLI is already authenticated as you (`vercel whoami`), no login needed.
 
 2. **Supabase project**: a dedicated project was created directly on supabase.com (not through the Vercel Marketplace, since that account's free-tier Marketplace slot was already used by another app). Project ref `bayncbpdxkoakrnidrkk`, region `eu-west-1` (Ireland). `vercel.json` pins Vercel Functions to `dub1` (Dublin) to sit next to it: every page makes several database calls in a row, and from Vercel's default `iad1` (Washington) each one cost ~340 ms. If the Supabase project ever moves region, move `regions` in `vercel.json` with it.
    - The 4 credentials (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `POSTGRES_URL_NON_POOLING`) are set in Vercel's Environment Variables (Production/Preview/Development) and in local `.env.local`.
@@ -16,11 +16,11 @@ Manual steps the platform owner needs to do. Kept up to date as new phases add n
    ```
    (On Windows/bash, `set -a && source .env.local && set +a` first so the var is in the shell's environment.)
 
-4. **Sign in once** at `/login` with your own email (`cavinmashilangwako@gmail.com`) to create your `auth.users` row — this has to happen before you can be made a platform admin.
+4. **Sign in once** at `/login` with your own email (the address you want as platform admin) to create your `auth.users` row — this has to happen before you can be made a platform admin.
 
 5. **Grant yourself platform admin**:
    ```
-   pnpm bootstrap-admin cavinmashilangwako@gmail.com
+   pnpm bootstrap-admin you@example.com
    ```
 
 6. **Seed the demo tenant**:

@@ -4,8 +4,8 @@ import { mergeContact } from "../lib/contacts/upsert";
 
 describe("canonicalPhone", () => {
   it("treats every way of writing the same SA number as one", () => {
-    for (const raw of ["0682190818", "068 219 0818", "+27 68 219 0818", "27682190818", "(068) 219-0818"]) {
-      expect(canonicalPhone(raw), raw).toBe("27682190818");
+    for (const raw of ["0825550134", "082 555 0134", "+27 82 555 0134", "27825550134", "(082) 555-0134"]) {
+      expect(canonicalPhone(raw), raw).toBe("27825550134");
     }
   });
 
@@ -21,7 +21,7 @@ describe("canonicalPhone", () => {
   });
 
   it("formats SA numbers for display", () => {
-    expect(formatPhone("27682190818")).toBe("+27 68 219 0818");
+    expect(formatPhone("27825550134")).toBe("+27 82 555 0134");
     expect(formatPhone("15551924773")).toBe("+15551924773");
     expect(formatPhone(null)).toBe("");
   });
@@ -32,7 +32,7 @@ describe("mergeContact", () => {
   const base = {
     name: null,
     name_source: null,
-    phone: "27682190818",
+    phone: "27825550134",
     email: null,
     consent_at: null,
     last_seen_at: "2026-09-27T10:00:00.000Z",

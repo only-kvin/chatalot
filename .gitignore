@@ -52,3 +52,13 @@ skills-lock.json
 # generated widget bundles — rebuilt by scripts/build-widget.mjs as part of `pnpm build`
 /public/widget.js
 /public/widgets/
+
+# secrets and local credentials — never commit these
+*.key
+*.p12
+*.pfx
+id_rsa*
+service-account*.json
+/supabase/.temp/
+/supabase/.branches/
+signing_keys.json
