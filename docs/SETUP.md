@@ -429,3 +429,21 @@ Migrations `20261011213033_staff_access`, `20261011213132_staff_email_lowercase`
   your own address until a sending domain is verified in Resend.
 - Not built yet: staff alerts on WhatsApp (needs an approved template), staff changing bookings themselves,
   per-seat billing.
+
+## External tools: abilities provided by another app (2026-11-10)
+
+Migration `20261110090000_external_tools.sql` is **NOT applied to the live database yet**. Until it is, nothing
+changes: the engine finds no tools and carries on as before, so the code is safe to deploy first.
+
+- Another app can give one business's receptionist an extra tool. First use: Sparesdesk (`Desktop\sparesdesk`),
+  whose `search_stock` tool answers "do you have this part?" from an auto spares shop's stock list.
+- When the AI calls the tool, Bookfront POSTs `{ tool, input, tenantId, conversationId, channel }` to the tool's
+  endpoint with `X-Bookfront-Timestamp` and `X-Bookfront-Signature` (HMAC-SHA256 of `<timestamp>.<body>` with
+  the tool's secret) and gives the model the `result` text that comes back. Six seconds, https only, no
+  redirects; failures are logged and the model is told to offer a person (`lib/agent/external-tools.ts`).
+- Tools are registered by the platform only, never by a business (a tool decides where customers' words are
+  sent): `pnpm register-external-tool <tenant-slug> <tools.json>`. The secret is stored encrypted with
+  `ENCRYPTION_KEY`. At most five per business; a name can't clash with a built-in tool.
+- **Manual steps:** apply the migration, deploy, then register each shop's tool (Sparesdesk's `docs/SETUP.md`,
+  step 4). For a spares shop, switch bookings off for the business in admin.
+- Not built yet: an admin screen for tools, and creating the Bookfront business automatically from the other app.
