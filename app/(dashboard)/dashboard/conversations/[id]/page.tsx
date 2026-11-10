@@ -67,8 +67,10 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
 
   let lastDay = "";
 
+  // On phones the chat fills the screen under the top nav (~6.25rem) and the
+  // page padding, so only the messages scroll and the header stays in view.
   return (
-    <div className="flex min-h-[70dvh] flex-col overflow-hidden rounded-2xl border bg-card md:h-full md:min-h-0">
+    <div className="flex h-[calc(100dvh-9rem)] min-h-[420px] flex-col overflow-hidden rounded-2xl border bg-card md:h-full md:min-h-0">
       {/* Header */}
       <header className="flex items-center gap-3 border-b px-4 py-3">
         <Link

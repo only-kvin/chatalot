@@ -252,8 +252,9 @@ export async function BookingsCalendar({
           {/* Hour labels */}
           <div className="sticky left-0 z-10 bg-card" style={{ height: gridHeight }}>
             {hours.map((h) => (
-              <div key={h} className="relative border-t first:border-t-0" style={{ height: HOUR_PX }}>
-                <span className="absolute -top-2 right-2 bg-card px-0.5 text-[11px] text-muted-foreground tabular-nums">
+              <div key={h} className="group relative border-t first:border-t-0" style={{ height: HOUR_PX }}>
+                {/* Labels sit on their hour line; the first is nudged down so the header doesn't clip it. */}
+                <span className="absolute -top-2 right-2 bg-card group-first:top-1 px-0.5 text-[11px] text-muted-foreground tabular-nums">
                   {String(h).padStart(2, "0")}:00
                 </span>
               </div>
