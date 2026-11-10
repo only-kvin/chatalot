@@ -49,7 +49,7 @@ export default async function ConversationsLayout({ children }: { children: Reac
   });
 
   return (
-    <div className={pageFrame("wide", "md:pb-6")}>
+    <div className={pageFrame("wide", "max-md:pb-4 md:pb-6")}>
       <Inbox items={items}>{children}</Inbox>
     </div>
   );

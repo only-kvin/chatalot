@@ -3,8 +3,8 @@
 import { useEffect, useRef } from "react";
 
 // The message list, scrolled to the newest message on open and whenever a
-// new one arrives (like a messaging app). On phones the page itself scrolls,
-// so the end of the list is brought into view instead.
+// new one arrives (like a messaging app). If the list isn't scrollable (a
+// short chat), the end is brought into view instead.
 export function ScrollToEnd({ count, className, children }: { count: number; className?: string; children: React.ReactNode }) {
   const box = useRef<HTMLDivElement>(null);
   const end = useRef<HTMLDivElement>(null);
