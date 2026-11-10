@@ -13,7 +13,8 @@
     "seed-demo-salon": "dotenv -e .env.local -- tsx scripts/seed-demo-salon.ts",
     "seed-chatalot": "dotenv -e .env.local -- tsx scripts/seed-chatalot.ts",
     "reembed-tenant": "dotenv -e .env.local -- tsx scripts/reembed-tenant.ts",
-    "eval-models": "dotenv -e .env.local -- tsx scripts/eval-models.ts"
+    "eval-models": "dotenv -e .env.local -- tsx scripts/eval-models.ts",
+    "register-external-tool": "dotenv -e .env.local -- tsx scripts/register-external-tool.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

@@ -3,6 +3,7 @@ import { buildSystemPrompt, type AgentConfig } from "./prompt";
 import { runAgentTurn, type ChatMessage } from "./model";
 import { CORE_TOOL_NAMES, EMERGENCY_TOOL, parseToolInput, toolsFor, type ToolCall } from "./tools";
 import { reportEmergency } from "./emergency";
+import { callExternalTool, loadExternalTools } from "./external-tools";
 import { hasFeature } from "@/lib/features";
 import { getRelevantKnowledge } from "./retrieval";
 import { findServiceByName, listActiveServiceNames, listActiveServices, listActiveStaff, matchStaff, type ActiveService } from "@/lib/bookings/catalog";
@@ -555,8 +556,14 @@ export async function* runAgent(params: {
     .select("assistant_name")
     .eq("tenant_id", params.tenantId)
     .maybeSingle();
+  // Tools another app provides for this business (e.g. a stock lookup), with
+  // their notes on when to use them.
+  const externalTools = await loadExternalTools(admin, params.tenantId);
+  const promptExtra = [agentConfig.system_prompt_extra, ...externalTools.map((t) => t.promptNote)]
+    .filter(Boolean)
+    .join("\n");
   const system = buildSystemPrompt(
-    { ...(agentConfig as AgentConfig), assistant_name: widgetIdentity?.assistant_name ?? null },
+    { ...(agentConfig as AgentConfig), system_prompt_extra: promptExtra, assistant_name: widgetIdentity?.assistant_name ?? null },
     knowledgeText,
     services,
     staff,
@@ -573,11 +580,19 @@ export async function* runAgent(params: {
     for await (const event of runAgentTurn({
       system,
       messages,
-      tools: toolsFor(takesBookings, agentConfig.emergency_callouts),
+      tools: [...toolsFor(takesBookings, agentConfig.emergency_callouts), ...externalTools.map((t) => t.def)],
       maxTokens: MAX_TOKENS,
       signal: AbortSignal.timeout(TURN_TIMEOUT_MS),
-      executeTool: (call) =>
-        executeTool(
+      executeTool: (call) => {
+        const external = externalTools.find((t) => t.def.name === call.name);
+        if (external) {
+          return callExternalTool(external, call.input, {
+            tenantId: params.tenantId,
+            conversationId: params.conversationId,
+            channel: params.channel,
+          });
+        }
+        return executeTool(
           admin,
           {
             tenantId: params.tenantId,
@@ -592,7 +607,8 @@ export async function* runAgent(params: {
             cancellationPolicy: agentConfig.cancellation_policy,
           },
           call,
-        ),
+        );
+      },
     })) {
       if (event.type === "text-delta") {
         fullText += event.text;
