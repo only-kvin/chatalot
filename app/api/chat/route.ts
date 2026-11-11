@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createAdminClient } from "@/lib/db/supabase-admin";
 import { parsePlan, resolveFeatures } from "@/lib/plans";
-import { isOriginAllowed } from "@/lib/security/origin-check";
+import { isChatRequestAllowed } from "@/lib/security/origin-check";
 import { checkRateLimit, checkDailyTenantCap } from "@/lib/security/rate-limit";
 import { runAgent } from "@/lib/agent/engine";
 import { wantsHuman } from "@/lib/agent/handoff-intent";
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Not found" }, { status: 404 });
   }
 
-  if (!isOriginAllowed(origin, tenant.allowed_domains)) {
+  if (!isChatRequestAllowed(request, tenant.allowed_domains)) {
     return Response.json(
       { error: "Origin not allowed" },
       { status: 403 },
