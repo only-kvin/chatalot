@@ -29,3 +29,10 @@ export function isOwnAppRequest(request: Request): boolean {
   const origin = request.headers.get("origin");
   return origin !== null && origin === new URL(request.url).origin;
 }
+
+// Who may use a business's chat: its own websites, and ChatAlot's own pages
+// (the chat preview in the dashboard), like every other widget
+// (lib/widgets/public-request.ts).
+export function isChatRequestAllowed(request: Request, allowedDomains: string[]): boolean {
+  return isOwnAppRequest(request) || isOriginAllowed(request.headers.get("origin"), allowedDomains);
+}

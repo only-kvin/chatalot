@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { isOriginAllowed, isOwnAppRequest } from "../lib/security/origin-check";
+import { isChatRequestAllowed, isOriginAllowed, isOwnAppRequest } from "../lib/security/origin-check";
 
 describe("isOriginAllowed", () => {
   afterEach(() => {
@@ -59,5 +59,27 @@ describe("isOwnAppRequest", () => {
     expect(isOwnAppRequest(req({ "sec-fetch-site": "cross-site", origin: "https://evil.example" }))).toBe(false);
     expect(isOwnAppRequest(req({ origin: "https://chatalot.vercel.app.evil.example" }))).toBe(false);
     expect(isOwnAppRequest(req({}))).toBe(false);
+  });
+});
+
+describe("isChatRequestAllowed", () => {
+  const req = (headers: Record<string, string>) => new Request("https://chatalot.vercel.app/api/chat", { method: "POST", headers });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("lets the dashboard's chat preview through when the business hasn't listed ChatAlot's domain", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    expect(isChatRequestAllowed(req({ origin: "https://chatalot.vercel.app" }), ["client-site.com"])).toBe(true);
+    expect(isChatRequestAllowed(req({ "sec-fetch-site": "same-origin" }), [])).toBe(true);
+  });
+
+  it("still allows the business's own websites, and only those", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    expect(isChatRequestAllowed(req({ origin: "https://client-site.com", "sec-fetch-site": "cross-site" }), ["client-site.com"])).toBe(true);
+    expect(isChatRequestAllowed(req({ origin: "https://evil.example", "sec-fetch-site": "cross-site" }), ["client-site.com"])).toBe(false);
+    expect(isChatRequestAllowed(req({ origin: "https://chatalot.vercel.app.evil.example" }), ["client-site.com"])).toBe(false);
+    expect(isChatRequestAllowed(req({}), ["client-site.com"])).toBe(false);
   });
 });

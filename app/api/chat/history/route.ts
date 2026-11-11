@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createAdminClient } from "@/lib/db/supabase-admin";
 import { parsePlan, resolveFeatures } from "@/lib/plans";
-import { isOriginAllowed } from "@/lib/security/origin-check";
+import { isChatRequestAllowed } from "@/lib/security/origin-check";
 
 const MAX_RESTORED_MESSAGES = 50;
 
@@ -42,7 +42,7 @@ export async function GET(request: Request) {
   ) {
     return Response.json({ error: "Not found" }, { status: 404 });
   }
-  if (!isOriginAllowed(origin, tenant.allowed_domains)) {
+  if (!isChatRequestAllowed(request, tenant.allowed_domains)) {
     return Response.json({ error: "Origin not allowed" }, { status: 403 });
   }
   const headers = { "Access-Control-Allow-Origin": origin ?? "*" };
