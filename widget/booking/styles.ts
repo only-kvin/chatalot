@@ -139,6 +139,7 @@ fieldset.address legend { font-weight: 600; font-size: 14px; padding: 0; margin-
 }
 .primary:hover:not(:disabled) { box-shadow: 0 1px 0 rgba(255,255,255,.25) inset, 0 10px 22px -6px var(--ca-glow); }
 .primary:disabled { opacity: .6; }
+a.primary { display: flex; align-items: center; justify-content: center; text-decoration: none; box-sizing: border-box; }
 .link { background: none; border: none; padding: 8px 0; min-height: 44px; color: var(--ca-text); text-decoration: underline; text-align: left; }
 .alert { border-radius: calc(var(--ca-radius) / 1.6); padding: 10px 12px; font-size: 14px; background: #fef3f2; color: #b42318; animation: up .3s ease both; }
 .note { font-size: 14px; margin: 0; }

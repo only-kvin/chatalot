@@ -6,6 +6,7 @@ import { todayLocalISO } from "@/lib/time";
 import { formatBookingWhen } from "@/lib/bookings/when";
 import { addressText, BOOKING_PLACE_COLUMNS, type BookingPlace } from "@/lib/bookings/place";
 import { DayView } from "./day-view";
+import { paymentBadge } from "@/lib/payments/labels";
 import { BookingsCalendar, type CalendarView } from "./calendar";
 import {
   describeEvent,
@@ -78,7 +79,7 @@ export default async function BookingsPage({
 
   let query = supabase
     .from("bookings")
-    .select(`id, name, starts_at, status, source, created_at, contact_id, staff_id, review_rating, ${BOOKING_PLACE_COLUMNS}, services(name)`)
+    .select(`id, name, starts_at, status, source, created_at, contact_id, staff_id, review_rating, payment_status, amount_due_cents, ${BOOKING_PLACE_COLUMNS}, services(name)`)
     .eq("tenant_id", tenantId)
     .limit(200);
   if (staffFilter === "none") query = query.is("staff_id", null);
@@ -187,6 +188,7 @@ export default async function BookingsPage({
             const service = (b.services as unknown as { name: string } | null)?.name ?? "Unknown service";
             const last = latest.get(b.id);
             const needsOutcome = tab === "past" && b.status === "confirmed";
+            const payment = paymentBadge(b.payment_status, b.amount_due_cents);
             return (
               <TableRow key={b.id}>
                 <TableCell className="whitespace-nowrap">
@@ -227,6 +229,11 @@ export default async function BookingsPage({
                     <Badge variant="outline">Mark attended?</Badge>
                   ) : (
                     <Badge variant={statusVariant(b.status)}>{STATUS_LABEL[b.status as BookingStatus] ?? b.status}</Badge>
+                  )}
+                  {payment && (
+                    <Badge variant={payment.variant} className="ml-2">
+                      {payment.label}
+                    </Badge>
                   )}
                   {b.review_rating && <Rating value={b.review_rating} className="ml-2" />}
                 </TableCell>

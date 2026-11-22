@@ -96,7 +96,8 @@ async function notify(
       pending,
       bookingId: booked.bookingId,
     }),
-    emailCustomerAboutBooking(admin, b.tenantId, booked.bookingId, pending ? "requested" : "confirmed"),
+    // A held booking is confirmed to the customer once they've paid.
+    booked.payment ? null : emailCustomerAboutBooking(admin, b.tenantId, booked.bookingId, pending ? "requested" : "confirmed"),
     notifyStaffAboutBooking(admin, b.tenantId, booked.bookingId, "new"),
   ]);
 }

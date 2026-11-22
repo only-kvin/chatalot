@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
 import { featureError } from "@/lib/dashboard-features";
+import { servicePaymentProblem } from "@/lib/payments/service-rules";
 
 // Services and who offers them. Uses the signed-in user's client, so RLS
 // keeps everything inside their business. Results are returned, not thrown
@@ -37,6 +38,9 @@ const serviceSchema = z.object({
   arrival_window_minutes: z
     .string()
     .refine((v) => v === "" || ["60", "120", "180", "240", "480"].includes(v), "Pick an arrival window"),
+  // Taken online through the business's own PayFast account.
+  payment_mode: z.enum(["none", "deposit", "full"]),
+  deposit_rand: rand("Enter a deposit like 100 or 100.00"),
   active: z.boolean(),
   online_bookable: z.boolean(),
   // "anyone" = every active staff member; otherwise only those ticked.
@@ -57,6 +61,8 @@ function parseForm(formData: FormData) {
     price_type: formData.get("price_type") ?? "fixed",
     callout_fee_rand: formData.get("callout_fee_rand") ?? "",
     arrival_window_minutes: formData.get("arrival_window_minutes") ?? "",
+    payment_mode: formData.get("payment_mode") ?? "none",
+    deposit_rand: formData.get("deposit_rand") ?? "",
     active: formData.get("active") === "on",
     online_bookable: formData.get("online_bookable") === "on",
     staff_mode: formData.get("staff_mode") ?? "anyone",
@@ -82,6 +88,22 @@ function toRecord(d: z.infer<typeof serviceSchema>) {
     active: d.active,
     online_bookable: d.online_bookable,
   };
+}
+
+// Online payment for the service. Without payments in the plan it's off
+// (and can't clash with a price change), whatever the form sent.
+async function paymentRecord(
+  d: z.infer<typeof serviceSchema>,
+): Promise<{ error: string } | { record: { payment_mode: string; deposit_cents: number | null } }> {
+  if (await featureError("payments")) return { record: { payment_mode: "none", deposit_cents: null } };
+  const problem = servicePaymentProblem({
+    paymentMode: d.payment_mode,
+    depositCents: cents(d.deposit_rand),
+    priceCents: d.price_type === "on_inspection" ? null : cents(d.price_rand),
+    priceType: d.price_type,
+  });
+  if (problem) return { error: problem };
+  return { record: { payment_mode: d.payment_mode, deposit_cents: d.payment_mode === "deposit" ? cents(d.deposit_rand) : null } };
 }
 
 async function session() {
@@ -129,6 +151,8 @@ export async function createServiceAction(formData: FormData): Promise<Result> {
   if (!s) return { error: "Not authorized." };
   const parsed = parseForm(formData);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  const payment = await paymentRecord(parsed.data);
+  if ("error" in payment) return payment;
 
   const { data: last } = await s.supabase
     .from("services")
@@ -139,7 +163,7 @@ export async function createServiceAction(formData: FormData): Promise<Result> {
     .maybeSingle();
   const { data, error } = await s.supabase
     .from("services")
-    .insert({ tenant_id: s.tenantId, ...toRecord(parsed.data), sort_order: (last?.sort_order ?? 0) + 1 })
+    .insert({ tenant_id: s.tenantId, ...toRecord(parsed.data), ...payment.record, sort_order: (last?.sort_order ?? 0) + 1 })
     .select("id")
     .single();
   if (error) return failed("add the service", error);
@@ -157,10 +181,12 @@ export async function updateServiceAction(serviceId: string, formData: FormData)
   if (!uuid.safeParse(serviceId).success) return { error: "Invalid request." };
   const parsed = parseForm(formData);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  const payment = await paymentRecord(parsed.data);
+  if ("error" in payment) return payment;
 
   const { error } = await s.supabase
     .from("services")
-    .update(toRecord(parsed.data))
+    .update({ ...toRecord(parsed.data), ...payment.record })
     .eq("id", serviceId)
     .eq("tenant_id", s.tenantId);
   if (error) return failed("save the service", error);

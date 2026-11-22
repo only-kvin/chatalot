@@ -447,3 +447,93 @@ changes: the engine finds no tools and carries on as before, so the code is safe
 - **Manual steps:** apply the migration, deploy, then register each shop's tool (Sparesdesk's `docs/SETUP.md`,
   step 4). For a spares shop, switch bookings off for the business in admin.
 - Not built yet: an admin screen for tools, and creating the Bookfront business automatically from the other app.
+
+## Payments: each business's own PayFast account (2026-11-22, DRAFT)
+
+Branch `payments-byo-payfast`. Only the migration `20261122090000_payments.sql` exists so far (tested on an
+in-memory Postgres with every migration applied); **not applied to the live database, no app code yet.**
+
+- Model: "bring your own gateway". Each business connects **its own** PayFast merchant account; customers pay
+  on PayFast's hosted page, money lands in the business's account. Bookfront never holds customer money
+  (no Third Party Payment Provider registration, no payouts, no card data, PCI SAQ-A). Bookfront earns from
+  its own subscription, billed separately.
+- Per service: `payment_mode` none | deposit | full (full only for a fixed price). A booking that needs
+  payment holds its slot for `agent_configs.payment_window_minutes` (default 30) with
+  `payment_status = 'awaiting'`; `expire_unpaid_bookings()` cancels it after that and frees the slot.
+- A booking becomes paid **only** through `apply_payment_notification()`, called by the ITN route after it
+  has verified the notification. The function re-checks amount, sandbox/live mode and duplicates under a lock.
+  Paid-after-expiry and wrong-amount payments raise a `payment_problem` notification for the owner.
+- Credentials (`merchant_key`, `passphrase`) are encrypted with `ENCRYPTION_KEY` (`lib/security/crypto.ts`).
+  Members can read the account's status columns only; writes go through an owner-only server action.
+
+### Before building / launching (manual)
+
+1. **Your own PayFast accounts.** A sandbox account at https://sandbox.payfast.co.za (free, for testing), and
+   later a live business account for Bookfront's *own* subscription billing (separate from the tenants').
+2. **Terms of service.** Add to `/terms`: the business is the seller and handles refunds/chargebacks; Bookfront
+   only passes the customer to the business's payment provider. Have this checked before going live.
+3. **`ENCRYPTION_KEY`** must be the same in every Vercel environment that reads credentials (already set for
+   WhatsApp; never rotate it without re-encrypting `payment_accounts`).
+4. **Public notify URL.** PayFast must reach `https://<app>/api/payments/payfast/notify/<tenant_id>` without
+   Vercel Deployment Protection (fine on production; preview deployments are protected, so test ITNs on
+   production with a sandbox account, or via a tunnel locally).
+5. **Daily cron**: add `expire_unpaid_bookings()` to `/api/cron/daily` as a backstop (the app also calls it
+   per tenant before checking availability).
+6. **Each business, to switch payments on:** register at payfast.co.za (business bank account + FICA documents;
+   PayFast approves them, not us), set a **passphrase** under Settings -> Security in PayFast, then enter
+   Merchant ID, Merchant Key and passphrase in the Bookfront dashboard and press "Test connection".
+7. Apply the migration to the live db (session pooler, as for external tools), then deploy.
+
+### Still to build (in order)
+
+- DONE: `lib/payments/` (`types.ts`, `payfast.ts`, `accounts.ts`, tests in `tests/payfast.test.ts`): checkout
+  form + signature, ITN verification (signature, merchant id, PayFast host IPs, `/eng/query/validate`), API
+  ping for "Test connection", credential validation/encryption. Signature rules follow PayFast's PHP SDK;
+  test vectors computed independently. **Still to confirm against the real sandbox**: the ping endpoint's
+  response codes, and one full sandbox payment end to end. Passphrases are limited to letters, numbers,
+  `.`, `_`, `-` because PayFast's SDK encodes the passphrase differently for checkouts and notifications.
+- DONE: Settings -> Payments card (`settings/payment-settings.tsx`, `payment-actions.ts`): owner-only connect,
+  save-and-test (PayFast API ping), test, turn off/on, unpaid-hold minutes; staff see status only. Services
+  editor: "Payment when booking" (none / deposit / full) with the rules in `lib/payments/service-rules.ts`.
+  **These pages read the new columns, so apply the migration BEFORE deploying this branch**, or Settings
+  and Services will error.
+- DONE: booking flow (`lib/payments/request.ts`, called from `createBooking`). A customer booking (AI chat,
+  WhatsApp, widgets, hosted page) of a service that needs payment, at a business with an active account, is
+  held (`payment_status = 'awaiting'`) and gets a `payments` row; the AI shares `/pay/<paymentId>` and the
+  widgets show "Pay R… now". The customer's confirmation email waits for the payment (sent in the next step).
+  `getAvailability` frees expired holds first. Pay page: `app/pay/[paymentId]` (`lib/payments/pay-page.ts`)
+  posts the signed form to PayFast; return/cancel come back to the same page.
+  Not charged: bookings made by the team, and bookings waiting for the owner's approval.
+- DONE: `/api/payments/payfast/notify/[tenantId]` (`lib/payments/notify.ts`): verifies, applies, then sends
+  the customer's confirmation email. 200 = handled (also for forged/foreign notifications, logged in
+  `payment_events`), 503 = couldn't check now so PayFast retries. `api/payments` skips the proxy. The daily
+  cron releases expired holds before sending reminders.
+
+- DONE: lost-confirmation recovery (`lib/payments/recover.ts`). If PayFast's notification never arrives (or
+  is turned away), we read the business's PayFast transaction history (`/transactions/history/daily`, signed
+  API call) and apply any payment listed under our payment id through `apply_payment_notification()`. Runs
+  when the customer returns from PayFast still unpaid, before an unpaid hold is released, and in the daily
+  cron (last 3 days). A payment found after its hold expired becomes a "Paid for a cancelled booking" alert.
+- End-to-end sandbox test passed 2026-11-23 (booking -> pay -> notification -> paid). PayFast's notification
+  came from 144.126.193.139, not an IP its hostnames resolve to, so the sender's IP is logged, not enforced.
+- Testing tip: the sandbox refuses "Merchant is unable to receive payments from the same account" when the
+  booking's email is your PayFast merchant email. Book with another email.
+
+- DONE: `payments` plan feature (Growth and Pro; trial has everything; needs `bookings`). Without it the
+  Payments card and the services payment field are hidden (locked: an upgrade hint), service saves reset
+  payment to none, and bookings take no payment. Notifications and recovery keep working regardless, so money
+  already taken is always recorded. Admins can grant or hide it per business like any feature.
+- DONE: dashboard payment status (list, day view, calendar, booking Payment card) and owner-only "Mark as
+  refunded" on the booking page (the refund itself is done in PayFast; this records it and logs it).
+
+### Testing against the PayFast sandbox
+
+1. Put `PAYFAST_SANDBOX_MERCHANT_ID`, `PAYFAST_SANDBOX_MERCHANT_KEY`, `PAYFAST_SANDBOX_PASSPHRASE` in
+   `.env.local`, then `pnpm payfast-sandbox-check` (ping with right/wrong passphrase, signed test checkout).
+2. Full payment: PayFast must reach the notify URL, so either apply the migration to the live db and deploy,
+   or run the app locally with a Cloudflare quick tunnel and set `NEXT_PUBLIC_APP_URL` to the tunnel URL
+   (links and notify_url are built from it). Connect the sandbox account in Settings -> Payments, set a
+   service to deposit, book it in the widget, pay with the sandbox wallet, and check: booking
+   `payment_status = 'paid'`, a "Payment received" notification, the customer's confirmation email, and an
+   `applied` row in `payment_events`.
+- `payments` feature in `lib/plans.ts`; Vitest tests for signatures, ITN verification and the SQL functions.

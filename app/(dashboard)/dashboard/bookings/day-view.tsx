@@ -5,6 +5,7 @@ import { addDays, formatLocalDate, formatLocalTime, localToUtcDate } from "@/lib
 import { canonicalPhone, formatPhone } from "@/lib/contacts/phone";
 import { STATUS_LABEL, statusVariant, type BookingStatus } from "@/lib/bookings/labels";
 import { formatRand, timeRangeLabel } from "@/lib/bookings/price-label";
+import { paymentBadge } from "@/lib/payments/labels";
 import { addressText, BOOKING_PLACE_COLUMNS, mapsUrl, type BookingPlace } from "@/lib/bookings/place";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,6 +22,8 @@ type Row = BookingPlace & {
   starts_at: string;
   status: string;
   staff_id: string | null;
+  payment_status: string;
+  amount_due_cents: number | null;
   services: unknown;
 };
 
@@ -43,7 +46,7 @@ export async function DayView({
 }) {
   let query = supabase
     .from("bookings")
-    .select(`id, name, phone, starts_at, status, staff_id, ${BOOKING_PLACE_COLUMNS}, services(name)`)
+    .select(`id, name, phone, starts_at, status, staff_id, payment_status, amount_due_cents, ${BOOKING_PLACE_COLUMNS}, services(name)`)
     .eq("tenant_id", tenantId)
     .neq("status", "cancelled")
     .gte("starts_at", localToUtcDate(date, "00:00").toISOString())
@@ -84,6 +87,7 @@ export async function DayView({
           const address = addressText(b);
           const maps = mapsUrl(b);
           const start = formatLocalTime(b.starts_at);
+          const payment = paymentBadge(b.payment_status, b.amount_due_cents);
           return (
             <li key={b.id}>
               <Card>
@@ -100,6 +104,7 @@ export async function DayView({
                         {service} · {b.name}
                       </Link>
                       <Badge variant={statusVariant(b.status)}>{STATUS_LABEL[b.status as BookingStatus] ?? b.status}</Badge>
+                      {payment && <Badge variant={payment.variant}>{payment.label}</Badge>}
                       {b.outside_service_area && <Badge variant="warning">Outside listed area</Badge>}
                     </div>
                     {address ? (

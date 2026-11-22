@@ -138,6 +138,8 @@ export async function POST(request: Request) {
       windowEnd: booked.windowEnd,
       calloutFeeCents: booked.calloutFeeCents,
       outsideArea: booked.outsideArea,
+      // Pay to secure the slot (held until dueAt).
+      payment: booked.payment && { url: booked.payment.url, amountCents: booked.payment.amountCents, dueAt: booked.payment.dueAt },
     },
     { headers },
   );

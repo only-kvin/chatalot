@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { paymentBadge } from "@/lib/payments/labels";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { cn } from "cn";
@@ -22,6 +23,8 @@ type Booking = {
   status: string;
   source: string;
   staff_id: string | null;
+  payment_status: string;
+  amount_due_cents: number | null;
   services: unknown;
 };
 type Block = { id: string; staff_id: string; starts_at: string; ends_at: string; reason: string };
@@ -108,7 +111,7 @@ export async function BookingsCalendar({
 
   let bookingsQuery = supabase
     .from("bookings")
-    .select("id, name, starts_at, ends_at, status, source, staff_id, services(name)")
+    .select("id, name, starts_at, ends_at, status, source, staff_id, payment_status, amount_due_cents, services(name)")
     .eq("tenant_id", tenantId)
     .neq("status", "cancelled")
     .gte("starts_at", from)
@@ -280,14 +283,17 @@ export async function BookingsCalendar({
               {place(c.bookings, startMin).map((b) => {
                 const service = (b.services as { name: string } | null)?.name ?? "Booking";
                 const short = b.height < 44;
+                const payment = paymentBadge(b.payment_status, b.amount_due_cents);
                 return (
                   <Link
                     key={b.id}
                     href={`/dashboard/bookings/${b.id}`}
-                    title={`${formatLocalTime(b.starts_at)}–${formatLocalTime(b.ends_at)} · ${b.name} · ${service} · ${STATUS_LABEL[b.status as BookingStatus] ?? b.status}`}
+                    title={`${formatLocalTime(b.starts_at)}–${formatLocalTime(b.ends_at)} · ${b.name} · ${service} · ${STATUS_LABEL[b.status as BookingStatus] ?? b.status}${payment ? ` · ${payment.label}` : ""}`}
                     className={cn(
                       "absolute overflow-hidden rounded-lg border px-2 py-1 text-xs transition-shadow hover:z-10 hover:shadow-overlay focus-visible:z-10",
                       TONE[b.status] ?? TONE.confirmed,
+                      // Held until paid: a dashed edge, like a pencilled-in booking.
+                      b.payment_status === "awaiting" && "border-dashed",
                     )}
                     style={{
                       top: b.top,
@@ -311,6 +317,7 @@ export async function BookingsCalendar({
                           {service}
                           {view === "week" && b.staff_id && names.get(b.staff_id) ? ` · ${names.get(b.staff_id)}` : ""}
                         </p>
+                        {payment && <p className="truncate font-medium opacity-80">{payment.label}</p>}
                       </>
                     )}
                   </Link>

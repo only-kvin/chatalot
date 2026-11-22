@@ -2,6 +2,7 @@ import { bookingIcs } from "../../lib/bookings/ics";
 import { h } from "../shared/dom";
 import { renderForm, type FormField, type RenderedForm } from "../shared/form";
 import type { Shell } from "./shell";
+import type { PaymentDue } from "./api";
 
 // The steps after a time is chosen, shared by every booking widget: the
 // customer's details (the business's form + consent + spam trap) and the
@@ -91,6 +92,31 @@ export function createDetails(shell: Shell): Details {
   };
 }
 
+function rand(cents: number): string {
+  return `R${(cents / 100).toFixed(2)}`;
+}
+
+function hhmm(iso: string): string {
+  return new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Africa/Johannesburg" });
+}
+
+// Booked but not yet paid: the slot is held until the deadline. The pay page
+// opens in a new tab so the business's website stays open behind it.
+function renderPayDue(pay: PaymentDue, summary: HTMLElement): Node[] {
+  return [
+    h("div", { class: "tick", "aria-hidden": "true" }, "…"),
+    h("h2", { tabindex: -1 }, "Pay to secure your booking"),
+    h("p", { class: "note" }, `Your time is held until ${hhmm(pay.dueAt)}. Pay ${rand(pay.amountCents)} before then or it's released.`),
+    summary,
+    h(
+      "div",
+      { class: "actions" },
+      h("a", { class: "primary", href: pay.url, target: "_blank", rel: "noopener" }, `Pay ${rand(pay.amountCents)} now`),
+    ),
+    h("p", { class: "note muted" }, "You'll get a confirmation email once you've paid."),
+  ];
+}
+
 // The confirmation: what happened, the reference, and add-to-calendar
 // (only once it's actually confirmed).
 export function renderDone(
@@ -103,8 +129,11 @@ export function renderDone(
     summary: HTMLElement;
     calendar: { uid: string; title: string; startsAt: string; endsAt: string; ref: string } | null;
     again: { label: string; onClick: () => void } | null;
+    // Held until paid: the pay link replaces the confirmation.
+    pay?: PaymentDue | null;
   },
 ): Node[] {
+  if (o.pay) return renderPayDue(o.pay, o.summary);
   let calendarLink: HTMLElement | null = null;
   if (!o.pending && o.calendar?.startsAt) {
     const ics = bookingIcs({

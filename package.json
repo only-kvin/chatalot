@@ -14,7 +14,9 @@
     "seed-chatalot": "dotenv -e .env.local -- tsx scripts/seed-chatalot.ts",
     "reembed-tenant": "dotenv -e .env.local -- tsx scripts/reembed-tenant.ts",
     "eval-models": "dotenv -e .env.local -- tsx scripts/eval-models.ts",
-    "register-external-tool": "dotenv -e .env.local -- tsx scripts/register-external-tool.ts"
+    "register-external-tool": "dotenv -e .env.local -- tsx scripts/register-external-tool.ts",
+    "payfast-sandbox-check": "dotenv -e .env.local -- tsx scripts/payfast-sandbox-check.ts",
+    "payments-e2e": "dotenv -e .env.local -- tsx scripts/payments-e2e.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

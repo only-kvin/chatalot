@@ -52,8 +52,12 @@ export type BookingResult =
       windowEnd?: string | null;
       calloutFeeCents?: number | null;
       outsideArea?: boolean;
+      // The slot is held until dueAt; paying secures it.
+      payment?: PaymentDue | null;
     }
   | { ok: false; error: string; slotTaken: boolean };
+
+export type PaymentDue = { url: string; amountCents: number; dueAt: string };
 
 export type AvailabilityQuery = {
   service: string;

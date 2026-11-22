@@ -62,6 +62,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!api/chat|api/widget|api/whatsapp|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|opengraph-image|video/).*)",
+    "/((?!api/chat|api/widget|api/whatsapp|api/payments|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|opengraph-image|video/).*)",
   ],
 };

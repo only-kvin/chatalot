@@ -4,6 +4,8 @@ import { currentTenantFeatures } from "@/lib/dashboard-features";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { SettingsForm } from "./settings-form";
 import { BookingSettingsCard } from "./booking-settings";
+import { PaymentSettingsCard, type PaymentAccountView } from "./payment-settings";
+import { getSessionUser } from "@/lib/db/auth";
 import { YourWebsite, type ConsentView } from "./your-website";
 import { currentConsents, type ConsentState } from "@/lib/consent/business-consent";
 import { setupComplete } from "@/lib/onboarding";
@@ -31,6 +33,18 @@ export default async function SettingsPage() {
       )
       .eq("tenant_id", tenantId)
       .single(),
+  ]);
+  const user = await getSessionUser();
+  const [{ data: member }, { data: paymentAccount }, { data: paymentConfig }] = await Promise.all([
+    supabase.from("tenant_members").select("role").eq("tenant_id", tenantId).eq("user_id", user?.id ?? "").maybeSingle(),
+    // Only the columns members are granted: never the encrypted credentials.
+    supabase
+      .from("payment_accounts")
+      .select("mode, merchant_id, status, verified_at, last_error")
+      .eq("tenant_id", tenantId)
+      .eq("provider", "payfast")
+      .maybeSingle<NonNullable<PaymentAccountView>>(),
+    supabase.from("agent_configs").select("payment_window_minutes").eq("tenant_id", tenantId).single(),
   ]);
   const [consents, { data: brief }, { data: websiteRequest }, setupDone] = await Promise.all([
     currentConsents(supabase, tenantId),
@@ -67,6 +81,15 @@ export default async function SettingsPage() {
       {features.bookings === "on" && booking && (
         <div id="bookings" className="mt-8 scroll-mt-8">
           <BookingSettingsCard initial={booking} />
+        </div>
+      )}
+      {features.payments === "on" && (
+        <div id="payments" className="mt-8 scroll-mt-8">
+          <PaymentSettingsCard
+            account={paymentAccount ?? null}
+            windowMinutes={paymentConfig?.payment_window_minutes ?? 30}
+            isOwner={member?.role === "owner"}
+          />
         </div>
       )}
       <div className="mt-6">

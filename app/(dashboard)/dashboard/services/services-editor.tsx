@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
 import { createServiceAction, deleteServiceAction, moveServiceAction, updateServiceAction } from "./actions";
@@ -12,6 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { calloutFeeNotice, priceLabel, type PriceType, type ServiceLocation } from "@/lib/bookings/price-label";
+import { paymentModeLabel, servicePaymentProblem, type ServicePaymentMode } from "@/lib/payments/service-rules";
+import type { FeatureState } from "@/lib/plans";
 
 type Service = {
   id: string;
@@ -28,6 +31,8 @@ type Service = {
   price_type: PriceType;
   callout_fee_cents: number | null;
   arrival_window_minutes: number | null;
+  payment_mode: ServicePaymentMode;
+  deposit_cents: number | null;
   // Empty = anyone.
   staffIds: string[];
 };
@@ -47,6 +52,8 @@ const BLANK: Omit<Service, "id"> = {
   price_type: "fixed",
   callout_fee_cents: null,
   arrival_window_minutes: null,
+  payment_mode: "none",
+  deposit_cents: null,
   staffIds: [],
 };
 
@@ -82,11 +89,15 @@ function ServiceForm({
   service,
   staff,
   businessName,
+  paymentsReady,
+  paymentsFeature,
   onDone,
 }: {
   service: Service | null;
   staff: Staff[];
   businessName: string;
+  paymentsReady: boolean;
+  paymentsFeature: FeatureState;
   onDone: () => void;
 }) {
   const router = useRouter();
@@ -99,6 +110,8 @@ function ServiceForm({
   const [priceType, setPriceType] = useState<PriceType>(values.price_type);
   const [priceRand, setPriceRand] = useState(toRand(values.price_cents));
   const [feeRand, setFeeRand] = useState(toRand(values.callout_fee_cents));
+  const [paymentMode, setPaymentMode] = useState<ServicePaymentMode>(values.payment_mode);
+  const [depositRand, setDepositRand] = useState(toRand(values.deposit_cents));
   const comesToCustomer = location !== "business";
   const preview = {
     price_type: priceType,
@@ -249,6 +262,31 @@ function ServiceForm({
         )}
       </div>
 
+      {paymentsFeature === "locked" && (
+        <p className="text-xs text-muted-foreground">
+          Take a deposit when customers book, into your own PayFast account.{" "}
+          <Link href="/dashboard/upgrade/payments" className="underline">
+            Available on Growth and Pro
+          </Link>
+          .
+        </p>
+      )}
+      {paymentsFeature === "on" && (
+      <PaymentFields
+        mode={paymentMode}
+        onMode={setPaymentMode}
+        depositRand={depositRand}
+        onDeposit={setDepositRand}
+        problem={servicePaymentProblem({
+          paymentMode,
+          depositCents: fromRand(depositRand),
+          priceCents: preview.price_cents,
+          priceType,
+        })}
+        paymentsReady={paymentsReady}
+      />
+      )}
+
       {staff.length > 0 && (
         <fieldset className="flex flex-col gap-2">
           <legend className="mb-2 text-sm font-medium">Who offers it</legend>
@@ -312,14 +350,79 @@ function ServiceForm({
   );
 }
 
+// Online payment for this service, through the business's own PayFast.
+function PaymentFields({
+  mode,
+  onMode,
+  depositRand,
+  onDeposit,
+  problem,
+  paymentsReady,
+}: {
+  mode: ServicePaymentMode;
+  onMode: (m: ServicePaymentMode) => void;
+  depositRand: string;
+  onDeposit: (v: string) => void;
+  problem: string | null;
+  paymentsReady: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap gap-4">
+        <div className="flex min-w-56 flex-1 flex-col gap-2">
+          <Label htmlFor="payment_mode">Payment when booking</Label>
+          <select
+            id="payment_mode"
+            name="payment_mode"
+            value={mode}
+            onChange={(e) => onMode(e.target.value as ServicePaymentMode)}
+            className="h-9 rounded-md border bg-transparent px-3 text-sm"
+          >
+            <option value="none">None: they pay you on the day</option>
+            <option value="deposit">A deposit online</option>
+            <option value="full">The full price online</option>
+          </select>
+        </div>
+        {mode === "deposit" && (
+          <div className="flex w-36 flex-col gap-2">
+            <Label htmlFor="deposit_rand">Deposit (R)</Label>
+            <Input
+              id="deposit_rand"
+              name="deposit_rand"
+              type="number"
+              min={1}
+              step="0.01"
+              required
+              value={depositRand}
+              onChange={(e) => onDeposit(e.target.value)}
+            />
+          </div>
+        )}
+      </div>
+      {mode !== "none" && problem && <p className="text-xs text-red-600">{problem}</p>}
+      {mode !== "none" && !problem && (
+        <p className="text-xs text-muted-foreground">
+          {paymentsReady
+            ? "Customers pay into your PayFast account when they book. The slot is held until they pay."
+            : "Saved, but customers won't be asked to pay until you connect PayFast in Settings → Payments."}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function ServicesEditor({
   initialServices,
   staff,
   businessName,
+  paymentsReady,
+  paymentsFeature,
 }: {
   initialServices: Service[];
   staff: Staff[];
   businessName: string;
+  paymentsReady: boolean;
+  paymentsFeature: FeatureState;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState<Service | null>(null);
@@ -350,6 +453,8 @@ export function ServicesEditor({
             service={editing}
             staff={staff}
             businessName={businessName}
+            paymentsReady={paymentsReady}
+            paymentsFeature={paymentsFeature}
             onDone={() => {
               setEditing(null);
               setFormKey((k) => k + 1);
@@ -372,6 +477,11 @@ export function ServicesEditor({
                   {service.active && !service.online_bookable && <Badge variant="secondary">Not on website</Badge>}
                   {service.location === "customer" && <Badge variant="outline">Call-out</Badge>}
                   {service.location === "either" && <Badge variant="outline">Here or at theirs</Badge>}
+                  {paymentsFeature === "on" && paymentModeLabel({ paymentMode: service.payment_mode, depositCents: service.deposit_cents }) && (
+                    <Badge variant="outline">
+                      {paymentModeLabel({ paymentMode: service.payment_mode, depositCents: service.deposit_cents })}
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-sm text-muted-foreground">
                   {service.duration_minutes} min · {priceSummary(service)}

@@ -1,4 +1,5 @@
 import { formatLocalDateTime } from "@/lib/time";
+import { formatRand } from "./price-label";
 import { NOT_SENT_REASON, type NotSentReason } from "./reminders";
 import { BRAND_NAME } from "@/lib/brand";
 
@@ -105,6 +106,12 @@ export function describeEvent(
     }
     case "review_rated":
       return `Customer rated the visit ${typeof d.rating === "number" ? d.rating : "?"}/5`;
+    case "payment_received":
+      return typeof d.amount_cents === "number" ? `Customer paid ${formatRand(d.amount_cents)} online` : "Customer paid online";
+    case "payment_expired":
+      return "Not paid in time, so the slot was released";
+    case "payment_refunded":
+      return "Payment refunded";
     default:
       return e.type;
   }

@@ -463,13 +463,19 @@ export async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall:
   );
   if (!booked.repeat) {
     await Promise.all([
-      emailCustomerAboutBooking(admin, tenantId, booked.bookingId, pending ? "requested" : "confirmed"),
+      // A held booking is confirmed to the customer once they've paid.
+      booked.payment ? null : emailCustomerAboutBooking(admin, tenantId, booked.bookingId, pending ? "requested" : "confirmed"),
       notifyStaffAboutBooking(admin, tenantId, booked.bookingId, "new"),
     ]);
   }
 
   if (pending) {
     return `${callout ? "Call-out requested" : "Booking requested"} (not yet confirmed): ${resolved.name} on ${when}${withText}${where} (reference ${booked.ref}). The business approves ${callout ? "call-outs" : "bookings"} first and will confirm soon; the time is held meanwhile. Tell the visitor exactly this, and don't call it confirmed. ${after}`.trim();
+  }
+  if (booked.payment) {
+    const minutes = Math.max(1, Math.round((new Date(booked.payment.dueAt).getTime() - Date.now()) / 60_000));
+    const amount = `R${(booked.payment.amountCents / 100).toFixed(2)}`;
+    return `Booking held, waiting for payment: ${resolved.name} on ${when}${withText}${where} (reference ${booked.ref}). To secure it they must pay ${amount} online within ${minutes} minutes at ${booked.payment.url} (share the link exactly as written). If they don't pay in time the slot is released. Tell them this; don't call it confirmed until they've paid. ${after}`.trim();
   }
   return `Booking confirmed: ${resolved.name} on ${when}${withText}${where} (reference ${booked.ref}). Tell the visitor exactly this date, time and person. ${after}`.trim();
 }

@@ -11,12 +11,14 @@ describe("resolveFeatures", () => {
       contact_form: "on",
       whatsapp: "locked",
       bookings: "locked",
+      payments: "locked",
       reviews: "locked",
       registration: "locked",
     });
     const growth = resolveFeatures("growth", {});
     expect(growth.whatsapp).toBe("on");
     expect(growth.bookings).toBe("on");
+    expect(growth.payments).toBe("on");
     expect(growth.reviews).toBe("locked");
     expect(Object.values(resolveFeatures("pro", {})).every((s) => s === "on")).toBe(true);
     expect(Object.values(resolveFeatures("trial", {})).every((s) => s === "on")).toBe(true);
@@ -26,6 +28,14 @@ describe("resolveFeatures", () => {
     expect(resolveFeatures("starter", { bookings: "on" }).bookings).toBe("on");
     // Off hides even what the plan includes.
     expect(resolveFeatures("pro", { bookings: "off" }).bookings).toBe("hidden");
+  });
+
+  it("makes payments follow bookings", () => {
+    // Payments granted without bookings: nothing to pay for, so locked.
+    expect(resolveFeatures("starter", { payments: "on" }).payments).toBe("locked");
+    expect(resolveFeatures("starter", { payments: "on", bookings: "on" }).payments).toBe("on");
+    // Bookings hidden for a business: payments disappear with them.
+    expect(resolveFeatures("growth", { bookings: "off" }).payments).toBe("hidden");
   });
 
   it("makes review requests follow bookings", () => {
