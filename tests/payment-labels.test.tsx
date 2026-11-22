@@ -1,4 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+
+// The refund button refreshes the page through the app router.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => undefined }) }));
 import { renderToStaticMarkup } from "react-dom/server";
 import { paymentBadge } from "../lib/payments/labels";
 import { describeEvent } from "../lib/bookings/labels";
@@ -45,12 +48,12 @@ const attempt = (over: Partial<PaymentAttempt>): PaymentAttempt => ({
 
 describe("payment card", () => {
   it("shows nothing for bookings without online payment", () => {
-    expect(renderToStaticMarkup(<PaymentCard status="not_required" amountDueCents={null} dueAt={null} attempts={[]} />)).toBe("");
+    expect(renderToStaticMarkup(<PaymentCard bookingId="b1" isOwner={false} status="not_required" amountDueCents={null} dueAt={null} attempts={[]} />)).toBe("");
   });
 
   it("while waiting: the deadline and the pay link to resend", () => {
     const html = renderToStaticMarkup(
-      <PaymentCard status="awaiting" amountDueCents={1000} dueAt="2026-11-23T08:30:00Z" attempts={[attempt({})]} />,
+      <PaymentCard bookingId="b1" isOwner={false} status="awaiting" amountDueCents={1000} dueAt="2026-11-23T08:30:00Z" attempts={[attempt({})]} />,
     );
     expect(html).toContain("Waiting for the customer to pay R10 online");
     expect(html).toContain("until 10:30");
@@ -60,6 +63,8 @@ describe("payment card", () => {
   it("once paid: fee, what they receive, PayFast's reference, test mode", () => {
     const html = renderToStaticMarkup(
       <PaymentCard
+        bookingId="b1"
+        isOwner={false}
         status="paid"
         amountDueCents={1000}
         dueAt={null}
@@ -72,5 +77,19 @@ describe("payment card", () => {
     expect(html).toContain("Test mode");
     expect(html).toContain("Payment attempts (2)");
     expect(html).not.toContain("/pay/");
+    // Only owners get the refund button.
+    expect(html).not.toContain("Mark as refunded");
+  });
+
+  it("offers the owner Mark as refunded once paid, and shows a refund", () => {
+    const paid = attempt({ status: "paid", fee_cents: 230, net_cents: 770, provider_payment_id: "3540217", paid_at: "2026-11-23T08:10:00Z" });
+    const owner = renderToStaticMarkup(<PaymentCard bookingId="b1" isOwner status="paid" amountDueCents={1000} dueAt={null} attempts={[paid]} />);
+    expect(owner).toContain("Mark as refunded");
+    const refunded = renderToStaticMarkup(
+      <PaymentCard bookingId="b1" isOwner status="refunded" amountDueCents={1000} dueAt={null} attempts={[{ ...paid, status: "refunded" }]} />,
+    );
+    expect(refunded).toContain("Refunded to the customer in PayFast");
+    expect(refunded).toContain("PayFast reference 3540217");
+    expect(refunded).not.toContain("Mark as refunded");
   });
 });

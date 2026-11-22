@@ -5,6 +5,7 @@ import { PAYMENT_ATTEMPT_LABEL, paymentBadge } from "@/lib/payments/labels";
 import { payUrl } from "@/lib/payments/request";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RefundButton } from "./refund-button";
 
 // A booking's online payment, for the business: what was asked, what was
 // paid (with PayFast's fee and what lands in their account), PayFast's
@@ -23,19 +24,25 @@ export type PaymentAttempt = {
 };
 
 export function PaymentCard({
+  bookingId,
   status,
   amountDueCents,
   dueAt,
   attempts,
+  isOwner,
 }: {
+  bookingId: string;
   status: string;
   amountDueCents: number | null;
   dueAt: string | null;
   attempts: PaymentAttempt[];
+  // Only the owner records refunds.
+  isOwner: boolean;
 }) {
   const badge = paymentBadge(status, amountDueCents);
   if (!badge) return null;
-  const paid = attempts.find((a) => a.status === "paid");
+  // The money that came in: still paid, or since refunded.
+  const paid = attempts.find((a) => a.status === "paid" || a.status === "refunded");
   // The link the customer was given: the newest attempt not yet paid.
   const open = attempts.find((a) => a.status !== "paid");
   const sandbox = attempts.some((a) => a.mode === "sandbox");
@@ -83,6 +90,7 @@ export function PaymentCard({
                 PayFast reference {paid.provider_payment_id}. Refunds are made in your PayFast account.
               </p>
             )}
+            {status === "paid" && isOwner && <RefundButton bookingId={bookingId} amountLabel={formatRand(paid.amount_cents)} />}
           </>
         )}
 
@@ -90,7 +98,7 @@ export function PaymentCard({
           <p>Not paid in time, so the booking was cancelled and the slot released.</p>
         )}
 
-        {status === "refunded" && <p>This payment was refunded.</p>}
+        {status === "refunded" && <p className="font-medium">Refunded to the customer in PayFast.</p>}
 
         {attempts.length > 1 && (
           <details className="text-muted-foreground">

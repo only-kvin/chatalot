@@ -43,7 +43,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
     .maybeSingle();
   if (!booking) notFound();
 
-  const [{ data: events }, { data: staff }, { data: payments }] = await Promise.all([
+  const [{ data: events }, { data: staff }, { data: payments }, { data: member }] = await Promise.all([
     supabase
       .from("booking_events")
       .select("type, actor, channel, details, created_by, created_at")
@@ -60,6 +60,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
           .eq("booking_id", id)
           .order("created_at", { ascending: false })
           .returns<PaymentAttempt[]>(),
+    supabase.from("tenant_members").select("role").eq("tenant_id", tenantId).eq("user_id", user?.id ?? "").maybeSingle(),
   ]);
   const payment = paymentBadge(booking.payment_status, booking.amount_due_cents);
   const staffNames = new Map((staff ?? []).map((p) => [p.id, p.name]));
@@ -130,6 +131,8 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
       </Card>
 
       <PaymentCard
+        bookingId={booking.id}
+        isOwner={member?.role === "owner"}
         status={booking.payment_status}
         amountDueCents={booking.amount_due_cents}
         dueAt={booking.payment_due_at}
