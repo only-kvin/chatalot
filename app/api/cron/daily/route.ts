@@ -6,6 +6,7 @@ import { tenantWhatsAppLookup, type TenantWhatsApp } from "@/lib/bookings/whatsa
 import { sendDailySummary } from "@/lib/email/send-daily-summary";
 import { tenantFeaturesLookup } from "@/lib/features";
 import { runScheduledImports } from "@/lib/website/import";
+import { recoverAllPayments } from "@/lib/payments/recover";
 import type { Features } from "@/lib/plans";
 
 // The daily jobs: booking reminders and review requests on WhatsApp, then the
@@ -142,8 +143,12 @@ export async function GET(request: Request) {
   const channelFor = tenantWhatsAppLookup(admin);
   const featuresFor = tenantFeaturesLookup(admin);
 
-  // Unpaid holds that ran out are released first, so they get no reminder.
-  // (Booking checks also release them as they go; this catches the rest.)
+  // Payments PayFast took but never told us about (a lost notification) are
+  // picked up from its transaction history first, then unpaid holds that ran
+  // out are released, so they get no reminder. (Booking checks do both as
+  // they go; this catches the rest.)
+  const [recovery] = await Promise.allSettled([recoverAllPayments(admin)]);
+  if (recovery.status === "rejected") console.error("Recovering payments failed:", recovery.reason);
   const { data: expired, error: expireError } = await admin.rpc("expire_unpaid_bookings", { p_tenant_id: null });
   if (expireError) console.error("Releasing unpaid holds failed:", expireError);
 
@@ -164,10 +169,11 @@ export async function GET(request: Request) {
     runScheduledImports(admin, { budgetMs: Math.max(0, startedAt + WEBSITE_DEADLINE_MS - Date.now()) }),
   ]);
   if (websites.status === "rejected") console.error("Website imports failed:", websites.reason);
-  const ok = !expireError && [reminders, reviews, summaries, websites].every((r) => r.status === "fulfilled");
+  const ok = recovery.status === "fulfilled" && !expireError && [reminders, reviews, summaries, websites].every((r) => r.status === "fulfilled");
 
   return Response.json(
     {
+      paymentsRecovered: recovery.status === "fulfilled" ? recovery.value : "failed",
       unpaidReleased: expireError ? "failed" : expired,
       reminders: reminders.status === "fulfilled" ? reminders.value : "failed",
       reviews: reviews.status === "fulfilled" ? reviews.value : "failed",

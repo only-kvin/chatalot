@@ -509,6 +509,16 @@ in-memory Postgres with every migration applied); **not applied to the live data
   `payment_events`), 503 = couldn't check now so PayFast retries. `api/payments` skips the proxy. The daily
   cron releases expired holds before sending reminders.
 
+- DONE: lost-confirmation recovery (`lib/payments/recover.ts`). If PayFast's notification never arrives (or
+  is turned away), we read the business's PayFast transaction history (`/transactions/history/daily`, signed
+  API call) and apply any payment listed under our payment id through `apply_payment_notification()`. Runs
+  when the customer returns from PayFast still unpaid, before an unpaid hold is released, and in the daily
+  cron (last 3 days). A payment found after its hold expired becomes a "Paid for a cancelled booking" alert.
+- End-to-end sandbox test passed 2026-11-23 (booking -> pay -> notification -> paid). PayFast's notification
+  came from 144.126.193.139, not an IP its hostnames resolve to, so the sender's IP is logged, not enforced.
+- Testing tip: the sandbox refuses "Merchant is unable to receive payments from the same account" when the
+  booking's email is your PayFast merchant email. Book with another email.
+
 ### Testing against the PayFast sandbox
 
 1. Put `PAYFAST_SANDBOX_MERCHANT_ID`, `PAYFAST_SANDBOX_MERCHANT_KEY`, `PAYFAST_SANDBOX_PASSPHRASE` in

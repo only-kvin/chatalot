@@ -54,6 +54,22 @@ export function notifyUrl(tenantId: string): string {
   return appUrl(`/api/payments/payfast/notify/${tenantId}`);
 }
 
+// The customer is back from PayFast. Usually its notification has already
+// marked the payment paid; if not, ask PayFast directly before showing the
+// page, so a lost notification doesn't leave them on "Confirming…".
+export async function loadPayPageAfterReturn(admin: SupabaseClient, paymentId: string, now = new Date()): Promise<PayPage> {
+  if (UUID.test(paymentId)) {
+    const { data: p } = await admin.from("payments").select("tenant_id, status").eq("id", paymentId).maybeSingle();
+    if (p && p.status !== "paid") {
+      const { recoverPayments } = await import("./recover");
+      await recoverPayments(admin, p.tenant_id, { paymentIds: [paymentId], now }).catch((err) =>
+        console.error(`Payments: recovery on return for ${paymentId} failed:`, err),
+      );
+    }
+  }
+  return loadPayPage(admin, paymentId, now);
+}
+
 export async function loadPayPage(admin: SupabaseClient, paymentId: string, now = new Date()): Promise<PayPage> {
   if (!UUID.test(paymentId)) return { state: "not_found" };
   const { data: p } = await admin

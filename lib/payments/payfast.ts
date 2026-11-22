@@ -238,21 +238,35 @@ function apiTimestamp(now: Date): string {
   return `${sa}+0200`;
 }
 
+export type ApiDeps = { fetch?: typeof fetch; now?: Date };
+
+// A signed GET to PayFast's API (Request::sendApiRequest): the signature
+// covers the headers and the query parameters, but not "testing", which
+// only routes the call to the sandbox.
+export function payfastApiGet(
+  account: PaymentAccountSecrets,
+  path: string,
+  query: Record<string, string> = {},
+  deps: ApiDeps = {},
+): Promise<Response> {
+  const headers = { "merchant-id": account.merchantId, version: "v1", timestamp: apiTimestamp(deps.now ?? new Date()) };
+  const params = new URLSearchParams({ ...query, ...(account.mode === "sandbox" ? { testing: "true" } : {}) }).toString();
+  return (deps.fetch ?? fetch)(`${API_URL}/${path}${params ? `?${params}` : ""}`, {
+    headers: { ...headers, signature: apiSignature({ ...headers, ...query }, account.passphrase) },
+    signal: AbortSignal.timeout(10_000),
+    redirect: "error",
+  });
+}
+
 // "Test connection" for the dashboard: PayFast's API ping checks the merchant
 // id and passphrase. (The merchant key is only checked by a real checkout;
 // the first sandbox payment proves it.)
 export async function pingPayfast(
   account: PaymentAccountSecrets,
-  deps: { fetch?: typeof fetch; now?: Date } = {},
+  deps: ApiDeps = {},
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const headers = { "merchant-id": account.merchantId, version: "v1", timestamp: apiTimestamp(deps.now ?? new Date()) };
-  const url = `${API_URL}/ping${account.mode === "sandbox" ? "?testing=true" : ""}`;
   try {
-    const res = await (deps.fetch ?? fetch)(url, {
-      headers: { ...headers, signature: apiSignature(headers, account.passphrase) },
-      signal: AbortSignal.timeout(8000),
-      redirect: "error",
-    });
+    const res = await payfastApiGet(account, "ping", {}, deps);
     if (res.ok) return { ok: true };
     return {
       ok: false,

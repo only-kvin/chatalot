@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { expireUnpaidHolds, requestPaymentForBooking } from "../lib/payments/request";
 
@@ -115,8 +115,26 @@ describe("requestPaymentForBooking", () => {
 });
 
 describe("expireUnpaidHolds", () => {
+  function holdsClient(overdue: { id: string }[]) {
+    const rpc = vi.fn(async () => ({ error: { code: "42501", message: "permission denied" } }));
+    const q = {
+      select: () => q,
+      eq: () => q,
+      lt: () => q,
+      limit: async () => ({ data: overdue, error: null }),
+    };
+    return { client: { from: () => q, rpc } as unknown as SupabaseClient, rpc };
+  }
+
+  it("does nothing when no hold has run out", async () => {
+    const { client, rpc } = holdsClient([]);
+    await expireUnpaidHolds(client, "t1");
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it("quietly skips when the client isn't allowed (signed-in dashboard)", async () => {
-    const { admin } = fakeAdmin({});
-    await expect(expireUnpaidHolds(admin, "t1")).resolves.toBeUndefined();
+    const { client, rpc } = holdsClient([{ id: "b1" }]);
+    await expect(expireUnpaidHolds(client, "t1")).resolves.toBeUndefined();
+    expect(rpc).toHaveBeenCalledWith("expire_unpaid_bookings", { p_tenant_id: "t1" });
   });
 });

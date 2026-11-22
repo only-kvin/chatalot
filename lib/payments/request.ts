@@ -131,10 +131,22 @@ export async function existingPaymentRequest(
   return { paymentId: payment.id, amountCents: payment.amount_cents, dueAt: booking.payment_due_at, url: payUrl(payment.id) };
 }
 
-// Frees slots held by unpaid bookings. Best effort: only the service role may
-// run it, so a dashboard (signed-in) client just skips it; the daily cron is
-// the backstop.
-export async function expireUnpaidHolds(client: SupabaseClient, tenantId: string): Promise<void> {
+// Frees slots held by unpaid bookings. Before releasing any, asks PayFast
+// whether they were paid after all (a lost confirmation). Best effort: only
+// the service role may do either, so a dashboard (signed-in) client just
+// skips them; the daily cron is the backstop.
+export async function expireUnpaidHolds(client: SupabaseClient, tenantId: string, now = new Date()): Promise<void> {
+  const { data: overdue } = await client
+    .from("bookings")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("payment_status", "awaiting")
+    .lt("payment_due_at", now.toISOString())
+    .limit(1);
+  if (!overdue?.length) return;
+  // Loaded only when needed (and it pulls in the email code).
+  const { recoverPayments } = await import("./recover");
+  await recoverPayments(client, tenantId, { now }).catch((err) => console.error(`Payments: recovery for ${tenantId} failed:`, err));
   const { error } = await client.rpc("expire_unpaid_bookings", { p_tenant_id: tenantId });
   if (error && error.code !== "42501") console.error(`Payments: expiring holds for ${tenantId} failed:`, error);
 }

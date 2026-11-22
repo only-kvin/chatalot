@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { createAdminClient } from "@/lib/db/supabase-admin";
-import { loadPayPage } from "@/lib/payments/pay-page";
+import { loadPayPage, loadPayPageAfterReturn } from "@/lib/payments/pay-page";
 import { formatLocalTime } from "@/lib/time";
 import { PublicCard, PublicShell } from "@/components/public/public-shell";
 import { CheckoutForm } from "./checkout-form";
@@ -29,7 +29,9 @@ export default async function PayPage({
   searchParams: Promise<{ returned?: string; cancelled?: string }>;
 }) {
   const [{ paymentId }, query] = await Promise.all([params, searchParams]);
-  const page = await loadPayPage(createAdminClient(), paymentId);
+  const admin = createAdminClient();
+  // Back from PayFast: make sure we know about the payment first.
+  const page = query.returned ? await loadPayPageAfterReturn(admin, paymentId) : await loadPayPage(admin, paymentId);
 
   return (
     <PublicShell>
