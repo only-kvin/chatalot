@@ -54,6 +54,8 @@ export function mountAppointment(host: HTMLElement, ctx: MountContext): void {
   } | null = null;
   // The details form is built once and kept when going back and forth.
   let detailsFor: string | null = null;
+  // Services whose details are unfolded.
+  const expanded = new Set<string>();
 
   const service = () => services.find((s) => s.id === serviceId) ?? null;
   const offering = () => staff.filter((p) => service()?.staffIds.includes(p.id));
@@ -226,34 +228,63 @@ export function mountAppointment(host: HTMLElement, ctx: MountContext): void {
           "div",
           { class: "group" },
           group.category ? h("h3", {}, group.category) : null,
-          h(
-            "ul",
-            { class: "list" },
-            group.services.map((s) =>
-              h(
-                "li",
-                { class: "item" },
-                h(
-                  "div",
-                  { class: "body" },
-                  h("div", { class: "name" }, s.name),
-                  s.description ? h("div", { class: "desc" }, s.description) : null,
-                  h(
-                    "div",
-                    { class: "meta" },
-                    [`${s.durationMinutes} min`, s.location === "customer" ? "We come to you" : s.location === "either" ? "Here or at yours" : null, price(s)]
-                      .filter(Boolean)
-                      .join(" · "),
-                  ),
-                ),
-                shell.button("pick", "Book", () => chooseService(s.id), `svc-${s.id}`, { "aria-label": `Book ${s.name}` }),
-              ),
-            ),
-          ),
+          h("ul", { class: "list" }, group.services.map(serviceCard)),
         ),
       );
     }
     return nodes;
+  }
+
+  // Name, duration and where on the left; price and Select on the right. The
+  // description folds away behind "Show details".
+  function serviceCard(s: Service) {
+    const open = expanded.has(s.id);
+    const priceText = price(s);
+    // "From R300" reads as a small "from" over the amount.
+    const from = priceText?.match(/^From (.+)$/i);
+    return h(
+      "li",
+      { class: "item svc" },
+      h(
+        "div",
+        { class: "body" },
+        h("div", { class: "name" }, s.name),
+        h(
+          "div",
+          { class: "meta" },
+          [`${s.durationMinutes} min`, s.location === "customer" ? "We come to you" : s.location === "either" ? "Here or at yours" : null].filter(Boolean).join(" • "),
+        ),
+        s.description
+          ? shell.button("details", open ? "Hide details ▴" : "Show details ▾", () => {
+              if (open) expanded.delete(s.id);
+              else expanded.add(s.id);
+              render();
+            }, `det-${s.id}`, { "aria-expanded": open ? "true" : "false" })
+          : null,
+        open ? h("div", { class: "desc" }, s.description) : null,
+      ),
+      h(
+        "div",
+        { class: "side" },
+        priceText ? h("div", { class: "price" }, from ? h("small", {}, "from ") : null, from ? from[1] : priceText) : null,
+        shell.button("pick", "Select", () => chooseService(s.id), `svc-${s.id}`, { "aria-label": `Select ${s.name}` }),
+      ),
+    );
+  }
+
+  // What they're booking, beside the times on wide widgets (above on narrow).
+  function summaryCard() {
+    const svc = service();
+    const who = personName() ?? (offering().length > 1 ? "Anyone available" : null);
+    return h(
+      "aside",
+      { class: "booking-summary", "aria-label": "Booking summary" },
+      h("div", { class: "label" }, "Booking summary"),
+      h("div", { class: "name" }, svc?.name ?? ""),
+      h("div", { class: "meta" }, [svc ? `${svc.durationMinutes} min` : null, who, atCustomer() ? "At your place" : null].filter(Boolean).join(" • ")),
+      svc && price(svc, atCustomer()) ? h("div", { class: "meta" }, price(svc, atCustomer())) : null,
+      h("div", { class: "hint" }, "Pick a time to continue."),
+    );
   }
 
   function avatar(p: Staff | null) {
@@ -350,10 +381,7 @@ export function mountAppointment(host: HTMLElement, ctx: MountContext): void {
       else if (step === "where") nodes.push(...where.renderChoice({ businessName: cfg.businessName, onChoose: chooseWhere }));
       else if (step === "staff") nodes.push(...staffStep());
       else if (step === "time") {
-        nodes.push(
-          summaryList([["Service", service()?.name], ["Where", atCustomer() ? "At your place" : null], ["With", personName()]]),
-          ...picker.render(alert),
-        );
+        nodes.push(h("div", { class: "time-layout" }, h("div", { class: "time-main" }, ...picker.render(alert)), summaryCard()));
       }
       else {
         nodes.push(

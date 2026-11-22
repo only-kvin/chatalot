@@ -3,7 +3,9 @@
 // dashboard: layered soft shadows, top-lit gradient buttons that dip when
 // pressed, shimmering placeholders and gentle staggered entrances.
 export const BOOKING_CSS = `
-:host { all: initial; display: block; container-type: inline-size; }
+/* all: initial keeps the page's CSS out, but the "system" font means the
+   page's own font, so that one is let back in. */
+:host { all: initial; font-family: inherit; display: block; container-type: inline-size; }
 * { box-sizing: border-box; }
 .card {
   font-family: var(--ca-font); font-size: 15px; line-height: 1.4;
@@ -44,10 +46,29 @@ select:focus, input:focus, textarea:focus { outline: none; border-color: var(--c
 textarea { resize: vertical; }
 [aria-invalid="true"] { border-color: #dc2626; }
 
-/* Date and time: the month calendar, with the chosen day's times beside it
-   (below it on narrow widgets). */
-.picker { display: grid; gap: 18px; }
-@container (min-width: 600px) { .picker { grid-template-columns: minmax(270px, 1.05fr) 1fr; align-items: start; } }
+/* Date and time: the month and switches, a strip of seven days (or the month
+   calendar), then the chosen day's times. */
+.picker { display: flex; flex-direction: column; gap: 14px; }
+.cal-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cal-bar strong { font-size: 16px; letter-spacing: -.01em; margin-right: 4px; }
+.cal-bar .toggle { margin-left: auto; }
+.pill {
+  background: var(--ca-raised); border: 1px solid var(--ca-line); border-radius: 999px; color: var(--ca-text);
+  min-height: 36px; padding: 0 14px; font-size: 14px; white-space: nowrap;
+}
+.pill:hover:not(:disabled) { border-color: var(--ca-primary); }
+.pill:disabled { opacity: .45; }
+.strip {
+  display: flex; align-items: center; gap: 2px; padding: 8px 0;
+  border-top: 1px solid var(--ca-line); border-bottom: 1px solid var(--ca-line); touch-action: pan-y;
+}
+.days.week { flex: 1; min-width: 0; }
+.days.week .day { flex-direction: column; gap: 6px; min-height: 76px; }
+.dow { font-size: 13px; color: var(--ca-muted); white-space: nowrap; }
+.days.week .num { width: 44px; height: 44px; border: 1px solid var(--ca-line); }
+.days.week .day[aria-checked="true"] .num, .days.week .day.skeleton .num { border-color: transparent; }
+.chip.none { align-self: flex-start; height: 32px; padding: 0 14px; background: var(--ca-line); color: var(--ca-muted); font-weight: 500; }
+.next { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; font-size: 13px; }
 .cal {
   background: var(--ca-raised); border-radius: calc(var(--ca-radius) / 1.2); padding: 10px 10px 12px;
   box-shadow: 0 0 0 1px var(--ca-line), 0 1px 2px var(--ca-shade); touch-action: pan-y;
@@ -108,7 +129,7 @@ textarea { resize: vertical; }
 .slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; }
 .slot-grid.wide { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); }
 .slot {
-  min-height: 44px; border-radius: calc(var(--ca-radius) / 1.6); border: none; font-weight: 600; font-variant-numeric: tabular-nums;
+  min-height: 44px; border-radius: 999px; border: none; font-weight: 500; font-variant-numeric: tabular-nums;
   background: var(--ca-raised); box-shadow: 0 0 0 1px var(--ca-line), 0 1px 2px var(--ca-shade);
 }
 .slot:hover:not(:disabled) { background: var(--ca-soft); box-shadow: 0 0 0 1.5px var(--ca-primary), 0 6px 14px -8px var(--ca-glow); transform: translateY(-1px); }
@@ -184,10 +205,16 @@ a.primary { display: flex; align-items: center; justify-content: center; text-de
   .head { flex-wrap: wrap; }
   .pickers label { flex-basis: 100%; }
 }
-/* Phones: circles shrink so the month fits; tap height stays 44px. */
+/* Phones: circles shrink so the month and week fit; tap height stays 44px. */
+@container (max-width: 420px) {
+  .days.week .num { width: 36px; height: 36px; font-size: 14px; }
+  .dow { font-size: 11px; }
+  .strip .arrow { min-width: 28px; }
+}
 @container (max-width: 360px) {
   .cal { padding: 8px 4px 10px; }
   .day .num { width: 34px; height: 34px; font-size: 14px; }
+  .days.week .num { width: 32px; height: 32px; }
 }
 /* Reduced motion means fewer and gentler, not none: nothing moves, but
    things still fade in so changes are easy to follow. */
@@ -237,6 +264,44 @@ export const APPOINTMENT_CSS = `
   background: var(--ca-soft); color: var(--ca-text); display: flex; align-items: center; justify-content: center; font-weight: 600;
 }
 .empty { color: var(--ca-muted); font-size: 14px; }
+/* Service cards: details left, price and Select right. */
+.svc { align-items: flex-start; padding: 16px 18px; }
+.svc .name { font-size: 16px; }
+.svc .side { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; flex: none; }
+.svc .price { font-weight: 700; font-size: 17px; white-space: nowrap; }
+.svc .price small { font-weight: 400; font-size: 13px; color: var(--ca-muted); }
+.svc .pick {
+  background: var(--ca-raised); color: var(--ca-text); border: 1px solid var(--ca-text); box-shadow: none;
+  border-radius: calc(var(--ca-radius) / 1.6); min-width: 104px;
+}
+.svc .pick:hover { background: var(--ca-text); color: var(--ca-surface); }
+.details {
+  background: none; border: none; padding: 6px 0 0; min-height: 36px; font-weight: 600; font-size: 14px;
+  color: var(--ca-primary);
+}
+.svc .desc { margin-top: 6px; }
+/* Time step: the picker, with the booking summary beside it when there's room. */
+.time-layout { display: flex; flex-direction: column; gap: 16px; }
+.booking-summary {
+  border: 1px solid var(--ca-line); border-radius: calc(var(--ca-radius) / 1.2); padding: 16px 18px;
+  background: var(--ca-raised); display: flex; flex-direction: column; gap: 4px;
+}
+.booking-summary .label { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ca-muted); margin-bottom: 6px; }
+.booking-summary .name { font-weight: 600; font-size: 16px; }
+.booking-summary .meta { font-size: 14px; color: var(--ca-muted); }
+.booking-summary .hint {
+  margin-top: 12px; border-radius: calc(var(--ca-radius) / 1.6); background: var(--ca-line); color: var(--ca-muted);
+  text-align: center; padding: 10px; font-size: 14px;
+}
+@container (min-width: 720px) {
+  .time-layout { flex-direction: row; align-items: flex-start; }
+  .time-main { flex: 1; min-width: 0; }
+  .booking-summary { width: 280px; flex: none; position: sticky; top: 12px; }
+}
+@container (max-width: 719px) {
+  .booking-summary { order: -1; }
+  .booking-summary .hint { display: none; }
+}
 @container (max-width: 400px) {
   .item { padding: 12px; gap: 10px; }
   .item .pick { padding: 0 14px; }
