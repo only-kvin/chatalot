@@ -8,8 +8,8 @@ import { verifyPayfastNotification, type VerifyDeps } from "./payfast";
 //   1. the business's own account (the tenant id is in the notify URL we gave
 //      PayFast, but nothing is trusted until the signature checks out with
 //      that business's passphrase);
-//   2. verifyPayfastNotification(): signature, merchant id, PayFast's IPs,
-//      and PayFast's server confirming it;
+//   2. verifyPayfastNotification(): signature, merchant id and PayFast's
+//      server confirming it (the sender's IP is logged, not enforced);
 //   3. apply_payment_notification() in the database: amount, sandbox/live and
 //      duplicates, under a lock. Only this marks a booking paid.
 //
@@ -69,6 +69,9 @@ export async function handlePayfastNotification(
     return { status: verified.reason === "malformed" ? 400 : 200, paidBookingId: null, detail: verified.reason };
   }
 
+  if (!verified.sourceTrusted) {
+    console.warn(`PayFast notification for ${tenantId} came from ${remoteIp ?? "an unknown address"}, not a PayFast host (accepted: signature and PayFast's confirmation passed)`);
+  }
   const n = verified.notification;
   const { data, error } = await admin.rpc("apply_payment_notification", {
     p_tenant_id: tenantId,

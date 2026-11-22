@@ -96,7 +96,6 @@ describe("handlePayfastNotification", () => {
   it("never reaches the database with a forged or unconfirmed notification", async () => {
     const cases = [
       { body: ITN.replace("amount_gross=250.00", "amount_gross=2.50"), ip: PAYFAST_IP, answer: "VALID", reason: "bad_signature" },
-      { body: ITN, ip: "203.0.113.7", answer: "VALID", reason: "untrusted_source" },
       { body: ITN, ip: PAYFAST_IP, answer: "INVALID", reason: "not_confirmed" },
     ];
     for (const c of cases) {

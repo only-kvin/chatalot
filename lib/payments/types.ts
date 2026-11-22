@@ -47,7 +47,6 @@ export type NotificationFailure = {
     | "malformed"
     | "bad_signature"
     | "wrong_merchant"
-    | "untrusted_source"
     | "not_confirmed"
     | "confirm_failed";
 };

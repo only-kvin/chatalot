@@ -157,15 +157,24 @@ export type VerifyDeps = {
   resolve?: (host: string) => Promise<string[]>;
 };
 
-// Every check PayFast asks for, cheapest first. Only a notification that
-// passes all of them reaches the database, which then checks the amount,
-// mode and duplicates under a lock (apply_payment_notification()).
+// The checks that decide, cheapest first: the signature (needs the
+// business's secret passphrase), the merchant id, and PayFast's own server
+// confirming these exact details as VALID. Only a notification that passes
+// all of them reaches the database, which then checks the amount, mode and
+// duplicates under a lock (apply_payment_notification()).
+//
+// The sender's IP is checked against PayFast's hosts but only reported
+// (sourceTrusted), not enforced: PayFast's notifications can come from
+// addresses those hostnames don't resolve to (the sandbox's did, in our
+// end-to-end test; WooCommerce's PayFast plugin skips the check in test
+// mode). A forger can't pass the confirmation step anyway: PayFast won't
+// call a payment VALID that it didn't take.
 export async function verifyPayfastNotification(
   rawBody: string,
   remoteIp: string | null,
   account: PaymentAccountSecrets,
   deps: VerifyDeps = {},
-): Promise<{ ok: true; notification: VerifiedNotification } | NotificationFailure> {
+): Promise<{ ok: true; notification: VerifiedNotification; sourceTrusted: boolean } | NotificationFailure> {
   const pairs = parseNotificationBody(rawBody);
   const get = (k: string) => pairs.find(([key]) => key === k)?.[1] ?? "";
 
@@ -181,8 +190,7 @@ export async function verifyPayfastNotification(
   if (!notificationSignatureValid(pairs, account.passphrase)) return { ok: false, reason: "bad_signature" };
   if (get("merchant_id") !== account.merchantId) return { ok: false, reason: "wrong_merchant" };
 
-  const ips = await payfastIps(deps.resolve);
-  if (!remoteIp || !ips.has(remoteIp)) return { ok: false, reason: "untrusted_source" };
+  const sourceTrusted = Boolean(remoteIp && (await payfastIps(deps.resolve)).has(remoteIp));
 
   try {
     const res = await (deps.fetch ?? fetch)(`${PAYFAST_HOSTS[account.mode]}/eng/query/validate`, {
@@ -201,6 +209,7 @@ export async function verifyPayfastNotification(
 
   return {
     ok: true,
+    sourceTrusted,
     notification: {
       paymentId,
       providerPaymentId,

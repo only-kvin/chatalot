@@ -128,6 +128,7 @@ describe("verifyPayfastNotification", () => {
     const r = await verifyPayfastNotification(itnBody(), PAYFAST_IP, account, { fetch, resolve });
     expect(r).toEqual({
       ok: true,
+      sourceTrusted: true,
       notification: { paymentId: PAYMENT_ID, providerPaymentId: "1089250", status: "COMPLETE", amountGrossCents: 25000, feeCents: 650 },
     });
     // Confirmed with PayFast using the signed string, without the passphrase.
@@ -151,11 +152,14 @@ describe("verifyPayfastNotification", () => {
     expect(r).toEqual({ ok: false, reason: "wrong_merchant" });
   });
 
-  it("rejects notifications from outside PayFast", async () => {
+  it("reports, but doesn't refuse, a sender outside PayFast's hosts", async () => {
     for (const ip of ["203.0.113.9", null]) {
       const r = await verifyPayfastNotification(itnBody(), ip, account, { fetch: validFetch(), resolve });
-      expect(r).toEqual({ ok: false, reason: "untrusted_source" });
+      expect(r).toMatchObject({ ok: true, sourceTrusted: false });
     }
+    // A forged notification from elsewhere still fails PayFast's confirmation.
+    const forged = await verifyPayfastNotification(itnBody(), "203.0.113.9", account, { fetch: validFetch("INVALID"), resolve });
+    expect(forged).toEqual({ ok: false, reason: "not_confirmed" });
   });
 
   it("rejects what PayFast won't confirm, and reports an unreachable PayFast", async () => {
