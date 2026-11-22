@@ -142,6 +142,11 @@ export async function GET(request: Request) {
   const channelFor = tenantWhatsAppLookup(admin);
   const featuresFor = tenantFeaturesLookup(admin);
 
+  // Unpaid holds that ran out are released first, so they get no reminder.
+  // (Booking checks also release them as they go; this catches the rest.)
+  const { data: expired, error: expireError } = await admin.rpc("expire_unpaid_bookings", { p_tenant_id: null });
+  if (expireError) console.error("Releasing unpaid holds failed:", expireError);
+
   // Each job runs even if the other fails.
   const [reminders, reviews] = await Promise.allSettled([
     sendReminders(admin, channelFor, featuresFor),
@@ -159,10 +164,11 @@ export async function GET(request: Request) {
     runScheduledImports(admin, { budgetMs: Math.max(0, startedAt + WEBSITE_DEADLINE_MS - Date.now()) }),
   ]);
   if (websites.status === "rejected") console.error("Website imports failed:", websites.reason);
-  const ok = [reminders, reviews, summaries, websites].every((r) => r.status === "fulfilled");
+  const ok = !expireError && [reminders, reviews, summaries, websites].every((r) => r.status === "fulfilled");
 
   return Response.json(
     {
+      unpaidReleased: expireError ? "failed" : expired,
       reminders: reminders.status === "fulfilled" ? reminders.value : "failed",
       reviews: reviews.status === "fulfilled" ? reviews.value : "failed",
       summaries: summaries.status === "fulfilled" ? summaries.value : "failed",

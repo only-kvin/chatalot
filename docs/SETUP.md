@@ -504,6 +504,19 @@ in-memory Postgres with every migration applied); **not applied to the live data
   `getAvailability` frees expired holds first. Pay page: `app/pay/[paymentId]` (`lib/payments/pay-page.ts`)
   posts the signed form to PayFast; return/cancel come back to the same page.
   Not charged: bookings made by the team, and bookings waiting for the owner's approval.
-- `/api/payments/payfast/notify/[tenantId]` route: verify, `apply_payment_notification()`, then send the
-  customer's confirmation email. Exclude `api/payments` from the proxy matcher.
+- DONE: `/api/payments/payfast/notify/[tenantId]` (`lib/payments/notify.ts`): verifies, applies, then sends
+  the customer's confirmation email. 200 = handled (also for forged/foreign notifications, logged in
+  `payment_events`), 503 = couldn't check now so PayFast retries. `api/payments` skips the proxy. The daily
+  cron releases expired holds before sending reminders.
+
+### Testing against the PayFast sandbox
+
+1. Put `PAYFAST_SANDBOX_MERCHANT_ID`, `PAYFAST_SANDBOX_MERCHANT_KEY`, `PAYFAST_SANDBOX_PASSPHRASE` in
+   `.env.local`, then `pnpm payfast-sandbox-check` (ping with right/wrong passphrase, signed test checkout).
+2. Full payment: PayFast must reach the notify URL, so either apply the migration to the live db and deploy,
+   or run the app locally with a Cloudflare quick tunnel and set `NEXT_PUBLIC_APP_URL` to the tunnel URL
+   (links and notify_url are built from it). Connect the sandbox account in Settings -> Payments, set a
+   service to deposit, book it in the widget, pay with the sandbox wallet, and check: booking
+   `payment_status = 'paid'`, a "Payment received" notification, the customer's confirmation email, and an
+   `applied` row in `payment_events`.
 - `payments` feature in `lib/plans.ts`; Vitest tests for signatures, ITN verification and the SQL functions.
