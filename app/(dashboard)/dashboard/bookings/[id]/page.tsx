@@ -22,6 +22,8 @@ import { Rating } from "@/components/dashboard/rating";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BookingActions } from "./booking-actions";
 import { AssignStaff } from "./assign-staff";
+import { PaymentCard, type PaymentAttempt } from "./payment-card";
+import { paymentBadge } from "@/lib/payments/labels";
 import { pageFrame } from "@/components/dashboard/page-frame";
 
 export default async function BookingPage({ params }: { params: Promise<{ id: string }> }) {
@@ -34,14 +36,14 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
   const { data: booking } = await supabase
     .from("bookings")
     .select(
-      `id, name, phone, email, starts_at, ends_at, status, source, created_at, contact_id, conversation_id, staff_id, review_rating, ${BOOKING_PLACE_COLUMNS}, services(name), conversations(channel)`,
+      `id, name, phone, email, starts_at, ends_at, status, source, created_at, contact_id, conversation_id, staff_id, review_rating, payment_status, amount_due_cents, payment_due_at, ${BOOKING_PLACE_COLUMNS}, services(name), conversations(channel)`,
     )
     .eq("id", id)
     .eq("tenant_id", tenantId)
     .maybeSingle();
   if (!booking) notFound();
 
-  const [{ data: events }, { data: staff }] = await Promise.all([
+  const [{ data: events }, { data: staff }, { data: payments }] = await Promise.all([
     supabase
       .from("booking_events")
       .select("type, actor, channel, details, created_by, created_at")
@@ -49,7 +51,17 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
       .eq("booking_id", id)
       .order("created_at"),
     supabase.from("staff").select("id, name, active").eq("tenant_id", tenantId).order("sort_order").order("name"),
+    booking.payment_status === "not_required"
+      ? Promise.resolve({ data: [] as PaymentAttempt[] })
+      : supabase
+          .from("payments")
+          .select("id, status, mode, amount_cents, fee_cents, net_cents, provider_payment_id, paid_at, created_at")
+          .eq("tenant_id", tenantId)
+          .eq("booking_id", id)
+          .order("created_at", { ascending: false })
+          .returns<PaymentAttempt[]>(),
   ]);
+  const payment = paymentBadge(booking.payment_status, booking.amount_due_cents);
   const staffNames = new Map((staff ?? []).map((p) => [p.id, p.name]));
   const staffName = booking.staff_id ? staffNames.get(booking.staff_id) : null;
 
@@ -74,6 +86,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
           <Badge variant={statusVariant(booking.status)}>
             {STATUS_LABEL[booking.status as BookingStatus] ?? booking.status}
           </Badge>
+          {payment && <Badge variant={payment.variant}>{payment.label}</Badge>}
           {booking.review_rating && <Rating value={booking.review_rating} />}
           {booking.location === "customer" && <Badge variant="outline">Call-out</Badge>}
           {booking.outside_service_area && <Badge variant="warning">Outside listed area</Badge>}
@@ -115,6 +128,13 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
           </p>
         </CardContent>
       </Card>
+
+      <PaymentCard
+        status={booking.payment_status}
+        amountDueCents={booking.amount_due_cents}
+        dueAt={booking.payment_due_at}
+        attempts={payments ?? []}
+      />
 
       {address && (
         <Card>
