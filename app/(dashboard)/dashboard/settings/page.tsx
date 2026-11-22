@@ -83,7 +83,7 @@ export default async function SettingsPage() {
           <BookingSettingsCard initial={booking} />
         </div>
       )}
-      {features.bookings === "on" && (
+      {features.payments === "on" && (
         <div id="payments" className="mt-8 scroll-mt-8">
           <PaymentSettingsCard
             account={paymentAccount ?? null}

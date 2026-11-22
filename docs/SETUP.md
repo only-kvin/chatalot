@@ -519,6 +519,13 @@ in-memory Postgres with every migration applied); **not applied to the live data
 - Testing tip: the sandbox refuses "Merchant is unable to receive payments from the same account" when the
   booking's email is your PayFast merchant email. Book with another email.
 
+- DONE: `payments` plan feature (Growth and Pro; trial has everything; needs `bookings`). Without it the
+  Payments card and the services payment field are hidden (locked: an upgrade hint), service saves reset
+  payment to none, and bookings take no payment. Notifications and recovery keep working regardless, so money
+  already taken is always recorded. Admins can grant or hide it per business like any feature.
+- DONE: dashboard payment status (list, day view, calendar, booking Payment card) and owner-only "Mark as
+  refunded" on the booking page (the refund itself is done in PayFast; this records it and logs it).
+
 ### Testing against the PayFast sandbox
 
 1. Put `PAYFAST_SANDBOX_MERCHANT_ID`, `PAYFAST_SANDBOX_MERCHANT_KEY`, `PAYFAST_SANDBOX_PASSPHRASE` in

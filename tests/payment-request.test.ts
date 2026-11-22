@@ -7,6 +7,7 @@ import { expireUnpaidHolds, requestPaymentForBooking } from "../lib/payments/req
 type Writes = { table: string; kind: "update" | "insert"; values: Record<string, unknown>; filters: string[] }[];
 
 function fakeAdmin(rows: {
+  plan?: string;
   service?: Record<string, unknown> | null;
   account?: Record<string, unknown> | null;
   holdSucceeds?: boolean;
@@ -17,6 +18,7 @@ function fakeAdmin(rows: {
     services: rows.service ?? null,
     payment_accounts: rows.account ?? null,
     agent_configs: { payment_window_minutes: 30 },
+    tenants: { plan: rows.plan ?? "growth", feature_overrides: {} },
   };
   const client = {
     from(table: string) {
@@ -98,6 +100,12 @@ describe("requestPaymentForBooking", () => {
       expect(await requestPaymentForBooking(admin, booking)).toBeNull();
       expect(writes).toEqual([]);
     }
+  });
+
+  it("asks for nothing when the plan doesn't include payments", async () => {
+    const { admin, writes } = fakeAdmin({ plan: "starter", service: fullService, account: activeAccount });
+    expect(await requestPaymentForBooking(admin, booking)).toBeNull();
+    expect(writes).toEqual([]);
   });
 
   it("doesn't create a payment when the booking couldn't be held", async () => {

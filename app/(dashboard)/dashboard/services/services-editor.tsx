@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
 import { createServiceAction, deleteServiceAction, moveServiceAction, updateServiceAction } from "./actions";
@@ -13,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { calloutFeeNotice, priceLabel, type PriceType, type ServiceLocation } from "@/lib/bookings/price-label";
 import { paymentModeLabel, servicePaymentProblem, type ServicePaymentMode } from "@/lib/payments/service-rules";
+import type { FeatureState } from "@/lib/plans";
 
 type Service = {
   id: string;
@@ -88,12 +90,14 @@ function ServiceForm({
   staff,
   businessName,
   paymentsReady,
+  paymentsFeature,
   onDone,
 }: {
   service: Service | null;
   staff: Staff[];
   businessName: string;
   paymentsReady: boolean;
+  paymentsFeature: FeatureState;
   onDone: () => void;
 }) {
   const router = useRouter();
@@ -258,6 +262,16 @@ function ServiceForm({
         )}
       </div>
 
+      {paymentsFeature === "locked" && (
+        <p className="text-xs text-muted-foreground">
+          Take a deposit when customers book, into your own PayFast account.{" "}
+          <Link href="/dashboard/upgrade/payments" className="underline">
+            Available on Growth and Pro
+          </Link>
+          .
+        </p>
+      )}
+      {paymentsFeature === "on" && (
       <PaymentFields
         mode={paymentMode}
         onMode={setPaymentMode}
@@ -271,6 +285,7 @@ function ServiceForm({
         })}
         paymentsReady={paymentsReady}
       />
+      )}
 
       {staff.length > 0 && (
         <fieldset className="flex flex-col gap-2">
@@ -401,11 +416,13 @@ export function ServicesEditor({
   staff,
   businessName,
   paymentsReady,
+  paymentsFeature,
 }: {
   initialServices: Service[];
   staff: Staff[];
   businessName: string;
   paymentsReady: boolean;
+  paymentsFeature: FeatureState;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState<Service | null>(null);
@@ -437,6 +454,7 @@ export function ServicesEditor({
             staff={staff}
             businessName={businessName}
             paymentsReady={paymentsReady}
+            paymentsFeature={paymentsFeature}
             onDone={() => {
               setEditing(null);
               setFormKey((k) => k + 1);
@@ -459,7 +477,7 @@ export function ServicesEditor({
                   {service.active && !service.online_bookable && <Badge variant="secondary">Not on website</Badge>}
                   {service.location === "customer" && <Badge variant="outline">Call-out</Badge>}
                   {service.location === "either" && <Badge variant="outline">Here or at theirs</Badge>}
-                  {paymentModeLabel({ paymentMode: service.payment_mode, depositCents: service.deposit_cents }) && (
+                  {paymentsFeature === "on" && paymentModeLabel({ paymentMode: service.payment_mode, depositCents: service.deposit_cents }) && (
                     <Badge variant="outline">
                       {paymentModeLabel({ paymentMode: service.payment_mode, depositCents: service.deposit_cents })}
                     </Badge>

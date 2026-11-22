@@ -15,6 +15,7 @@ export const FEATURE_PITCH: Record<Feature, string> = {
   contact_form: "Contact form widget",
   whatsapp: "AI replies on WhatsApp",
   bookings: "Online booking, booking links and reminders",
+  payments: "Deposits and payments into your own PayFast account",
   reviews: "Review requests and low-score alerts",
   registration: "Customer registration widget",
 };

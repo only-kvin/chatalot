@@ -18,7 +18,7 @@ import { pingPayfast } from "@/lib/payments/payfast";
 type Result = { error: string | null; warning?: string | null };
 
 async function ownerContext(): Promise<{ tenantId: string; userId: string } | { error: string }> {
-  const blocked = await featureError("bookings");
+  const blocked = await featureError("payments");
   if (blocked) return { error: blocked };
   const [user, tenantId] = await Promise.all([getSessionUser(), getCurrentTenantId()]);
   if (!user || !tenantId) return { error: "Not authorized." };

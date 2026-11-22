@@ -4,7 +4,7 @@ import { z } from "zod";
 // customers are part of every plan and aren't listed. Pricing changes are a
 // code change on purpose: one place, reviewed, deployed.
 
-export const FEATURES = ["web_chat", "contact_form", "whatsapp", "bookings", "reviews", "registration"] as const;
+export const FEATURES = ["web_chat", "contact_form", "whatsapp", "bookings", "payments", "reviews", "registration"] as const;
 export type Feature = (typeof FEATURES)[number];
 
 export const PLANS = ["starter", "growth", "pro", "trial"] as const;
@@ -12,7 +12,7 @@ export type Plan = (typeof PLANS)[number];
 
 const PLAN_FEATURES: Record<Plan, readonly Feature[]> = {
   starter: ["web_chat", "contact_form"],
-  growth: ["web_chat", "contact_form", "whatsapp", "bookings"],
+  growth: ["web_chat", "contact_form", "whatsapp", "bookings", "payments"],
   pro: FEATURES,
   // Everything unlocked, so owners see what they'd lose.
   trial: FEATURES,
@@ -26,8 +26,9 @@ export const PLAN_LABEL: Record<Plan, string> = {
 };
 
 // Features that only work on top of another: review requests go out after an
-// attended booking. If the base isn't on, the dependant takes its state.
-const REQUIRES: Partial<Record<Feature, Feature>> = { reviews: "bookings" };
+// attended booking, and payments are taken for bookings. If the base isn't
+// on, the dependant takes its state.
+const REQUIRES: Partial<Record<Feature, Feature>> = { reviews: "bookings", payments: "bookings" };
 
 // on: usable. locked: not in their plan, shown to the owner as an upsell.
 // hidden: switched off by the platform admin because it doesn't fit the
@@ -99,6 +100,15 @@ export const FEATURE_INFO: Record<Feature, { title: string; pitch: string; point
     title: "Online bookings",
     pitch: "Let customers book themselves: on your website, your own booking page, or by chatting with the AI.",
     points: ["Services, staff and opening hours", "Booking widgets and a hosted booking page", "Reminders, rescheduling and cancellation links"],
+  },
+  payments: {
+    title: "Online payments",
+    pitch: "Take a deposit or the full price when customers book, straight into your own PayFast account.",
+    points: [
+      "Deposits cut no-shows: the slot is only held once they pay",
+      "Money goes directly to you; we never hold it",
+      "Every payment shown on the booking, with PayFast's fee",
+    ],
   },
   reviews: {
     title: "Review requests",

@@ -70,6 +70,14 @@ const PREVIEWS: Record<Feature, React.ReactNode> = {
       </div>
     </div>
   ),
+  payments: (
+    <div className="flex flex-col gap-3 rounded-xl bg-card p-4 shadow-card">
+      <span className="text-sm font-semibold">Pay R100 to secure your booking</span>
+      <span className="text-xs text-muted-foreground">Haircut on Saturday at 10:30. Your slot is held for 30 minutes.</span>
+      <div className="h-9 rounded-lg bg-primary/90 text-center text-xs leading-9 font-semibold text-white">Pay R100 with PayFast</div>
+      <span className="self-start rounded-full bg-tone-ok px-2.5 py-0.5 text-[11px] font-semibold text-tone-ok-foreground">Paid R100</span>
+    </div>
+  ),
   reviews: (
     <div className="flex flex-col gap-3">
       <div className={`${bubble} self-start bg-card shadow-[0_0_0_1px_var(--border)]`}>

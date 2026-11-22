@@ -1,11 +1,12 @@
 import { createClient } from "@/lib/db/supabase-server";
-import { requireFeaturePage } from "@/lib/dashboard-features";
+import { currentTenantFeatures, requireFeaturePage } from "@/lib/dashboard-features";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { ServicesEditor } from "./services-editor";
 import { pageFrame } from "@/components/dashboard/page-frame";
 
 export default async function ServicesPage() {
   const tenantId = await requireFeaturePage("bookings");
+  const paymentsFeature = (await currentTenantFeatures())?.features.payments ?? "hidden";
 
   const supabase = await createClient();
   const [{ data: services }, { data: staff }, { data: links }, { data: config }] = await Promise.all([
@@ -40,6 +41,7 @@ export default async function ServicesPage() {
         staff={staff ?? []}
         businessName={config?.business_name ?? ""}
         paymentsReady={account?.status === "active"}
+        paymentsFeature={paymentsFeature}
       />
     </div>
   );

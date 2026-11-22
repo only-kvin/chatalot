@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { appUrl } from "@/lib/app-url";
+import { hasFeature } from "@/lib/features";
 import { amountDueCents, type ServicePaymentMode } from "./service-rules";
 
 // Asking a customer to pay for a booking they just made. Called by
@@ -37,6 +38,8 @@ export async function requestPaymentForBooking(
   admin: SupabaseClient,
   b: { tenantId: string; bookingId: string; serviceId: string; now?: Date },
 ): Promise<PaymentRequest | null> {
+  // Not in their plan (any more): bookings go through as pay-on-the-day.
+  if (!(await hasFeature(admin, b.tenantId, "payments"))) return null;
   const [{ data: service }, { data: account }, { data: config }] = await Promise.all([
     admin
       .from("services")
