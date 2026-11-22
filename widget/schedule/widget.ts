@@ -1,7 +1,7 @@
 import { h } from "../shared/dom";
 import { emit } from "../shared/events";
 import type { MountContext } from "../shared/loader-contract";
-import { createApi, price, type BaseConfig, type Service, type Staff } from "../booking/api";
+import { createApi, price, type BaseConfig, type PaymentDue, type Service, type Staff } from "../booking/api";
 import { dayLong } from "../booking/calendar";
 import { createPicker } from "../booking/picker";
 import { createShell } from "../booking/shell";
@@ -41,6 +41,7 @@ export function mountSchedule(host: HTMLElement, ctx: MountContext): void {
     email: string;
     calloutFeeCents?: number | null;
     outsideArea?: boolean;
+    payment?: PaymentDue | null;
   } | null = null;
 
   const service = () => services.find((s) => s.id === serviceId) ?? null;
@@ -224,6 +225,7 @@ export function mountSchedule(host: HTMLElement, ctx: MountContext): void {
             .join(" "),
           email: r.email,
           summary: summary([["Reference", r.ref || null]]),
+          pay: r.payment,
           calendar: { uid: r.ref, title: `${service()?.name ?? "Appointment"} at ${cfg.businessName}`, startsAt: r.startsAt, endsAt: r.endsAt, ref: r.ref },
           again: {
             label: "Book another",

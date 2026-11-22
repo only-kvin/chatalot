@@ -5,6 +5,7 @@ import { bookingRef, type BookingActor, type BookingEventChannel } from "./manag
 import { addressProblem, needsApproval, type CustomerAddress } from "./callout";
 import type { BookingLocation } from "./price-label";
 import { inServiceArea } from "./service-area";
+import { existingPaymentRequest, requestPaymentForBooking, type PaymentRequest } from "@/lib/payments/request";
 
 // Making a booking — the one way in for the AI, the booking widgets and the
 // dashboard. The slot is re-checked against the live calendar here (what the
@@ -62,6 +63,8 @@ export type CreatedBooking = {
   calloutFeeCents: number | null;
   // The suburb isn't one the business lists: a request it confirms.
   outsideArea: boolean;
+  // The service needs paying online: the slot is held until dueAt.
+  payment: PaymentRequest | null;
 };
 
 export type BookingFailure = {
@@ -108,6 +111,7 @@ export async function createBooking(
         windowEnd: existing.arrival_window_end,
         calloutFeeCents: existing.callout_fee_cents,
         outsideArea: existing.outside_service_area,
+        payment: await existingPaymentRequest(client, input.tenantId, existing.id),
       };
     }
   }
@@ -199,6 +203,13 @@ export async function createBooking(
         .eq("tenant_id", input.tenantId)
         .eq("id", result.booking_id)
         .maybeSingle();
+      // Customers pay when they book; the team booking on someone's behalf
+      // doesn't send a pay link, and approvals aren't charged up front.
+      const payment = result.repeat
+        ? await existingPaymentRequest(client, input.tenantId, result.booking_id)
+        : status === "confirmed" && !input.forTeam
+          ? await requestPaymentForBooking(client, { tenantId: input.tenantId, bookingId: result.booking_id, serviceId: input.serviceId, now: input.now })
+          : null;
       return {
         ok: true,
         bookingId: result.booking_id,
@@ -213,6 +224,7 @@ export async function createBooking(
         windowEnd: row?.arrival_window_end ?? null,
         calloutFeeCents: row?.callout_fee_cents ?? null,
         outsideArea,
+        payment,
       };
     }
     lastReason = result.reason as BookingFailure["reason"];

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { expireUnpaidHolds } from "@/lib/payments/request";
 import { addDays, localDateISO, localToUtcDate, weekdayOf } from "@/lib/time";
 import { resolveBookingLocation, type BookingLocation, type ServiceLocation } from "./price-label";
 
@@ -194,6 +195,8 @@ export async function getAvailability(
   q: AvailabilityQuery,
 ): Promise<Availability | null> {
   const now = q.now ?? new Date();
+  // Unpaid holds that ran out stop blocking the calendar.
+  await expireUnpaidHolds(client, tenantId);
   const dates: string[] = [];
   for (let d = q.fromDate; d <= q.toDate && dates.length < MAX_RANGE_DAYS; d = addDays(d, 1)) dates.push(d);
   if (!dates.length) return null;

@@ -497,7 +497,13 @@ in-memory Postgres with every migration applied); **not applied to the live data
   editor: "Payment when booking" (none / deposit / full) with the rules in `lib/payments/service-rules.ts`.
   **These pages read the new columns, so apply the migration BEFORE deploying this branch**, or Settings
   and Services will error.
-- Booking flow: set `amount_due_cents`/`payment_due_at`, create the `payments` row, send the pay link in
-  chat/WhatsApp; call `expire_unpaid_bookings(tenant)` before availability checks.
-- `/api/payments/payfast/notify/[tenantId]` route and return/cancel pages.
+- DONE: booking flow (`lib/payments/request.ts`, called from `createBooking`). A customer booking (AI chat,
+  WhatsApp, widgets, hosted page) of a service that needs payment, at a business with an active account, is
+  held (`payment_status = 'awaiting'`) and gets a `payments` row; the AI shares `/pay/<paymentId>` and the
+  widgets show "Pay R… now". The customer's confirmation email waits for the payment (sent in the next step).
+  `getAvailability` frees expired holds first. Pay page: `app/pay/[paymentId]` (`lib/payments/pay-page.ts`)
+  posts the signed form to PayFast; return/cancel come back to the same page.
+  Not charged: bookings made by the team, and bookings waiting for the owner's approval.
+- `/api/payments/payfast/notify/[tenantId]` route: verify, `apply_payment_notification()`, then send the
+  customer's confirmation email. Exclude `api/payments` from the proxy matcher.
 - `payments` feature in `lib/plans.ts`; Vitest tests for signatures, ITN verification and the SQL functions.
