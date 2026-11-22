@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/db/supabase-server";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
 import { featureError } from "@/lib/dashboard-features";
+import { servicePaymentProblem } from "@/lib/payments/service-rules";
 
 // Services and who offers them. Uses the signed-in user's client, so RLS
 // keeps everything inside their business. Results are returned, not thrown
@@ -37,6 +38,9 @@ const serviceSchema = z.object({
   arrival_window_minutes: z
     .string()
     .refine((v) => v === "" || ["60", "120", "180", "240", "480"].includes(v), "Pick an arrival window"),
+  // Taken online through the business's own PayFast account.
+  payment_mode: z.enum(["none", "deposit", "full"]),
+  deposit_rand: rand("Enter a deposit like 100 or 100.00"),
   active: z.boolean(),
   online_bookable: z.boolean(),
   // "anyone" = every active staff member; otherwise only those ticked.
@@ -57,6 +61,8 @@ function parseForm(formData: FormData) {
     price_type: formData.get("price_type") ?? "fixed",
     callout_fee_rand: formData.get("callout_fee_rand") ?? "",
     arrival_window_minutes: formData.get("arrival_window_minutes") ?? "",
+    payment_mode: formData.get("payment_mode") ?? "none",
+    deposit_rand: formData.get("deposit_rand") ?? "",
     active: formData.get("active") === "on",
     online_bookable: formData.get("online_bookable") === "on",
     staff_mode: formData.get("staff_mode") ?? "anyone",
@@ -79,6 +85,8 @@ function toRecord(d: z.infer<typeof serviceSchema>) {
     // Fee and window only apply at the customer's address.
     callout_fee_cents: d.location === "business" ? null : cents(d.callout_fee_rand),
     arrival_window_minutes: d.location === "business" || !d.arrival_window_minutes ? null : Number(d.arrival_window_minutes),
+    payment_mode: d.payment_mode,
+    deposit_cents: d.payment_mode === "deposit" ? cents(d.deposit_rand) : null,
     active: d.active,
     online_bookable: d.online_bookable,
   };
@@ -129,6 +137,13 @@ export async function createServiceAction(formData: FormData): Promise<Result> {
   if (!s) return { error: "Not authorized." };
   const parsed = parseForm(formData);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  const paymentError = servicePaymentProblem({
+    paymentMode: parsed.data.payment_mode,
+    depositCents: cents(parsed.data.deposit_rand),
+    priceCents: parsed.data.price_type === "on_inspection" ? null : cents(parsed.data.price_rand),
+    priceType: parsed.data.price_type,
+  });
+  if (paymentError) return { error: paymentError };
 
   const { data: last } = await s.supabase
     .from("services")
@@ -157,6 +172,13 @@ export async function updateServiceAction(serviceId: string, formData: FormData)
   if (!uuid.safeParse(serviceId).success) return { error: "Invalid request." };
   const parsed = parseForm(formData);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  const paymentError = servicePaymentProblem({
+    paymentMode: parsed.data.payment_mode,
+    depositCents: cents(parsed.data.deposit_rand),
+    priceCents: parsed.data.price_type === "on_inspection" ? null : cents(parsed.data.price_rand),
+    priceType: parsed.data.price_type,
+  });
+  if (paymentError) return { error: paymentError };
 
   const { error } = await s.supabase
     .from("services")

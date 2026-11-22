@@ -492,7 +492,11 @@ in-memory Postgres with every migration applied); **not applied to the live data
   test vectors computed independently. **Still to confirm against the real sandbox**: the ping endpoint's
   response codes, and one full sandbox payment end to end. Passphrases are limited to letters, numbers,
   `.`, `_`, `-` because PayFast's SDK encodes the passphrase differently for checkouts and notifications.
-- Dashboard: Settings -> Payments (owner only) and payment mode/deposit on the services editor.
+- DONE: Settings -> Payments card (`settings/payment-settings.tsx`, `payment-actions.ts`): owner-only connect,
+  save-and-test (PayFast API ping), test, turn off/on, unpaid-hold minutes; staff see status only. Services
+  editor: "Payment when booking" (none / deposit / full) with the rules in `lib/payments/service-rules.ts`.
+  **These pages read the new columns, so apply the migration BEFORE deploying this branch**, or Settings
+  and Services will error.
 - Booking flow: set `amount_due_cents`/`payment_due_at`, create the `payments` row, send the pay link in
   chat/WhatsApp; call `expire_unpaid_bookings(tenant)` before availability checks.
 - `/api/payments/payfast/notify/[tenantId]` route and return/cancel pages.

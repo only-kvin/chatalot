@@ -12,7 +12,7 @@ export default async function ServicesPage() {
     supabase
       .from("services")
       .select(
-        "id, name, description, category, duration_minutes, buffer_before_min, buffer_after_min, price_cents, active, online_bookable, location, price_type, callout_fee_cents, arrival_window_minutes",
+        "id, name, description, category, duration_minutes, buffer_before_min, buffer_after_min, price_cents, active, online_bookable, location, price_type, callout_fee_cents, arrival_window_minutes, payment_mode, deposit_cents",
       )
       .eq("tenant_id", tenantId)
       .order("sort_order")
@@ -21,6 +21,13 @@ export default async function ServicesPage() {
     supabase.from("staff_services").select("staff_id, service_id").eq("tenant_id", tenantId),
     supabase.from("agent_configs").select("business_name").eq("tenant_id", tenantId).maybeSingle(),
   ]);
+  // Members can read the account's status (not its credentials).
+  const { data: account } = await supabase
+    .from("payment_accounts")
+    .select("status")
+    .eq("tenant_id", tenantId)
+    .eq("provider", "payfast")
+    .maybeSingle();
 
   return (
     <div className={pageFrame("form")}>
@@ -32,6 +39,7 @@ export default async function ServicesPage() {
         }))}
         staff={staff ?? []}
         businessName={config?.business_name ?? ""}
+        paymentsReady={account?.status === "active"}
       />
     </div>
   );
