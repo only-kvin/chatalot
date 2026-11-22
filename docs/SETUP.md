@@ -447,3 +447,53 @@ changes: the engine finds no tools and carries on as before, so the code is safe
 - **Manual steps:** apply the migration, deploy, then register each shop's tool (Sparesdesk's `docs/SETUP.md`,
   step 4). For a spares shop, switch bookings off for the business in admin.
 - Not built yet: an admin screen for tools, and creating the Bookfront business automatically from the other app.
+
+## Payments: each business's own PayFast account (2026-11-22, DRAFT)
+
+Branch `payments-byo-payfast`. Only the migration `20261122090000_payments.sql` exists so far (tested on an
+in-memory Postgres with every migration applied); **not applied to the live database, no app code yet.**
+
+- Model: "bring your own gateway". Each business connects **its own** PayFast merchant account; customers pay
+  on PayFast's hosted page, money lands in the business's account. Bookfront never holds customer money
+  (no Third Party Payment Provider registration, no payouts, no card data, PCI SAQ-A). Bookfront earns from
+  its own subscription, billed separately.
+- Per service: `payment_mode` none | deposit | full (full only for a fixed price). A booking that needs
+  payment holds its slot for `agent_configs.payment_window_minutes` (default 30) with
+  `payment_status = 'awaiting'`; `expire_unpaid_bookings()` cancels it after that and frees the slot.
+- A booking becomes paid **only** through `apply_payment_notification()`, called by the ITN route after it
+  has verified the notification. The function re-checks amount, sandbox/live mode and duplicates under a lock.
+  Paid-after-expiry and wrong-amount payments raise a `payment_problem` notification for the owner.
+- Credentials (`merchant_key`, `passphrase`) are encrypted with `ENCRYPTION_KEY` (`lib/security/crypto.ts`).
+  Members can read the account's status columns only; writes go through an owner-only server action.
+
+### Before building / launching (manual)
+
+1. **Your own PayFast accounts.** A sandbox account at https://sandbox.payfast.co.za (free, for testing), and
+   later a live business account for Bookfront's *own* subscription billing (separate from the tenants').
+2. **Terms of service.** Add to `/terms`: the business is the seller and handles refunds/chargebacks; Bookfront
+   only passes the customer to the business's payment provider. Have this checked before going live.
+3. **`ENCRYPTION_KEY`** must be the same in every Vercel environment that reads credentials (already set for
+   WhatsApp; never rotate it without re-encrypting `payment_accounts`).
+4. **Public notify URL.** PayFast must reach `https://<app>/api/payments/payfast/notify/<tenant_id>` without
+   Vercel Deployment Protection (fine on production; preview deployments are protected, so test ITNs on
+   production with a sandbox account, or via a tunnel locally).
+5. **Daily cron**: add `expire_unpaid_bookings()` to `/api/cron/daily` as a backstop (the app also calls it
+   per tenant before checking availability).
+6. **Each business, to switch payments on:** register at payfast.co.za (business bank account + FICA documents;
+   PayFast approves them, not us), set a **passphrase** under Settings -> Security in PayFast, then enter
+   Merchant ID, Merchant Key and passphrase in the Bookfront dashboard and press "Test connection".
+7. Apply the migration to the live db (session pooler, as for external tools), then deploy.
+
+### Still to build (in order)
+
+- DONE: `lib/payments/` (`types.ts`, `payfast.ts`, `accounts.ts`, tests in `tests/payfast.test.ts`): checkout
+  form + signature, ITN verification (signature, merchant id, PayFast host IPs, `/eng/query/validate`), API
+  ping for "Test connection", credential validation/encryption. Signature rules follow PayFast's PHP SDK;
+  test vectors computed independently. **Still to confirm against the real sandbox**: the ping endpoint's
+  response codes, and one full sandbox payment end to end. Passphrases are limited to letters, numbers,
+  `.`, `_`, `-` because PayFast's SDK encodes the passphrase differently for checkouts and notifications.
+- Dashboard: Settings -> Payments (owner only) and payment mode/deposit on the services editor.
+- Booking flow: set `amount_due_cents`/`payment_due_at`, create the `payments` row, send the pay link in
+  chat/WhatsApp; call `expire_unpaid_bookings(tenant)` before availability checks.
+- `/api/payments/payfast/notify/[tenantId]` route and return/cancel pages.
+- `payments` feature in `lib/plans.ts`; Vitest tests for signatures, ITN verification and the SQL functions.
