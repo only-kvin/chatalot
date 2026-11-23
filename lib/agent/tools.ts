@@ -173,6 +173,28 @@ export const AGENT_TOOLS: ToolDef[] = [
     },
   },
   {
+    name: "list_events",
+    description:
+      "List the business's upcoming events (workshops, open days, tastings...) with each one's reference, date, price and spots left. Call it whenever someone asks what's on or about a specific event, and answer only from its result.",
+    parameters: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "sign_up_for_event",
+    description:
+      "Sign the visitor up for an event from list_events. Only once they've chosen the event and how many tickets, and given their name and phone number (and agreed to them being saved). Then tell them exactly what the result says, including any payment link.",
+    parameters: {
+      type: "object",
+      properties: {
+        event: { type: "string", description: "The event's reference from list_events, e.g. E-1A2B3C" },
+        tickets: { type: "integer", description: "How many tickets (spots), at least 1" },
+        name: { type: "string", description: "The visitor's full name" },
+        phone: { type: "string", description: "The visitor's phone number" },
+        email: { type: ["string", "null"], description: "Their email, if given (for the confirmation); otherwise null" },
+      },
+      required: ["event", "tickets", "name", "phone"],
+    },
+  },
+  {
     name: "report_emergency",
     description:
       "An urgent job (burst pipe, no power, flooding, a blocked toilet on a weekend...): alerts the owner straight away and hands the chat to them. Call it as soon as the visitor describes an emergency, instead of offering booking times. Then follow the instructions in the result.",
@@ -218,13 +240,17 @@ const locationText = z
 // Tools that work without online bookings on the business's plan.
 export const CORE_TOOL_NAMES = ["save_lead", "request_human"];
 export const EMERGENCY_TOOL = "report_emergency";
+// Offered when events are on the business's plan (with or without bookings).
+export const EVENT_TOOL_NAMES = ["list_events", "sign_up_for_event"];
 
 // The tools offered to the model: the booking ones only when the business
-// takes bookings, and the emergency one only when it takes emergency
-// call-outs, so it never offers what the business can't do.
-export function toolsFor(takesBookings: boolean, emergencyCallouts = false): ToolDef[] {
+// takes bookings, the event ones only when it runs events, and the
+// emergency one only when it takes emergency call-outs, so it never offers
+// what the business can't do.
+export function toolsFor(takesBookings: boolean, emergencyCallouts = false, takesEvents = false): ToolDef[] {
   return AGENT_TOOLS.filter((t) => {
     if (t.name === EMERGENCY_TOOL) return emergencyCallouts;
+    if (EVENT_TOOL_NAMES.includes(t.name)) return takesEvents;
     return takesBookings || CORE_TOOL_NAMES.includes(t.name);
   });
 }
@@ -261,6 +287,14 @@ export const TOOL_INPUT_SCHEMAS = {
   reschedule_booking: z.object({ booking_ref: requiredText, date: dateText, time: timeText }),
   send_booking_link: z.object({ service: optionalText }),
   report_emergency: z.object({ problem: requiredText, name: optionalText, phone: optionalText, address: optionalText }),
+  list_events: z.object({}).passthrough(),
+  sign_up_for_event: z.object({
+    event: requiredText,
+    tickets: z.coerce.number().int().min(1).max(20).default(1),
+    name: requiredText,
+    phone: requiredText,
+    email: optionalText,
+  }),
 };
 
 export type ToolName = keyof typeof TOOL_INPUT_SCHEMAS;

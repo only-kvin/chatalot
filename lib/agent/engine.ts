@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/db/supabase-admin";
+import { listEventsForAgent, signUpFromChat } from "./event-tools";
 import { buildSystemPrompt, type AgentConfig } from "./prompt";
 import { runAgentTurn, type ChatMessage } from "./model";
 import { CORE_TOOL_NAMES, EMERGENCY_TOOL, parseToolInput, toolsFor, type ToolCall } from "./tools";
@@ -119,6 +120,8 @@ export type ToolContext = {
   // Online bookings are on the business's plan. Without them only the core
   // tools run, whatever the model asks for.
   takesBookings: boolean;
+  // Events are on the business's plan: list_events and sign_up_for_event run.
+  takesEvents?: boolean;
   // The business takes emergency call-outs (report_emergency is offered).
   emergencyCallouts?: boolean;
   emergencyNote?: string;
@@ -191,6 +194,14 @@ export async function executeTool(admin: AdminClient, ctx: ToolContext, rawCall:
       { tenantId, businessName, conversationId, channel: ctx.channel, emergencyNote: ctx.emergencyNote ?? "" },
       call.input,
     );
+  }
+  if (call.name === "list_events" || call.name === "sign_up_for_event") {
+    if (!ctx.takesEvents) return "This business doesn't list events here. Offer to take their name and phone number for a callback (save_lead).";
+    if (call.name === "list_events") return listEventsForAgent(admin, tenantId);
+    const { name, phone, email } = call.input;
+    // Link this chat to the customer, like a booking does.
+    await rememberCustomer(admin, ctx, { name, phone, email });
+    return signUpFromChat(admin, { tenantId, conversationId }, call.input);
   }
   if (!ctx.takesBookings && !CORE_TOOL_NAMES.includes(call.name)) {
     return "Bookings can't be made in this chat. Offer to take their name and phone number for a callback (save_lead).";
@@ -552,7 +563,10 @@ export async function* runAgent(params: {
     // to just the tenant layer of the prompt.
   }
 
-  const takesBookings = await hasFeature(admin, params.tenantId, "bookings");
+  const [takesBookings, takesEvents] = await Promise.all([
+    hasFeature(admin, params.tenantId, "bookings"),
+    hasFeature(admin, params.tenantId, "events"),
+  ]);
   const [services, staff] = takesBookings
     ? await Promise.all([listActiveServices(admin, params.tenantId), listActiveStaff(admin, params.tenantId)])
     : [[], []];
@@ -574,6 +588,7 @@ export async function* runAgent(params: {
     services,
     staff,
     takesBookings,
+    takesEvents,
   );
 
   let fullText = "";
@@ -586,7 +601,7 @@ export async function* runAgent(params: {
     for await (const event of runAgentTurn({
       system,
       messages,
-      tools: [...toolsFor(takesBookings, agentConfig.emergency_callouts), ...externalTools.map((t) => t.def)],
+      tools: [...toolsFor(takesBookings, agentConfig.emergency_callouts, takesEvents), ...externalTools.map((t) => t.def)],
       maxTokens: MAX_TOKENS,
       signal: AbortSignal.timeout(TURN_TIMEOUT_MS),
       executeTool: (call) => {
@@ -608,6 +623,7 @@ export async function* runAgent(params: {
             whatsappAvailable: params.whatsappAvailable ?? false,
             cutoffMinutes: agentConfig.booking_change_cutoff_minutes ?? 120,
             takesBookings,
+            takesEvents,
             emergencyCallouts: agentConfig.emergency_callouts,
             emergencyNote: agentConfig.emergency_note,
             cancellationPolicy: agentConfig.cancellation_policy,
