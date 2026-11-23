@@ -6,8 +6,9 @@ import { getCurrentTenantId } from "@/lib/db/current-tenant";
 // bundle against the tenant's real config (via the same public /api/widget/config
 // endpoint a real client site would hit) — not a mockup — so the preview reflects
 // live saved settings exactly.
-export default async function WidgetPreviewPage({ searchParams }: { searchParams: Promise<{ widget?: string }> }) {
-  const requested = (await searchParams).widget;
+export default async function WidgetPreviewPage({ searchParams }: { searchParams: Promise<{ widget?: string; id?: string }> }) {
+  const { widget: requested, id } = await searchParams;
+  const widgetId = /^[0-9a-f-]{36}$/i.test(id ?? "") ? id : undefined;
   const inline = ["schedule", "appointment", "contact", "registration"].includes(requested ?? "") ? requested! : null;
   const tenantId = await getCurrentTenantId();
   if (!tenantId) redirect("/");
@@ -28,7 +29,8 @@ export default async function WidgetPreviewPage({ searchParams }: { searchParams
       {inline ? (
         <>
           <div style={{ maxWidth: 560, margin: "0 auto", padding: "0 16px 24px" }}>
-            <div data-chatalot={inline} />
+            {/* data-preview: click through it freely, nothing is booked or sent. */}
+            <div data-chatalot={inline} data-widget={widgetId} data-preview="" />
           </div>
           <script src="/widget.js" data-key={tenant.public_widget_key} data-chat="off" async />
         </>
