@@ -316,7 +316,7 @@ function mountEvents(host: HTMLElement, ctx: MountContext): void {
       calendar: { uid: e.id, title: e.title, startsAt: e.startsAt, endsAt: e.endsAt ?? e.startsAt, ref: "" },
       again: { label: "See other events", onClick: () => go("list") },
       pay: r.payment,
-      tickets: true,
+      held: "tickets",
     });
   }
 
