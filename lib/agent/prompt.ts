@@ -112,6 +112,7 @@ function buildTenantLayer(
   services: BookableService[],
   staff: PromptStaff[],
   takesBookings: boolean,
+  takesEvents = false,
 ): string {
   const lines = [
     `You are the receptionist for ${config.business_name}.`,
@@ -142,6 +143,11 @@ function buildTenantLayer(
           : "The business hasn't listed the areas it covers; take any address.",
       );
     }
+  }
+  if (takesEvents) {
+    lines.push(
+      "This business runs events. When someone asks what's on, or about an event, call list_events and answer only from its result: never invent events, dates, prices or spots. To sign someone up, ask which event and how many tickets, get their name and phone number (and permission to save them), then call sign_up_for_event with the event's reference and tell them exactly what the result says, including any payment link.",
+    );
   }
   if (config.cancellation_policy?.trim()) lines.push(`Cancellation policy: ${config.cancellation_policy.trim()}`);
   if (config.emergency_callouts) {
@@ -206,11 +212,12 @@ export function buildSystemPrompt(
   services: BookableService[] = [],
   staff: PromptStaff[] = [],
   takesBookings = true,
+  takesEvents = false,
 ): string {
   return [
     PLATFORM_LAYER,
     "\n---\n",
-    buildTenantLayer(config, services, staff, takesBookings),
+    buildTenantLayer(config, services, staff, takesBookings, takesEvents),
     "\n---\n",
     buildKnowledgeLayer(knowledgeText),
   ].join("\n");
