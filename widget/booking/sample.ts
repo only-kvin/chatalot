@@ -56,7 +56,7 @@ export function sampleConfig<T extends BaseConfig>(): T {
     contact: "",
     theme: { primary: "#4f46e5", surface: "#ffffff", text: "#18181b", radius: 20, font: "system", mode: "light" },
     fields: [
-      { key: "name", label: "Full name", type: "text", required: true },
+      { key: "full_name", label: "Full name", type: "text", required: true },
       { key: "phone", label: "Phone", type: "tel", required: true },
       { key: "email", label: "Email", type: "email", required: false },
     ],
