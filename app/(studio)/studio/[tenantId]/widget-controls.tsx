@@ -13,6 +13,7 @@ const TYPES = [
   { value: "contact", label: "Contact form" },
   { value: "registration", label: "Registration" },
   { value: "events", label: "Events" },
+  { value: "classes", label: "Find a Class" },
 ];
 
 export function NewWidgetForm({ tenantId }: { tenantId: string }) {

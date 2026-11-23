@@ -19,7 +19,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
   const supabase = await createClient();
   const now = new Date().toISOString();
 
-  let q = supabase.from("events").select("id, title, starts_at, status, capacity, price_cents").eq("tenant_id", tenantId).limit(200);
+  let q = supabase.from("events").select("id, title, starts_at, status, capacity, price_cents").eq("tenant_id", tenantId).eq("kind", "event").limit(200);
   q = past ? q.lt("starts_at", now).order("starts_at", { ascending: false }) : q.gte("starts_at", now).order("starts_at");
   const { data: events } = await q;
   const ids = (events ?? []).map((e) => e.id);

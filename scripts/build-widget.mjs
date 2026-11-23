@@ -13,6 +13,7 @@ const bundles = [
   { entry: "widget/contact/index.ts", out: "public/widgets/contact.js" },
   { entry: "widget/registration/index.ts", out: "public/widgets/registration.js" },
   { entry: "widget/events/index.ts", out: "public/widgets/events.js" },
+  { entry: "widget/classes/index.ts", out: "public/widgets/classes.js" },
 ];
 
 // Each file must stay under this, gzipped (see CLAUDE.md): a page loads

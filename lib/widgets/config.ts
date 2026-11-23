@@ -17,7 +17,7 @@ export type WidgetTheme = {
 
 export type BookingWidgetType = "schedule" | "appointment";
 // Every widget configured in widget_instances.
-export type WidgetType = BookingWidgetType | "contact" | "registration" | "events";
+export type WidgetType = BookingWidgetType | "contact" | "registration" | "events" | "classes";
 
 // Which form each widget shows (lib/widgets/fields.ts).
 export const FORM_KIND: Record<WidgetType, FormKind> = {
@@ -27,6 +27,7 @@ export const FORM_KIND: Record<WidgetType, FormKind> = {
   registration: "registration",
   // Name, phone and email, like a booking.
   events: "booking",
+  classes: "booking",
 };
 
 // Wording both booking widgets have.
@@ -145,6 +146,27 @@ export const WIDGET_SCHEMAS = {
     },
     defaultSettings: { showPast: false },
   },
+  classes: {
+    copy: z.object({
+      title: z.string().trim().min(1).max(60),
+      bookButton: z.string().trim().min(1).max(40),
+      successTitle: z.string().trim().min(1).max(60),
+      successMessage: z.string().trim().max(300),
+      emptyDay: z.string().trim().max(200),
+    }),
+    settings: z.object({
+      // The Class type and Instructor dropdowns above the timetable.
+      showFilters: z.boolean(),
+    }),
+    defaultCopy: {
+      title: "Find a class",
+      bookButton: "Book",
+      successTitle: "You're booked in!",
+      successMessage: "See you in class.",
+      emptyDay: "No classes on this day.",
+    },
+    defaultSettings: { showFilters: true },
+  },
 } as const;
 
 type Schemas = typeof WIDGET_SCHEMAS;
@@ -211,6 +233,7 @@ export const WIDGET_TYPE_LABEL: Record<WidgetType, string> = {
   contact: "Contact",
   registration: "Registration",
   events: "Events",
+  classes: "Classes",
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

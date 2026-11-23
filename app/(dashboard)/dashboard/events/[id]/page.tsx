@@ -28,7 +28,7 @@ export default async function EventPage({ params, searchParams }: { params: Prom
   const supabase = await createClient();
   const { data: e } = await supabase
     .from("events")
-    .select("id, title, summary, description, starts_at, ends_at, location, poster_path, capacity, max_per_signup, price_cents, signups_open, status")
+    .select("id, title, summary, description, starts_at, ends_at, location, poster_path, capacity, max_per_signup, price_cents, signups_open, status, kind, series_id")
     .eq("tenant_id", tenantId)
     .eq("id", id)
     .maybeSingle();
@@ -53,8 +53,11 @@ export default async function EventPage({ params, searchParams }: { params: Prom
   return (
     <div className={pageFrame("wide", "flex flex-col gap-6")}>
       <div>
-        <Link href="/dashboard/events" className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeftIcon className="size-4" /> Events
+        <Link
+          href={e.series_id ? `/dashboard/classes/${e.series_id}` : "/dashboard/events"}
+          className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeftIcon className="size-4" /> {e.kind === "class" ? "Class" : "Events"}
         </Link>
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-semibold">{e.title}</h1>
@@ -65,6 +68,12 @@ export default async function EventPage({ params, searchParams }: { params: Prom
           {e.ends_at ? ` – ${formatLocalTime(e.ends_at)}` : ""} · {e.price_cents ? `${formatRand(e.price_cents)} a ticket` : "Free"} ·{" "}
           {e.capacity ? `${taken} of ${e.capacity} tickets taken` : `${taken} ticket${taken === 1 ? "" : "s"} taken`}
         </p>
+        {e.series_id && (
+          <p className="mt-2 text-sm text-muted-foreground">
+            One session of a weekly class. Changes to the class (time, price, instructor…) are made on the class and update this session; use Cancel
+            below to call off just this one.
+          </p>
+        )}
         {query.created && <p className="mt-2 text-sm text-green-700 dark:text-green-400">Created. Add a poster, then publish it when you&apos;re ready.</p>}
         {query.copied && <p className="mt-2 text-sm text-green-700 dark:text-green-400">Copied a week later, as a Draft. Check the date and publish it.</p>}
       </div>
