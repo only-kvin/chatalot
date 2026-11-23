@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { emailCustomerAboutBooking } from "@/lib/email/customer-booking";
+import { sendPaidConfirmation, type PaidFor } from "./paid";
 import { addDays, localDateISO } from "@/lib/time";
 import { loadPaymentAccount } from "./accounts";
 import { payfastApiGet, randToCents, type ApiDeps } from "./payfast";
@@ -85,8 +85,9 @@ export async function fetchPayfastDay(account: PaymentAccountSecrets, date: stri
   return parseHistory(await res.text());
 }
 
-type OpenPayment = { id: string; booking_id: string | null; amount_cents: number; created_at: string };
+type OpenPayment = { id: string; booking_id: string | null; event_signup_id: string | null; amount_cents: number; created_at: string };
 
+// recovered: the bookings (or event sign-ups) now paid.
 export type RecoverResult = { checked: number; recovered: string[]; problems: number };
 
 // Checks one business's unpaid payments (all from the last 3 days, or just
@@ -104,7 +105,7 @@ export async function recoverPayments(
 
   let q = admin
     .from("payments")
-    .select("id, booking_id, amount_cents, created_at")
+    .select("id, booking_id, event_signup_id, amount_cents, created_at")
     .eq("tenant_id", tenantId)
     .eq("provider", "payfast")
     .eq("mode", account.secrets.mode)
@@ -135,6 +136,7 @@ export async function recoverPayments(
   }
 
   const result: RecoverResult = { checked: open.length, recovered: [], problems: 0 };
+  const paidFor: PaidFor[] = [];
   for (const p of open as OpenPayment[]) {
     const row = found.get(p.id);
     if (!row) continue;
@@ -153,14 +155,17 @@ export async function recoverPayments(
       continue;
     }
     const outcome = data as { outcome: string; reason: string | null };
-    if (outcome.outcome === "applied" && !outcome.reason && p.booking_id) result.recovered.push(p.booking_id);
+    if (outcome.outcome === "applied" && !outcome.reason && (p.booking_id || p.event_signup_id)) {
+      result.recovered.push((p.booking_id ?? p.event_signup_id)!);
+      paidFor.push({ bookingId: p.booking_id, signupId: p.event_signup_id });
+    }
     else if (outcome.reason) result.problems++;
     console.warn(`Payments: recovered payment ${p.id} from PayFast's history: ${outcome.outcome}${outcome.reason ? ` (${outcome.reason})` : ""}`);
   }
 
   // The "you're booked" email held back until payment.
   if (opts.sendEmails !== false) {
-    await Promise.all(result.recovered.map((bookingId) => emailCustomerAboutBooking(admin, tenantId, bookingId, "confirmed")));
+    await Promise.all(paidFor.map((paid) => sendPaidConfirmation(admin, tenantId, paid)));
   }
   return result;
 }

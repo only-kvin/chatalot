@@ -16,6 +16,7 @@ export const FEATURE_PITCH: Record<Feature, string> = {
   whatsapp: "AI replies on WhatsApp",
   bookings: "Online booking, booking links and reminders",
   payments: "Deposits and payments into your own PayFast account",
+  events: "Events with posters, sign-ups and tickets",
   reviews: "Review requests and low-score alerts",
   registration: "Customer registration widget",
 };

@@ -8,7 +8,7 @@ import { normalizeFields, type Field } from "./fields";
 // use. A business that has never saved a type has no row at all; its
 // default then comes from the built-in settings until the first save.
 
-export const WIDGET_TYPES = ["appointment", "schedule", "contact", "registration"] as const satisfies readonly WidgetType[];
+export const WIDGET_TYPES = ["appointment", "schedule", "contact", "registration", "events"] as const satisfies readonly WidgetType[];
 
 export type WidgetValues = { active: boolean; copy: unknown; settings: unknown; fields: Field[] };
 

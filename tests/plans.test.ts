@@ -12,6 +12,7 @@ describe("resolveFeatures", () => {
       whatsapp: "locked",
       bookings: "locked",
       payments: "locked",
+      events: "locked",
       reviews: "locked",
       registration: "locked",
     });
@@ -19,6 +20,7 @@ describe("resolveFeatures", () => {
     expect(growth.whatsapp).toBe("on");
     expect(growth.bookings).toBe("on");
     expect(growth.payments).toBe("on");
+    expect(growth.events).toBe("on");
     expect(growth.reviews).toBe("locked");
     expect(Object.values(resolveFeatures("pro", {})).every((s) => s === "on")).toBe(true);
     expect(Object.values(resolveFeatures("trial", {})).every((s) => s === "on")).toBe(true);

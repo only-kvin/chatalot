@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadPaymentAccount } from "./accounts";
 import { verifyPayfastNotification, type VerifyDeps } from "./payfast";
+import { paidForOf, type PaidFor } from "./paid";
 
 // Handling one PayFast notification (ITN) for one business. The route only
 // reads the request; everything that decides whether money arrived is here:
@@ -18,9 +19,9 @@ import { verifyPayfastNotification, type VerifyDeps } from "./payfast";
 
 export type NotifyOutcome = {
   status: 200 | 400 | 503;
-  // Set when this notification just paid for a live booking: send the
+  // Set when this notification just paid for something: send the
   // customer's confirmation.
-  paidBookingId: string | null;
+  paid: PaidFor | null;
   // For logs.
   detail: string;
 };
@@ -48,25 +49,25 @@ export async function handlePayfastNotification(
   remoteIp: string | null,
   deps: VerifyDeps = {},
 ): Promise<NotifyOutcome> {
-  if (!UUID.test(tenantId)) return { status: 400, paidBookingId: null, detail: "bad tenant id" };
+  if (!UUID.test(tenantId)) return { status: 400, paid: null, detail: "bad tenant id" };
 
   let account;
   try {
     account = await loadPaymentAccount(admin, tenantId);
   } catch (err) {
     console.error(`Payments: loading the account for ${tenantId} failed:`, err);
-    return { status: 503, paidBookingId: null, detail: "account unreadable" };
+    return { status: 503, paid: null, detail: "account unreadable" };
   }
   // No account (or a guessed URL): nothing to check against. 200 so PayFast
   // stops; a disabled account still accepts notifications for payments
   // already started.
-  if (!account) return { status: 200, paidBookingId: null, detail: "no account" };
+  if (!account) return { status: 200, paid: null, detail: "no account" };
 
   const verified = await verifyPayfastNotification(rawBody, remoteIp, account.secrets, deps);
   if (!verified.ok) {
     await logRejected(admin, tenantId, verified.reason, rawBody).catch(() => undefined);
-    if (verified.reason === "confirm_failed") return { status: 503, paidBookingId: null, detail: verified.reason };
-    return { status: verified.reason === "malformed" ? 400 : 200, paidBookingId: null, detail: verified.reason };
+    if (verified.reason === "confirm_failed") return { status: 503, paid: null, detail: verified.reason };
+    return { status: verified.reason === "malformed" ? 400 : 200, paid: null, detail: verified.reason };
   }
 
   if (!verified.sourceTrusted) {
@@ -85,19 +86,10 @@ export async function handlePayfastNotification(
   });
   if (error) {
     console.error(`Payments: applying notification for ${tenantId} failed:`, error);
-    return { status: 503, paidBookingId: null, detail: "apply failed" };
+    return { status: 503, paid: null, detail: "apply failed" };
   }
   const result = data as { outcome: string; reason: string | null };
 
-  let paidBookingId: string | null = null;
-  if (result.outcome === "applied" && n.status === "COMPLETE" && !result.reason) {
-    const { data: payment } = await admin
-      .from("payments")
-      .select("booking_id")
-      .eq("tenant_id", tenantId)
-      .eq("id", n.paymentId)
-      .maybeSingle();
-    paidBookingId = payment?.booking_id ?? null;
-  }
-  return { status: 200, paidBookingId, detail: `${result.outcome}${result.reason ? `: ${result.reason}` : ""}` };
+  const paid = result.outcome === "applied" && n.status === "COMPLETE" && !result.reason ? await paidForOf(admin, tenantId, n.paymentId) : null;
+  return { status: 200, paid, detail: `${result.outcome}${result.reason ? `: ${result.reason}` : ""}` };
 }

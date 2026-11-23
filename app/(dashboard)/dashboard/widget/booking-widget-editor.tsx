@@ -137,6 +137,19 @@ const WIDGET_UI: Record<
     ],
     place: "the service list",
   },
+  events: {
+    name: "Events widget",
+    description: "Your published events with their posters. Customers open one and sign up with this form (and pay, for paid events).",
+    copy: [
+      ["title", "Title"],
+      ["signUpButton", "Sign-up button"],
+      ["successTitle", "Signed up: heading"],
+      ["successMessage", "Signed up: message"],
+      ["emptyMessage", "When nothing is coming up"],
+    ],
+    toggles: [["showPast", "Also show past events (marked as past)"]],
+    place: "the event",
+  },
   contact: {
     name: "Contact widget",
     description: "A message form. Each message lands in Messages and Leads, and you get an alert.",

@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { appUrl } from "@/lib/app-url";
 import { bookingRef } from "@/lib/bookings/manage";
 import { formatBookingWhen } from "@/lib/bookings/when";
+import { formatLocalDateTime } from "@/lib/time";
 import { loadPaymentAccount } from "./accounts";
 import { buildPayfastCheckout } from "./payfast";
 import type { Checkout } from "./types";
@@ -10,13 +11,18 @@ import type { Checkout } from "./types";
 // only key, so the page reveals no more than the customer already knows:
 // the business, service, time and amount.
 
+// kind: what's being paid for, which decides the wording ("You're booked"
+// or "You're signed up").
+export type PayKind = "booking" | "event";
+
 export type PayPage =
   | { state: "not_found" }
-  | { state: "paid"; businessName: string; serviceName: string; when: string; ref: string }
-  | { state: "expired"; businessName: string; contact: string }
+  | { state: "paid"; kind: PayKind; businessName: string; serviceName: string; when: string; ref: string }
+  | { state: "expired"; kind: PayKind; businessName: string; contact: string }
   | { state: "unavailable"; businessName: string; contact: string }
   | {
       state: "pay";
+      kind: PayKind;
       businessName: string;
       serviceName: string;
       when: string;
@@ -27,26 +33,34 @@ export type PayPage =
       checkout: Checkout;
     };
 
+type Customer = { name: string; phone: string; email: string | null };
+type Held = { status: string; payment_status: string; payment_due_at: string | null };
+
 type Row = {
   id: string;
   tenant_id: string;
-  booking_id: string | null;
   amount_cents: number;
   status: string;
   mode: "sandbox" | "live";
-  bookings: {
-    id: string;
-    name: string;
-    phone: string;
-    email: string | null;
-    starts_at: string;
-    arrival_window_end: string | null;
-    status: string;
-    payment_status: string;
-    payment_due_at: string | null;
-    services: { name: string } | null;
-  } | null;
+  bookings: (Customer & Held & { id: string; starts_at: string; arrival_window_end: string | null; services: { name: string } | null }) | null;
+  event_signups: (Customer & Held & { id: string; quantity: number; events: { title: string; starts_at: string } | null }) | null;
 };
+
+// A booking or an event sign-up, in the shape the page needs.
+type Purchase = Customer & Held & { kind: PayKind; serviceName: string; when: string; ref: string };
+
+function purchaseOf(p: Row): Purchase | null {
+  if (p.bookings) {
+    const b = p.bookings;
+    return { ...b, kind: "booking", serviceName: b.services?.name ?? "Booking", when: formatBookingWhen(b.starts_at, b.arrival_window_end), ref: bookingRef(b.id) };
+  }
+  const s = p.event_signups;
+  if (s?.events) {
+    const tickets = `${s.quantity} ticket${s.quantity === 1 ? "" : "s"}`;
+    return { ...s, kind: "event", serviceName: `${s.events.title} (${tickets})`, when: formatLocalDateTime(s.events.starts_at), ref: bookingRef(s.id) };
+  }
+  return null;
+}
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -75,11 +89,13 @@ export async function loadPayPage(admin: SupabaseClient, paymentId: string, now 
   const { data: p } = await admin
     .from("payments")
     .select(
-      "id, tenant_id, booking_id, amount_cents, status, mode, bookings(id, name, phone, email, starts_at, arrival_window_end, status, payment_status, payment_due_at, services(name))",
+      "id, tenant_id, amount_cents, status, mode, " +
+        "bookings(id, name, phone, email, starts_at, arrival_window_end, status, payment_status, payment_due_at, services(name)), " +
+        "event_signups(id, name, phone, email, quantity, status, payment_status, payment_due_at, events(title, starts_at))",
     )
     .eq("id", paymentId)
     .maybeSingle<Row>();
-  const b = p?.bookings;
+  const b = p ? purchaseOf(p) : null;
   if (!p || !b) return { state: "not_found" };
 
   const { data: config } = await admin
@@ -89,15 +105,13 @@ export async function loadPayPage(admin: SupabaseClient, paymentId: string, now 
     .maybeSingle();
   const businessName = config?.business_name || "the business";
   const contact = config?.handoff_contact ?? "";
-  const serviceName = b.services?.name ?? "Booking";
-  const when = formatBookingWhen(b.starts_at, b.arrival_window_end);
-  const ref = bookingRef(b.id);
+  const { kind, serviceName, when, ref } = b;
 
-  if (p.status === "paid") return { state: "paid", businessName, serviceName, when, ref };
+  if (p.status === "paid") return { state: "paid", kind, businessName, serviceName, when, ref };
   const due = b.payment_due_at ? new Date(b.payment_due_at) : null;
   // Expired, cancelled, or already paid through another attempt.
   if (b.payment_status !== "awaiting" || b.status === "cancelled" || !due || due <= now) {
-    return b.payment_status === "paid" ? { state: "paid", businessName, serviceName, when, ref } : { state: "expired", businessName, contact };
+    return b.payment_status === "paid" ? { state: "paid", kind, businessName, serviceName, when, ref } : { state: "expired", kind, businessName, contact };
   }
 
   const account = await loadPaymentAccount(admin, p.tenant_id).catch(() => null);
@@ -110,7 +124,7 @@ export async function loadPayPage(admin: SupabaseClient, paymentId: string, now 
     paymentId: p.id,
     amountCents: p.amount_cents,
     itemName: `${serviceName} - ${businessName}`,
-    itemDescription: `Booking ${ref}, ${when}`,
+    itemDescription: `${kind === "event" ? "Tickets" : "Booking"} ${ref}, ${when}`,
     customer: { name: b.name, email: b.email, phone: b.phone },
     returnUrl: appUrl(`/pay/${p.id}?returned=1`),
     cancelUrl: appUrl(`/pay/${p.id}?cancelled=1`),
@@ -118,6 +132,7 @@ export async function loadPayPage(admin: SupabaseClient, paymentId: string, now 
   });
   return {
     state: "pay",
+    kind,
     businessName,
     serviceName,
     when,

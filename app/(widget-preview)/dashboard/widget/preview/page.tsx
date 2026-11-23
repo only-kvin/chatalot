@@ -9,7 +9,7 @@ import { getCurrentTenantId } from "@/lib/db/current-tenant";
 export default async function WidgetPreviewPage({ searchParams }: { searchParams: Promise<{ widget?: string; id?: string }> }) {
   const { widget: requested, id } = await searchParams;
   const widgetId = /^[0-9a-f-]{36}$/i.test(id ?? "") ? id : undefined;
-  const inline = ["schedule", "appointment", "contact", "registration"].includes(requested ?? "") ? requested! : null;
+  const inline = ["schedule", "appointment", "contact", "registration", "events"].includes(requested ?? "") ? requested! : null;
   const tenantId = await getCurrentTenantId();
   if (!tenantId) redirect("/");
 

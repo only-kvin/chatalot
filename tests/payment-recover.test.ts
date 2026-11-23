@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 const emails = vi.fn(async () => undefined);
 vi.mock("../lib/email/customer-booking", () => ({ emailCustomerAboutBooking: (...a: unknown[]) => emails(...(a as [])) }));
+vi.mock("../lib/email/event-signup", () => ({ emailCustomerAboutSignup: (...a: unknown[]) => emails(...(a as [])) }));
 
 import { parseCsv, parseHistory, recoverPayments } from "../lib/payments/recover";
 
@@ -45,7 +46,7 @@ beforeAll(async () => {
   encryptFn = (await import("../lib/security/crypto")).encrypt;
 });
 
-function fakeAdmin(open: { id: string; booking_id: string; created_at: string }[], apply: { outcome: string; reason: string | null } = { outcome: "applied", reason: null }) {
+function fakeAdmin(open: { id: string; booking_id: string | null; event_signup_id?: string | null; created_at: string }[], apply: { outcome: string; reason: string | null } = { outcome: "applied", reason: null }) {
   const rpc = vi.fn(async () => ({ data: apply, error: null }));
   const client = {
     from(table: string) {
@@ -69,7 +70,7 @@ function fakeAdmin(open: { id: string; booking_id: string; created_at: string }[
                 error: null,
               }
             : { data: null, error: null },
-        then: (resolve: (v: unknown) => void) => resolve({ data: open.map((p) => ({ ...p, amount_cents: 1000 })), error: null }),
+        then: (resolve: (v: unknown) => void) => resolve({ data: open.map((p) => ({ event_signup_id: null, ...p, amount_cents: 1000 })), error: null }),
       };
       return q;
     },
@@ -104,6 +105,14 @@ describe("recoverPayments", () => {
       p_mode: "sandbox",
     }));
     expect(emails).toHaveBeenCalledWith(admin, TENANT, "booking-1", "confirmed");
+  });
+
+  it("recovers a paid event sign-up and sends its email", async () => {
+    emails.mockClear();
+    const { admin } = fakeAdmin([{ id: LOST, booking_id: null, event_signup_id: "signup-1", created_at: "2026-11-23T06:00:00Z" }]);
+    const fetch = vi.fn(async () => new Response(`${HEADER}\n${row(LOST, "9")}`)) as unknown as typeof globalThis.fetch;
+    expect((await recoverPayments(admin, TENANT, { now, deps: { fetch } })).recovered).toEqual(["signup-1"]);
+    expect(emails).toHaveBeenCalledWith(admin, TENANT, "signup-1");
   });
 
   it("leaves payments PayFast doesn't list, and counts problems the database caught", async () => {

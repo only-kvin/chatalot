@@ -16,6 +16,7 @@ const FEATURE_HOME: Record<Feature, string> = {
   whatsapp: "/dashboard/conversations",
   bookings: "/dashboard/bookings",
   payments: "/dashboard/settings#payments",
+  events: "/dashboard/events",
   reviews: "/dashboard/settings",
   registration: "/dashboard/widget?tab=registration",
 };
