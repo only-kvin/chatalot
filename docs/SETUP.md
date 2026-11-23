@@ -193,7 +193,7 @@ Manual steps the platform owner needs to do. Kept up to date as new phases add n
 **How it's put together:**
 
 - `widget.js` is now a small **loader**: it starts the chat (unless the script tag has `data-chat="off"`) and mounts every `<div data-chatalot="schedule">` on the page, fetching that widget's own bundle (`/widgets/schedule.js`) only when the page has one. Existing installs keep working unchanged. `window.ChatAlot.scan()` mounts boxes added after the page loads (single-page sites). `data-mode="float"` on the box shows it as a launcher bubble instead.
-- Both bundles are built by `scripts/build-widget.mjs` (part of `pnpm build`), which prints their gzipped sizes and **fails the build over 60 KB in total** (12.7 KB today).
+- Both bundles are built by `scripts/build-widget.mjs` (part of `pnpm build`), which prints their gzipped sizes and **fails the build when any one file is over 20 KB** (it was 60 KB in total until 2026-11-24).
 - The widget (`widget/schedule/`) reuses the server's own pure code where it can (SA dates from `lib/time.ts`, phone checks, the `.ics` builder), takes all colours/roundness/font from the business's look via `--ca-*` CSS variables, and emits `chatalot:event` (`view`, `step`, `submitted`) as a DOM event and a window message for analytics.
 - The dashboard's preview pages call the widget API from ChatAlot's own domain; `isOwnAppRequest()` (`lib/security/origin-check.ts`) lets those through without the business adding `chatalot.vercel.app` to its allowed domains.
 - A booking's owner alert and customer email are sent after the response (`waitUntil`), so customers see their confirmation in about a second instead of six.
@@ -559,3 +559,25 @@ new columns).
   the business's contact details. **`data-preview`** on a widget's box (for website builders) uses the
   business's real look and services when it has them, sample ones when it hasn't, explains what's missing,
   and never sends anything.
+
+## Events widget (2026-11-24)
+
+Migration `20261124090000_events.sql` (apply BEFORE deploying). `events` is a plan feature on Growth and Pro.
+
+- **Dashboard → Events**: create an event (title, summary, description, date and times in SA time, location,
+  ticket price, spots, tickets per sign-up), upload a poster (JPEG/PNG/WebP, max 4 MB, stored in the public
+  `event-posters` bucket under `<tenant_id>/`), publish it (Draft until then). Duplicate copies it a week later
+  as a Draft; Cancel shows it as cancelled and closes sign-ups (people aren't told automatically); events
+  without sign-ups can be deleted. Each event lists its sign-ups (contact, tickets, payment state) and a
+  sign-up can be cancelled to put its tickets back on sale.
+- **Widget**: `<div data-chatalot="events">` (variants with `data-widget`, `data-preview` for website
+  builders, like the other widgets). Poster cards → event page → tickets → the business's form → "You're
+  signed up", or the pay step for paid tickets.
+- **Sign-ups** go through `create_event_signup()` (service role only): status, per-sign-up ticket limit and
+  spots are checked under a lock on the event, so the last spot can't be sold twice; expired payment holds
+  are released first; the amount (price × tickets) comes from the event; same idempotency key = same sign-up.
+- **Paid tickets**: when the business can take payments online (payments in its plan and PayFast active) the
+  tickets are held for the payment window and the customer gets a pay link; the pay page, PayFast
+  notifications, lost-payment recovery and the daily cron handle sign-ups like bookings. Otherwise a priced
+  event is "pay at the event". Customers get a "You're signed up" email once their spot is secured.
+- **Widget size budget** is now per file: 20 KB gzipped each (`scripts/build-widget.mjs`).
