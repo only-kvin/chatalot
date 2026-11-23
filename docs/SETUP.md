@@ -567,7 +567,8 @@ Migration `20261124090000_events.sql` (apply BEFORE deploying). `events` is a pl
 - **Dashboard → Events**: create an event (title, summary, description, date and times in SA time, location,
   ticket price, spots, tickets per sign-up), upload a poster (JPEG/PNG/WebP, max 4 MB, stored in the public
   `event-posters` bucket under `<tenant_id>/`), publish it (Draft until then). Duplicate copies it a week later
-  as a Draft; Cancel shows it as cancelled and closes sign-ups (people aren't told automatically); events
+  as a Draft; Cancel shows it as cancelled and closes sign-ups, and can email everyone still signed up
+  (with an email) once, with the business's message (paid ones: "they'll be in touch about a refund"); events
   without sign-ups can be deleted. Each event lists its sign-ups (contact, tickets, payment state) and a
   sign-up can be cancelled to put its tickets back on sale.
 - **Widget**: `<div data-chatalot="events">` (variants with `data-widget`, `data-preview` for website

@@ -107,7 +107,13 @@ export default async function EventPage({ params, searchParams }: { params: Prom
           </Card>
           <Card>
             <CardContent className="pt-6">
-              <EventActions eventId={e.id} cancelled={e.status === "cancelled"} hasSignups={(signups ?? []).length > 0} />
+              <EventActions
+                eventId={e.id}
+                cancelled={e.status === "cancelled"}
+                hasSignups={(signups ?? []).length > 0}
+                attending={(signups ?? []).filter((x) => x.status === "confirmed").length}
+                withEmail={(signups ?? []).filter((x) => x.status === "confirmed" && x.email).length}
+              />
             </CardContent>
           </Card>
         </div>

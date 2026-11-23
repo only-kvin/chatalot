@@ -40,3 +40,78 @@ export async function emailCustomerAboutSignup(admin: SupabaseClient, tenantId: 
     console.error(`Event sign-up email for ${signupId} failed:`, err);
   }
 }
+
+// ---------------------------------------------------------------------------
+// "Cancelled" to everyone still signed up when the business cancels an
+// event, with the business's own message. Paid tickets: the business refunds
+// in its own PayFast account, so the email says they'll be in touch rather
+// than promising an automatic refund.
+// ---------------------------------------------------------------------------
+
+export type CancellationEmailInput = {
+  name: string;
+  businessName: string;
+  contact: string;
+  title: string;
+  startsAt: string;
+  message: string;
+  paidCents: number | null;
+};
+
+export function cancellationEmail(c: CancellationEmailInput): { subject: string; html: string } {
+  const business = c.businessName || "the organisers";
+  const paragraphs = c.message
+    .trim()
+    .split(/\n\s*\n/)
+    .filter(Boolean)
+    .map((p) => `<p>${escapeHtml(p).replace(/\n/g, "<br>")}</p>`)
+    .join("");
+  return {
+    subject: `Cancelled: ${c.title}`,
+    html: `
+      <p>Hi ${escapeHtml(c.name)},</p>
+      <p>Sorry, ${escapeHtml(business)} has cancelled <strong>${escapeHtml(c.title)}</strong> on ${escapeHtml(formatLocalDateTime(c.startsAt))}.</p>
+      ${paragraphs ? `<p><em>Their message:</em></p>${paragraphs}` : ""}
+      ${c.paidCents ? `<p>You paid ${escapeHtml(formatRand(c.paidCents))} for your tickets. ${escapeHtml(business)} will be in touch about your refund.</p>` : ""}
+      ${c.contact ? `<p>Questions? Contact ${escapeHtml(business)} on ${escapeHtml(c.contact)}.</p>` : ""}
+    `,
+  };
+}
+
+// Emails everyone still signed up (with an email address). Returns how many
+// were sent.
+export async function emailSignupsAboutCancellation(
+  admin: SupabaseClient,
+  tenantId: string,
+  eventId: string,
+  message: string,
+): Promise<number> {
+  const [{ data: event }, { data: signups }, { data: config }] = await Promise.all([
+    admin.from("events").select("title, starts_at").eq("tenant_id", tenantId).eq("id", eventId).maybeSingle(),
+    admin
+      .from("event_signups")
+      .select("id, name, email, payment_status, amount_due_cents")
+      .eq("tenant_id", tenantId)
+      .eq("event_id", eventId)
+      .eq("status", "confirmed")
+      .not("email", "is", null),
+    admin.from("agent_configs").select("business_name, handoff_contact").eq("tenant_id", tenantId).maybeSingle(),
+  ]);
+  if (!event) return 0;
+  let sent = 0;
+  for (const s of signups ?? []) {
+    if (!s.email) continue;
+    const { subject, html } = cancellationEmail({
+      name: s.name,
+      businessName: config?.business_name ?? "",
+      contact: config?.handoff_contact ?? "",
+      title: event.title,
+      startsAt: event.starts_at,
+      message,
+      paidCents: s.payment_status === "paid" ? s.amount_due_cents : null,
+    });
+    await sendCustomerEmail({ to: s.email, subject, html });
+    sent++;
+  }
+  return sent;
+}

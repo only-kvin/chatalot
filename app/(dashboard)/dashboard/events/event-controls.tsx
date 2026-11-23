@@ -54,22 +54,36 @@ export function PosterUpload({ eventId, posterUrl }: { eventId: string; posterUr
   );
 }
 
-export function EventActions({ eventId, cancelled, hasSignups }: { eventId: string; cancelled: boolean; hasSignups: boolean }) {
+export function EventActions({
+  eventId,
+  cancelled,
+  hasSignups,
+  attending,
+  withEmail,
+}: {
+  eventId: string;
+  cancelled: boolean;
+  hasSignups: boolean;
+  // Still signed up, and how many of them gave an email address.
+  attending: number;
+  withEmail: number;
+}) {
   const { pending, error, run, router } = useRun();
+  const [cancelling, setCancelling] = useState(false);
+  const [message, setMessage] = useState("");
+  const [notify, setNotify] = useState(withEmail > 0);
+  const [done, setDone] = useState<string | null>(null);
+  const noEmail = attending - withEmail;
+
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" disabled={pending} onClick={() => run(() => duplicateEventAction(eventId), (r) => r.id && router.push(`/dashboard/events/${r.id}?copied=1`))}>
           Duplicate
         </Button>
-        {!cancelled && (
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={pending}
-            onClick={() => confirm("Cancel this event? It shows as cancelled on your website and sign-ups close. People who signed up aren't told automatically.") && run(() => cancelEventAction(eventId))}
-          >
-            Cancel event
+        {!cancelled && !cancelling && (
+          <Button variant="outline" size="sm" disabled={pending} onClick={() => setCancelling(true)}>
+            Cancel event…
           </Button>
         )}
         {!hasSignups && (
@@ -83,6 +97,63 @@ export function EventActions({ eventId, cancelled, hasSignups }: { eventId: stri
           </Button>
         )}
       </div>
+
+      {cancelling && !cancelled && (
+        <div className="flex flex-col gap-3 rounded-lg border p-3 text-sm">
+          <p className="font-medium">Cancel this event?</p>
+          <p className="text-muted-foreground">It shows as cancelled on your website and sign-ups close. This can&apos;t be undone.</p>
+          {attending > 0 ? (
+            <>
+              <label className="flex items-start gap-2">
+                <input type="checkbox" className="mt-1" checked={notify} disabled={withEmail === 0} onChange={(e) => setNotify(e.target.checked)} />
+                <span>
+                  Email the {withEmail} {withEmail === 1 ? "person" : "people"} who signed up with an email address
+                  {noEmail > 0 && (
+                    <span className="block text-xs text-muted-foreground">
+                      {noEmail} signed up without one: contact them by phone (numbers are in the list below).
+                    </span>
+                  )}
+                </span>
+              </label>
+              {notify && (
+                <textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  maxLength={1000}
+                  rows={3}
+                  placeholder="Optional message, e.g. why, or the new date. People who paid are told you'll be in touch about a refund."
+                  className="rounded-md border bg-transparent px-3 py-2"
+                />
+              )}
+            </>
+          ) : (
+            <p className="text-muted-foreground">Nobody has signed up yet.</p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={pending}
+              onClick={() =>
+                run(
+                  () => cancelEventAction(eventId, { message, notify }),
+                  (r) => {
+                    setCancelling(false);
+                    const emailed = (r as { emailed?: number }).emailed ?? 0;
+                    setDone(emailed ? `Cancelled. Emailing ${emailed} ${emailed === 1 ? "person" : "people"} now.` : "Cancelled.");
+                  },
+                )
+              }
+            >
+              {pending ? "Cancelling…" : notify && withEmail > 0 ? "Cancel and email them" : "Cancel event"}
+            </Button>
+            <Button size="sm" variant="ghost" disabled={pending} onClick={() => setCancelling(false)}>
+              Keep it
+            </Button>
+          </div>
+        </div>
+      )}
+      {done && <p className="text-sm text-green-700 dark:text-green-400">{done}</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
     </div>
   );
