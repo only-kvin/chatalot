@@ -582,3 +582,8 @@ Migration `20261124090000_events.sql` (apply BEFORE deploying). `events` is a pl
   notifications, lost-payment recovery and the daily cron handle sign-ups like bookings. Otherwise a priced
   event is "pay at the event". Customers get a "You're signed up" email once their spot is secured.
 - **Widget size budget** is now per file: 20 KB gzipped each (`scripts/build-widget.mjs`).
+- **Reminders** (migration `20261125090000_event_reminders.sql`, `lib/events/reminders.ts`): the daily cron
+  (08:00 SA) emails everyone still signed up for a published event starting in the next 40 hours, once
+  (`event_signups.reminder_sent_at`), if they gave an email and their spot is secured (free, paid or pay at the
+  event; not an unpaid hold). People who signed up in the last 12 hours are skipped. Pay-at-the-event
+  customers are told how much to bring. Email only.

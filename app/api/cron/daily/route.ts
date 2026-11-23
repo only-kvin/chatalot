@@ -7,10 +7,11 @@ import { sendDailySummary } from "@/lib/email/send-daily-summary";
 import { tenantFeaturesLookup } from "@/lib/features";
 import { runScheduledImports } from "@/lib/website/import";
 import { recoverAllPayments } from "@/lib/payments/recover";
+import { sendEventReminders } from "@/lib/events/reminders";
 import type { Features } from "@/lib/plans";
 
-// The daily jobs: booking reminders and review requests on WhatsApp, then the
-// owners' summary email. Runs once a day at 06:00 UTC = 08:00 SA (see
+// The daily jobs: booking reminders and review requests on WhatsApp, event
+// reminders by email (lib/events/reminders.ts), then the owners' summary email. Runs once a day at 06:00 UTC = 08:00 SA (see
 // vercel.json — Vercel's Hobby plan only allows daily cron schedules). How
 // each message is sent, and what happens when it can't be, lives in
 // lib/bookings/reminders.ts, review-requests.ts and lib/summary/.
@@ -157,11 +158,12 @@ export async function GET(request: Request) {
   if (signupExpireError) console.error("Releasing unpaid event sign-ups failed:", signupExpireError);
 
   // Each job runs even if the other fails.
-  const [reminders, reviews] = await Promise.allSettled([
+  const [reminders, reviews, eventReminders] = await Promise.allSettled([
     sendReminders(admin, channelFor, featuresFor),
     sendReviewRequests(admin, channelFor, featuresFor),
+    sendEventReminders(admin, featuresFor),
   ]);
-  for (const [job, result] of [["reminders", reminders], ["review requests", reviews]] as const) {
+  for (const [job, result] of [["reminders", reminders], ["review requests", reviews], ["event reminders", eventReminders]] as const) {
     if (result.status === "rejected") console.error(`Daily ${job} failed:`, result.reason);
   }
   // After the WhatsApp jobs, so today's "reminder not sent" is already known.
@@ -173,7 +175,7 @@ export async function GET(request: Request) {
     runScheduledImports(admin, { budgetMs: Math.max(0, startedAt + WEBSITE_DEADLINE_MS - Date.now()) }),
   ]);
   if (websites.status === "rejected") console.error("Website imports failed:", websites.reason);
-  const ok = recovery.status === "fulfilled" && !expireError && [reminders, reviews, summaries, websites].every((r) => r.status === "fulfilled");
+  const ok = recovery.status === "fulfilled" && !expireError && [reminders, reviews, eventReminders, summaries, websites].every((r) => r.status === "fulfilled");
 
   return Response.json(
     {
@@ -181,6 +183,7 @@ export async function GET(request: Request) {
       unpaidReleased: expireError ? "failed" : expired,
       reminders: reminders.status === "fulfilled" ? reminders.value : "failed",
       reviews: reviews.status === "fulfilled" ? reviews.value : "failed",
+      eventReminders: eventReminders.status === "fulfilled" ? eventReminders.value : "failed",
       summaries: summaries.status === "fulfilled" ? summaries.value : "failed",
       websites: websites.status === "fulfilled" ? websites.value : "failed",
     },
