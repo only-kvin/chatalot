@@ -9,6 +9,9 @@ export type MountContext = {
   mode: "inline" | "float";
   // data-widget: which of the business's widgets of this type; null = its default.
   widgetId: string | null;
+  // data-preview: for whoever is building the site. Sample data when the
+  // business hasn't set the widget up, a note saying so, nothing sent.
+  preview: boolean;
 };
 
 export type MountFn = (el: HTMLElement, ctx: MountContext) => void;

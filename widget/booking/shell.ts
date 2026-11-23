@@ -19,6 +19,8 @@ export type Shell = {
   applyTheme: (theme: Theme, launcherLabel: string) => void;
   button: (cls: string, label: string, onClick: () => void, key?: string, attrs?: Record<string, string | boolean | number>) => HTMLButtonElement;
   focusFirst: (selector: string) => void;
+  // A line above everything else, e.g. "Preview: nothing here is booked".
+  setNotice: (text: string | null) => void;
 };
 
 let instances = 0;
@@ -34,6 +36,7 @@ export function createShell(host: HTMLElement, ctx: MountContext, name: string, 
   const powered = poweredBy();
   shadow.append(h("style", {}, BOOKING_CSS + extraCss + POWERED_CSS + ".card > .powered { margin-top: -6px; }"), themeStyle, live);
 
+  let notice: string | null = null;
   let launcher: HTMLButtonElement | null = null;
   if (ctx.mode === "float") {
     launcher = h("button", { class: "launcher", "aria-expanded": "false" }, "Book now");
@@ -59,7 +62,8 @@ export function createShell(host: HTMLElement, ctx: MountContext, name: string, 
     const focusKey = active?.dataset?.k;
     const nodes = build();
     card.className = `card${opts.done ? " done" : ""}`;
-    card.replaceChildren(...nodes.filter((n): n is Node => Boolean(n)), powered);
+    const top = notice ? h("p", { class: "notice", role: "note" }, notice) : null;
+    card.replaceChildren(...(top ? [top] : []), ...nodes.filter((n): n is Node => Boolean(n)), powered);
     // Re-inserting nodes drops focus: put it back on the same element (form
     // fields persist across renders), or its re-created twin.
     if (active?.isConnected) active.focus();
@@ -86,6 +90,9 @@ export function createShell(host: HTMLElement, ctx: MountContext, name: string, 
       const b = h("button", { type: "button", class: cls, "data-k": key, ...attrs }, label);
       b.addEventListener("click", onClick);
       return b;
+    },
+    setNotice(text) {
+      notice = text;
     },
     focusFirst(selector) {
       (card.querySelector(selector) as HTMLElement | null)?.focus();

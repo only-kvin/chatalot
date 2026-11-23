@@ -2,6 +2,7 @@ import type { FormField } from "../shared/form";
 import type { Theme } from "../shared/theme";
 import type { Slot } from "./calendar";
 import { priceLabel, type BookingLocation, type PriceType, type ServiceLocation } from "../../lib/bookings/price-label";
+import { isSample, PREVIEW_NOTE, SAMPLE_SERVICES, sampleConfig, sampleDays } from "./sample";
 
 // Calls to ChatAlot's public widget API. Every call carries the business's
 // public key; the server resolves the business and checks the website.
@@ -22,6 +23,8 @@ export type BaseConfig = {
     requestedTitle: string;
     requestedMessage: string;
   };
+  // Which of the business's widgets this is; a draft takes no bookings.
+  widget?: { id: string | null; name: string; status: "draft" | "live" };
 };
 
 export type Service = {
@@ -78,18 +81,46 @@ async function post(url: string, body: unknown): Promise<{ ok: boolean; json: Re
 const OFFLINE = "We couldn't reach the booking system. Check your connection and try again.";
 
 // widgetId: which of the business's widgets (null = its default).
-export function createApi(apiOrigin: string, key: string, widgetId: string | null = null) {
+// preview: data-preview on the box. The business's real look and services
+// when it has them, sample ones when it hasn't, and nothing is ever booked.
+export function createApi(apiOrigin: string, key: string, widgetId: string | null = null, preview = false) {
   async function get<T>(path: string, params: Record<string, string> = {}): Promise<T> {
     const res = await fetch(`${apiOrigin}${path}?${new URLSearchParams({ key, ...params })}`);
     if (!res.ok) throw new Error(`${path}: ${res.status}`);
     return (await res.json()) as T;
   }
+  let usingSample = false;
+  let draft = false;
 
   return {
-    config: <T extends BaseConfig>(widget: BookingWidget) => get<T>("/api/widget/config", { widget, ...(widgetId ? { id: widgetId } : {}) }),
-    services: () => get<{ services: Service[]; staff: Staff[]; business?: BusinessInfo }>("/api/public/services"),
-    availability: (q: AvailabilityQuery) =>
-      get<{ days: { date: string; slots: Slot[] }[] }>("/api/public/availability", {
+    async config<T extends BaseConfig>(widget: BookingWidget): Promise<T> {
+      try {
+        const cfg = await get<T>("/api/widget/config", { widget, ...(widgetId ? { id: widgetId } : {}) });
+        draft = cfg.widget?.status === "draft";
+        return cfg;
+      } catch (err) {
+        if (!preview) throw err;
+        return sampleConfig<T>();
+      }
+    },
+    async services(): Promise<{ services: Service[]; staff: Staff[]; business?: BusinessInfo }> {
+      const real = await get<{ services: Service[]; staff: Staff[]; business?: BusinessInfo }>("/api/public/services").catch((err) => {
+        if (!preview) throw err;
+        return null;
+      });
+      if (preview && !real?.services.length) {
+        usingSample = true;
+        return { services: SAMPLE_SERVICES, staff: [], business: real?.business };
+      }
+      return real!;
+    },
+    // The line shown at the top of the widget, if any.
+    notice(): string | null {
+      if (preview) return usingSample ? PREVIEW_NOTE.sample : PREVIEW_NOTE.real;
+      return draft ? PREVIEW_NOTE.draft : null;
+    },
+    availability: async (q: AvailabilityQuery) =>
+      isSample(q.service) ? { days: sampleDays(q.from, q.to) } : get<{ days: { date: string; slots: Slot[] }[] }>("/api/public/availability", {
         service: q.service,
         from: q.from,
         to: q.to,
@@ -98,6 +129,11 @@ export function createApi(apiOrigin: string, key: string, widgetId: string | nul
         ...(q.location ? { location: q.location } : {}),
       }),
     async book(widget: BookingWidget, body: Record<string, unknown>): Promise<BookingResult> {
+      // Preview: show the confirmation without sending anything.
+      if (preview) {
+        const startsAt = `${String(body.date)}T${String(body.time)}:00+02:00`;
+        return { ok: true, status: "confirmed", ref: "PREVIEW", startsAt, endsAt: startsAt, staffName: null };
+      }
       try {
         const { ok, json } = await post(`${apiOrigin}/api/public/appointments`, { key, widget, widgetId, ...body });
         if (ok && json.ok) return json as BookingResult;

@@ -17,6 +17,7 @@ type ContactConfig = {
   fields: FormField[];
   copy: { title: string; submitButton: string; successTitle: string; successMessage: string; responseTime: string };
   settings: { offerNewsletter: boolean; offerPromotions: boolean };
+  widget?: { status: "draft" | "live" };
 };
 
 function mountContact(host: HTMLElement, ctx: MountContext): void {
@@ -46,6 +47,13 @@ function mountContact(host: HTMLElement, ctx: MountContext): void {
       // The form's own check focuses its field; the "no way to reply" one
       // points at the email (or phone) box.
       if (!problem) shell.focusFirst('[name="email"], [name="phone"]');
+      return;
+    }
+    // Preview: show the thank-you without sending anything.
+    if (ctx.preview) {
+      sent = true;
+      render();
+      shell.focusFirst("h2");
       return;
     }
     sending = true;
@@ -143,6 +151,13 @@ function mountContact(host: HTMLElement, ctx: MountContext): void {
       if (!res.ok) throw new Error(String(res.status));
       config = (await res.json()) as ContactConfig;
       shell.applyTheme(config.theme, config.copy.title);
+      shell.setNotice(
+        ctx.preview
+          ? "Preview: this is the business's real form, but nothing here is sent."
+          : config.widget?.status === "draft"
+            ? "Test widget (Draft): messages aren't sent until it's made Live."
+            : null,
+      );
       form = renderForm(config.fields, shell.id);
       shownAt = Date.now();
       render();
