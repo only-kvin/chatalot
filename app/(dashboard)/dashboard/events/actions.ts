@@ -9,6 +9,8 @@ import { createClient } from "@/lib/db/supabase-server";
 import { featureError } from "@/lib/dashboard-features";
 import { imageKind } from "@/lib/staff/photo";
 import { localToUtcDate } from "@/lib/time";
+import { waitUntil } from "@vercel/functions";
+import { emailSignupsAboutCancellation } from "@/lib/email/event-signup";
 
 // Dashboard → Events. Members of the business create and edit events, upload
 // posters, duplicate, cancel, and cancel sign-ups. The signed-in user's
@@ -163,19 +165,51 @@ export async function duplicateEventAction(eventId: string): Promise<Result> {
 }
 
 // Cancelled: shown as cancelled on the website, no more sign-ups. Existing
-// sign-ups stay listed so the business can contact (and refund) them.
-export async function cancelEventAction(eventId: string): Promise<Result> {
+// sign-ups stay listed so the business can contact (and refund) them. With
+// notify, everyone still signed up who gave an email gets a "Cancelled"
+// email with the business's message, once: the event only changes (and
+// emails only go) if it wasn't cancelled already.
+export async function cancelEventAction(
+  eventId: string,
+  opts: { message?: string; notify?: boolean } = {},
+): Promise<Result & { emailed?: number }> {
   const s = await session();
   if ("error" in s) return { error: s.error ?? "Not authorized." };
   if (!uuid.safeParse(eventId).success) return { error: "Invalid event." };
-  const { error } = await s.supabase
+  const message = z.string().trim().max(1000, "Keep the message under 1,000 characters.").safeParse(opts.message ?? "");
+  if (!message.success) return { error: message.error.issues[0]?.message ?? "Invalid message." };
+
+  const { data, error } = await s.supabase
     .from("events")
     .update({ status: "cancelled", signups_open: false, updated_at: new Date().toISOString() })
     .eq("tenant_id", s.tenantId)
-    .eq("id", eventId);
+    .eq("id", eventId)
+    .neq("status", "cancelled")
+    .select("id");
   if (error) return failed("cancel the event", error);
+  if (!data?.length) return { error: "This event is already cancelled." };
+
+  let emailed = 0;
+  if (opts.notify) {
+    const { count } = await s.supabase
+      .from("event_signups")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", s.tenantId)
+      .eq("event_id", eventId)
+      .eq("status", "confirmed")
+      .not("email", "is", null);
+    emailed = count ?? 0;
+    // After the response: a few emails shouldn't keep the owner waiting.
+    if (emailed) {
+      waitUntil(
+        emailSignupsAboutCancellation(createAdminClient(), s.tenantId, eventId, message.data).catch((err) =>
+          console.error(`Events: cancellation emails for ${eventId} failed:`, err),
+        ),
+      );
+    }
+  }
   revalidate(eventId);
-  return { error: null };
+  return { error: null, emailed };
 }
 
 // Only events nobody has signed up for can be deleted; otherwise cancel.
