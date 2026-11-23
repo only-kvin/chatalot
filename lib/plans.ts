@@ -78,6 +78,8 @@ export const WIDGET_FEATURE = {
   contact: "contact_form",
   registration: "registration",
   events: "events",
+  // Class sessions are events, so the Find a Class widget comes with them.
+  classes: "events",
 } as const satisfies Record<string, Feature>;
 
 // Owner-facing copy for the upgrade page and locked menu items.

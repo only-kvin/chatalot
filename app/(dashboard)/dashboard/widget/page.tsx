@@ -20,6 +20,7 @@ const TABS = [
   { id: "contact", label: "Contact" },
   { id: "registration", label: "Registration" },
   { id: "events", label: "Events" },
+  { id: "classes", label: "Classes" },
 ] as const;
 
 export default async function WidgetPage({ searchParams }: { searchParams: Promise<{ tab?: string; w?: string }> }) {

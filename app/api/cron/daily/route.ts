@@ -8,6 +8,7 @@ import { tenantFeaturesLookup } from "@/lib/features";
 import { runScheduledImports } from "@/lib/website/import";
 import { recoverAllPayments } from "@/lib/payments/recover";
 import { sendEventReminders } from "@/lib/events/reminders";
+import { syncAllClassSeries } from "@/lib/classes/sync";
 import type { Features } from "@/lib/plans";
 
 // The daily jobs: booking reminders and review requests on WhatsApp, event
@@ -157,6 +158,11 @@ export async function GET(request: Request) {
   const { error: signupExpireError } = await admin.rpc("expire_unpaid_event_signups", { p_tenant_id: null });
   if (signupExpireError) console.error("Releasing unpaid event sign-ups failed:", signupExpireError);
 
+  // Class timetables: keep eight weeks of sessions ahead (before reminders,
+  // which then see any session starting soon).
+  const [classSync] = await Promise.allSettled([syncAllClassSeries(admin)]);
+  if (classSync.status === "rejected") console.error("Syncing class timetables failed:", classSync.reason);
+
   // Each job runs even if the other fails.
   const [reminders, reviews, eventReminders] = await Promise.allSettled([
     sendReminders(admin, channelFor, featuresFor),
@@ -184,6 +190,7 @@ export async function GET(request: Request) {
       reminders: reminders.status === "fulfilled" ? reminders.value : "failed",
       reviews: reviews.status === "fulfilled" ? reviews.value : "failed",
       eventReminders: eventReminders.status === "fulfilled" ? eventReminders.value : "failed",
+      classSessions: classSync.status === "fulfilled" ? classSync.value : "failed",
       summaries: summaries.status === "fulfilled" ? summaries.value : "failed",
       websites: websites.status === "fulfilled" ? websites.value : "failed",
     },

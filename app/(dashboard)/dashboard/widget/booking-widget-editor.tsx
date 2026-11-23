@@ -150,6 +150,19 @@ const WIDGET_UI: Record<
     toggles: [["showPast", "Also show past events (marked as past)"]],
     place: "the event",
   },
+  classes: {
+    name: "Find a Class widget",
+    description: "Your class timetable by day, with each class's instructor and spots left. Customers book a spot with this form (and pay, for paid drop-ins).",
+    copy: [
+      ["title", "Title"],
+      ["bookButton", "Book button"],
+      ["successTitle", "Booked: heading"],
+      ["successMessage", "Booked: message"],
+      ["emptyDay", "When a day has no classes"],
+    ],
+    toggles: [["showFilters", "Show Class type and Instructor filters"]],
+    place: "the class",
+  },
   contact: {
     name: "Contact widget",
     description: "A message form. Each message lands in Messages and Leads, and you get an alert.",

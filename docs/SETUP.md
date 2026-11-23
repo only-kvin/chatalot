@@ -587,3 +587,20 @@ Migration `20261124090000_events.sql` (apply BEFORE deploying). `events` is a pl
   (`event_signups.reminder_sent_at`), if they gave an email and their spot is secured (free, paid or pay at the
   event; not an unpaid hold). People who signed up in the last 12 hours are skipped. Pay-at-the-event
   customers are told how much to bring. Email only.
+
+## AI and events; classes with a Find a Class widget (2026-11-24)
+
+- **AI receptionist and events**: for businesses with events on their plan, the AI gets `list_events` (upcoming
+  published events with a short reference like E-1A2B3C, time, place, price, spots) and `sign_up_for_event`
+  (after name, phone and consent). Sign-ups go through `create_event_signup()` like the widget; paid tickets
+  return the pay link. One sign-up per event per chat. Classes aren't offered to the AI yet.
+- **Classes** (migration `20261126090000_classes.sql`, apply BEFORE deploying): Dashboard → Classes holds a
+  weekly timetable (`class_series`: name, instructor from Staff, days, time, length, spots, drop-in price,
+  place, date range). Sessions are events (`kind = 'class'`, one spot per booking) created eight weeks ahead
+  by `sync_class_series()` (service role only) when a class is saved and by the daily cron. Future sessions
+  take the class's details; unbooked ones that no longer fit are removed; booked and cancelled ones stay, and a
+  cancelled day is never refilled. Open a session (its event page) to see who's booked or cancel just it
+  (with the cancellation email). Classes come with the `events` plan feature.
+- **Find a Class widget**: `<div data-chatalot="classes">`: week strip, the day's classes (time, length, class,
+  instructor and photo, place, Book), optional Class type / Instructor filters, then the business's form and
+  "You're booked in" or the pay step. Preview shows a sample timetable when there are no classes.

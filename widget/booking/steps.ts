@@ -103,12 +103,14 @@ function hhmm(iso: string): string {
 
 // Booked but not yet paid: the slot is held until the deadline. The pay page
 // opens in a new tab so the business's website stays open behind it.
-// tickets: an event sign-up, where what's held is tickets rather than a time.
-function renderPayDue(pay: PaymentDue, summary: HTMLElement, tickets = false): Node[] {
+// held: what's being held for payment (a booking's time, event tickets, a
+// spot in a class), for the wording.
+function renderPayDue(pay: PaymentDue, summary: HTMLElement, held: "time" | "tickets" | "spot" = "time"): Node[] {
+  const what = { time: ["booking", "Your time is", "it's"], tickets: ["tickets", "Your tickets are", "they're"], spot: ["spot", "Your spot is", "it's"] }[held];
   return [
     h("div", { class: "tick", "aria-hidden": "true" }, "…"),
-    h("h2", { tabindex: -1 }, tickets ? "Pay to secure your tickets" : "Pay to secure your booking"),
-    h("p", { class: "note" }, `${tickets ? "Your tickets are" : "Your time is"} held until ${hhmm(pay.dueAt)}. Pay ${rand(pay.amountCents)} before then or ${tickets ? "they're" : "it's"} released.`),
+    h("h2", { tabindex: -1 }, `Pay to secure your ${what[0]}`),
+    h("p", { class: "note" }, `${what[1]} held until ${hhmm(pay.dueAt)}. Pay ${rand(pay.amountCents)} before then or ${what[2]} released.`),
     summary,
     h(
       "div",
@@ -133,11 +135,11 @@ export function renderDone(
     again: { label: string; onClick: () => void } | null;
     // Held until paid: the pay link replaces the confirmation.
     pay?: PaymentDue | null;
-    // An event sign-up: word the pay step for tickets.
-    tickets?: boolean;
+    // What's held for payment, for the wording (a booking's time by default).
+    held?: "time" | "tickets" | "spot";
   },
 ): Node[] {
-  if (o.pay) return renderPayDue(o.pay, o.summary, o.tickets);
+  if (o.pay) return renderPayDue(o.pay, o.summary, o.held);
   let calendarLink: HTMLElement | null = null;
   if (!o.pending && o.calendar?.startsAt) {
     const ics = bookingIcs({

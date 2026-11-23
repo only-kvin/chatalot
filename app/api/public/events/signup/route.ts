@@ -12,6 +12,9 @@ export const OPTIONS = preflight;
 
 const bodySchema = z.object({
   key: z.string().min(1).max(100),
+  // Which widget it came from: the events widget, or Find a Class (whose
+  // sessions are events too). Its form and Draft status apply.
+  widget: z.enum(["events", "classes"]).default("events"),
   widgetId: z.string().uuid().nullish(),
   eventId: z.string().uuid(),
   quantity: z.number().int().min(1).max(20),
@@ -28,7 +31,7 @@ const REFUSED: Record<string, [number, string]> = {
   not_open: [404, "That event isn't available any more."],
   closed: [409, "Sign-ups for this event have closed."],
   sold_out: [409, "Sorry, there aren't enough spots left."],
-  too_many: [400, "That's more tickets than one person can take for this event."],
+  too_many: [400, "That's more spots than one person can book here."],
 };
 
 // A sign-up from the events widget. Same front door and spam checks as
@@ -52,7 +55,7 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient();
-  const widget = await loadWidget(admin, tenantId, "events", body.widgetId);
+  const widget = await loadWidget(admin, tenantId, body.widget, body.widgetId);
   if (!widget.active) return NextResponse.json({ error: "Not found" }, { status: 404, headers });
   if (widget.status === "draft") {
     return NextResponse.json({ error: "This is a test widget, so it can't take real sign-ups yet." }, { status: 403, headers });

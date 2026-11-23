@@ -52,7 +52,7 @@ export async function listPublicEvents(
   opts: { showPast?: boolean; now?: Date } = {},
 ): Promise<PublicEvent[]> {
   const now = opts.now ?? new Date();
-  let q = admin.from("events").select(EVENT_COLUMNS).eq("tenant_id", tenantId).in("status", ["published", "cancelled"]).limit(100);
+  let q = admin.from("events").select(EVENT_COLUMNS).eq("tenant_id", tenantId).eq("kind", "event").in("status", ["published", "cancelled"]).limit(100);
   if (!opts.showPast) q = q.gte("starts_at", now.toISOString());
   const { data, error } = await q.order("starts_at");
   if (error) throw error;
