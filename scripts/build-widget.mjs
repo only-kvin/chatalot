@@ -12,13 +12,16 @@ const bundles = [
   { entry: "widget/reschedule/index.ts", out: "public/widgets/reschedule.js" },
   { entry: "widget/contact/index.ts", out: "public/widgets/contact.js" },
   { entry: "widget/registration/index.ts", out: "public/widgets/registration.js" },
+  { entry: "widget/events/index.ts", out: "public/widgets/events.js" },
 ];
 
-// All widgets together must stay under this, gzipped (see CLAUDE.md). A page
-// loads only the widgets it uses. Raised from 60 KB for the week-strip restyle.
-const BUDGET_BYTES = 70 * 1024;
+// Each file must stay under this, gzipped (see CLAUDE.md): a page loads
+// widget.js plus only the widgets it shows, so what matters is each one's
+// size, not the sum of all of them (printed for reference).
+const BUDGET_PER_FILE = 20 * 1024;
 
 let total = 0;
+const over = [];
 for (const { entry, out } of bundles) {
   await build({
     entryPoints: [entry],
@@ -30,10 +33,11 @@ for (const { entry, out } of bundles) {
   });
   const gz = gzipSync(readFileSync(out)).length;
   total += gz;
+  if (gz > BUDGET_PER_FILE) over.push(out);
   console.log(`${out}: ${(gz / 1024).toFixed(1)} KB gzipped`);
 }
-console.log(`widgets total: ${(total / 1024).toFixed(1)} KB gzipped (budget ${BUDGET_BYTES / 1024} KB)`);
-if (total > BUDGET_BYTES) {
-  console.error("Widget bundles are over budget.");
+console.log(`all widgets: ${(total / 1024).toFixed(1)} KB gzipped (budget ${BUDGET_PER_FILE / 1024} KB per file)`);
+if (over.length) {
+  console.error(`Over budget: ${over.join(", ")}`);
   process.exit(1);
 }

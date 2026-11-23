@@ -153,3 +153,72 @@ export async function expireUnpaidHolds(client: SupabaseClient, tenantId: string
   const { error } = await client.rpc("expire_unpaid_bookings", { p_tenant_id: tenantId });
   if (error && error.code !== "42501") console.error(`Payments: expiring holds for ${tenantId} failed:`, error);
 }
+
+// ---------------------------------------------------------------------------
+// Event sign-ups. create_event_signup() decides the amount and the hold from
+// the event; this says whether the business can take it online, then makes
+// the payment row for a sign-up the database put on hold.
+// ---------------------------------------------------------------------------
+
+export type OnlineAccount = { id: string; provider: "payfast"; mode: "sandbox" | "live" };
+
+// Payments in the plan and a working PayFast account; otherwise paid events
+// are "pay at the event".
+export async function onlinePaymentAccount(admin: SupabaseClient, tenantId: string): Promise<OnlineAccount | null> {
+  if (!(await hasFeature(admin, tenantId, "payments"))) return null;
+  const { data } = await admin
+    .from("payment_accounts")
+    .select("id, provider, mode, status")
+    .eq("tenant_id", tenantId)
+    .eq("provider", "payfast")
+    .maybeSingle<OnlineAccount & { status: string }>();
+  return data && data.status === "active" ? { id: data.id, provider: data.provider, mode: data.mode } : null;
+}
+
+export async function createSignupPayment(
+  admin: SupabaseClient,
+  s: { tenantId: string; signupId: string; amountCents: number; dueAt: string; account: OnlineAccount },
+): Promise<PaymentRequest | null> {
+  const { data, error } = await admin
+    .from("payments")
+    .insert({
+      tenant_id: s.tenantId,
+      event_signup_id: s.signupId,
+      payment_account_id: s.account.id,
+      provider: s.account.provider,
+      mode: s.account.mode,
+      amount_cents: s.amountCents,
+    })
+    .select("id")
+    .single();
+  if (error || !data) {
+    console.error(`Payments: creating the payment for sign-up ${s.signupId} failed:`, error);
+    // No link to pay with: keep their spot as "pay at the event" rather
+    // than letting the hold run out on them.
+    await admin
+      .from("event_signups")
+      .update({ payment_status: "not_required", amount_due_cents: null, payment_due_at: null, updated_at: new Date().toISOString() })
+      .eq("tenant_id", s.tenantId)
+      .eq("id", s.signupId);
+    return null;
+  }
+  return { paymentId: data.id, amountCents: s.amountCents, dueAt: s.dueAt, url: payUrl(data.id) };
+}
+
+// A retried sign-up (same idempotency key): the payment it already made.
+export async function existingSignupPayment(admin: SupabaseClient, tenantId: string, signupId: string): Promise<PaymentRequest | null> {
+  const [{ data: signup }, { data: payment }] = await Promise.all([
+    admin.from("event_signups").select("payment_status, payment_due_at").eq("tenant_id", tenantId).eq("id", signupId).maybeSingle(),
+    admin
+      .from("payments")
+      .select("id, amount_cents")
+      .eq("tenant_id", tenantId)
+      .eq("event_signup_id", signupId)
+      .eq("status", "created")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  if (signup?.payment_status !== "awaiting" || !signup.payment_due_at || !payment) return null;
+  return { paymentId: payment.id, amountCents: payment.amount_cents, dueAt: signup.payment_due_at, url: payUrl(payment.id) };
+}

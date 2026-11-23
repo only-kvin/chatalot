@@ -16,9 +16,10 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     serverActions: {
-      // Staff photo uploads (up to 2 MB, see app/(dashboard)/dashboard/staff/actions.ts)
-      // plus multipart overhead. The default is 1 MB.
-      bodySizeLimit: "3mb",
+      // Event posters (up to 4 MB, app/(dashboard)/dashboard/events/actions.ts)
+      // and staff photos (2 MB), plus multipart overhead. Vercel itself
+      // accepts at most 4.5 MB. The default is 1 MB.
+      bodySizeLimit: "4.5mb",
     },
   },
 };

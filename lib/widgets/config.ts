@@ -17,7 +17,7 @@ export type WidgetTheme = {
 
 export type BookingWidgetType = "schedule" | "appointment";
 // Every widget configured in widget_instances.
-export type WidgetType = BookingWidgetType | "contact" | "registration";
+export type WidgetType = BookingWidgetType | "contact" | "registration" | "events";
 
 // Which form each widget shows (lib/widgets/fields.ts).
 export const FORM_KIND: Record<WidgetType, FormKind> = {
@@ -25,6 +25,8 @@ export const FORM_KIND: Record<WidgetType, FormKind> = {
   appointment: "booking",
   contact: "contact",
   registration: "registration",
+  // Name, phone and email, like a booking.
+  events: "booking",
 };
 
 // Wording both booking widgets have.
@@ -121,6 +123,28 @@ export const WIDGET_SCHEMAS = {
     },
     defaultSettings: { offerMarketing: true },
   },
+  events: {
+    copy: z.object({
+      title: z.string().trim().min(1).max(60),
+      signUpButton: z.string().trim().min(1).max(40),
+      successTitle: z.string().trim().min(1).max(60),
+      successMessage: z.string().trim().max(300),
+      // Shown when nothing is coming up.
+      emptyMessage: z.string().trim().max(200),
+    }),
+    settings: z.object({
+      // Also list events that have passed (marked as past), newest first.
+      showPast: z.boolean(),
+    }),
+    defaultCopy: {
+      title: "Upcoming events",
+      signUpButton: "Sign up",
+      successTitle: "You're signed up!",
+      successMessage: "We've saved your spot. See you there!",
+      emptyMessage: "No events coming up right now. Check back soon!",
+    },
+    defaultSettings: { showPast: false },
+  },
 } as const;
 
 type Schemas = typeof WIDGET_SCHEMAS;
@@ -186,6 +210,7 @@ export const WIDGET_TYPE_LABEL: Record<WidgetType, string> = {
   appointment: "Appointment",
   contact: "Contact",
   registration: "Registration",
+  events: "Events",
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

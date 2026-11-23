@@ -1,6 +1,6 @@
 import { waitUntil } from "@vercel/functions";
 import { createAdminClient } from "@/lib/db/supabase-admin";
-import { emailCustomerAboutBooking } from "@/lib/email/customer-booking";
+import { sendPaidConfirmation } from "@/lib/payments/paid";
 import { handlePayfastNotification } from "@/lib/payments/notify";
 
 // PayFast's server-to-server payment notification (ITN) for one business.
@@ -29,12 +29,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
   if (outcome.status !== 200) console.warn(`PayFast notification for ${tenantId}: ${outcome.detail}`);
 
   // The customer's "you're booked" email was held back until they paid.
-  if (outcome.paidBookingId) {
-    waitUntil(
-      emailCustomerAboutBooking(admin, tenantId, outcome.paidBookingId, "confirmed").catch((err) =>
-        console.error(`Payments: confirmation email for booking ${outcome.paidBookingId} failed:`, err),
-      ),
-    );
+  if (outcome.paid) {
+    const paid = outcome.paid;
+    waitUntil(sendPaidConfirmation(admin, tenantId, paid).catch((err) => console.error(`Payments: confirmation email failed:`, err)));
   }
   return new Response(outcome.status === 200 ? "OK" : "Not processed", { status: outcome.status });
 }

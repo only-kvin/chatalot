@@ -12,6 +12,7 @@ const TYPES = [
   { value: "schedule", label: "Schedule (date first)" },
   { value: "contact", label: "Contact form" },
   { value: "registration", label: "Registration" },
+  { value: "events", label: "Events" },
 ];
 
 export function NewWidgetForm({ tenantId }: { tenantId: string }) {

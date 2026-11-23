@@ -151,6 +151,10 @@ export async function GET(request: Request) {
   if (recovery.status === "rejected") console.error("Recovering payments failed:", recovery.reason);
   const { data: expired, error: expireError } = await admin.rpc("expire_unpaid_bookings", { p_tenant_id: null });
   if (expireError) console.error("Releasing unpaid holds failed:", expireError);
+  // Event tickets held for payment that ran out (sign-ups also release
+  // these per event as they come in).
+  const { error: signupExpireError } = await admin.rpc("expire_unpaid_event_signups", { p_tenant_id: null });
+  if (signupExpireError) console.error("Releasing unpaid event sign-ups failed:", signupExpireError);
 
   // Each job runs even if the other fails.
   const [reminders, reviews] = await Promise.allSettled([

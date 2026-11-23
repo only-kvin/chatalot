@@ -23,6 +23,7 @@ const TYPE_HINT: Record<WidgetType, string> = {
   schedule: "Customers pick a date and time first.",
   contact: "A contact form; messages land in the business's inbox.",
   registration: "Customers sign up to the business's customer list.",
+  events: "Upcoming events with posters; customers sign up or buy tickets.",
 };
 
 function Snippet({ code, label }: { code: string; label: string }) {

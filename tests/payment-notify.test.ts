@@ -51,7 +51,7 @@ function fakeAdmin(opts: { account?: boolean; apply?: { outcome: string; reason:
               error: null,
             };
           }
-          if (table === "payments") return { data: { booking_id: "booking-1" }, error: null };
+          if (table === "payments") return { data: { booking_id: "booking-1", event_signup_id: null }, error: null };
           return { data: null, error: null };
         },
         insert: async (row: Record<string, unknown>) => (events.push(row), { error: null }),
@@ -67,7 +67,7 @@ describe("handlePayfastNotification", () => {
   it("applies a genuine payment and reports the booking to confirm", async () => {
     const { admin, rpc } = fakeAdmin({});
     const r = await handlePayfastNotification(admin, TENANT, ITN, PAYFAST_IP, { fetch: payfastSays("VALID"), resolve });
-    expect(r).toEqual({ status: 200, paidBookingId: "booking-1", detail: "applied" });
+    expect(r).toEqual({ status: 200, paid: { bookingId: "booking-1", signupId: null }, detail: "applied" });
     expect(rpc).toHaveBeenCalledWith("apply_payment_notification", {
       p_tenant_id: TENANT,
       p_payment_id: "3f1a2b3c-0000-4000-8000-000000000001",
@@ -89,7 +89,7 @@ describe("handlePayfastNotification", () => {
       const { admin } = fakeAdmin({ apply });
       const r = await handlePayfastNotification(admin, TENANT, ITN, PAYFAST_IP, { fetch: payfastSays("VALID"), resolve });
       expect(r.status).toBe(200);
-      expect(r.paidBookingId).toBeNull();
+      expect(r.paid).toBeNull();
     }
   });
 
@@ -101,7 +101,7 @@ describe("handlePayfastNotification", () => {
     for (const c of cases) {
       const { admin, rpc, events } = fakeAdmin({});
       const r = await handlePayfastNotification(admin, TENANT, c.body, c.ip, { fetch: payfastSays(c.answer), resolve });
-      expect(r).toMatchObject({ status: 200, paidBookingId: null, detail: c.reason });
+      expect(r).toMatchObject({ status: 200, paid: null, detail: c.reason });
       expect(rpc).not.toHaveBeenCalled();
       // Logged, without linking it to a payment the sender named.
       expect(events[0]).toMatchObject({ tenant_id: TENANT, outcome: "rejected", reason: c.reason });

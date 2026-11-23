@@ -4,7 +4,7 @@ import { z } from "zod";
 // customers are part of every plan and aren't listed. Pricing changes are a
 // code change on purpose: one place, reviewed, deployed.
 
-export const FEATURES = ["web_chat", "contact_form", "whatsapp", "bookings", "payments", "reviews", "registration"] as const;
+export const FEATURES = ["web_chat", "contact_form", "whatsapp", "bookings", "payments", "events", "reviews", "registration"] as const;
 export type Feature = (typeof FEATURES)[number];
 
 export const PLANS = ["starter", "growth", "pro", "trial"] as const;
@@ -12,7 +12,7 @@ export type Plan = (typeof PLANS)[number];
 
 const PLAN_FEATURES: Record<Plan, readonly Feature[]> = {
   starter: ["web_chat", "contact_form"],
-  growth: ["web_chat", "contact_form", "whatsapp", "bookings", "payments"],
+  growth: ["web_chat", "contact_form", "whatsapp", "bookings", "payments", "events"],
   pro: FEATURES,
   // Everything unlocked, so owners see what they'd lose.
   trial: FEATURES,
@@ -77,6 +77,7 @@ export const WIDGET_FEATURE = {
   appointment: "bookings",
   contact: "contact_form",
   registration: "registration",
+  events: "events",
 } as const satisfies Record<string, Feature>;
 
 // Owner-facing copy for the upgrade page and locked menu items.
@@ -109,6 +110,11 @@ export const FEATURE_INFO: Record<Feature, { title: string; pitch: string; point
       "Money goes directly to you; we never hold it",
       "Every payment shown on the booking, with PayFast's fee",
     ],
+  },
+  events: {
+    title: "Events",
+    pitch: "List upcoming events on your website with posters, and let customers sign up or buy tickets.",
+    points: ["Posters, descriptions and dates", "Free sign-ups or paid tickets, with limited spots", "Everyone who signed up, in one list"],
   },
   reviews: {
     title: "Review requests",

@@ -12,6 +12,7 @@ describe("resolveFeatures", () => {
       whatsapp: "locked",
       bookings: "locked",
       payments: "locked",
+      events: "locked",
       reviews: "locked",
       registration: "locked",
     });
@@ -19,6 +20,7 @@ describe("resolveFeatures", () => {
     expect(growth.whatsapp).toBe("on");
     expect(growth.bookings).toBe("on");
     expect(growth.payments).toBe("on");
+    expect(growth.events).toBe("on");
     expect(growth.reviews).toBe("locked");
     expect(Object.values(resolveFeatures("pro", {})).every((s) => s === "on")).toBe(true);
     expect(Object.values(resolveFeatures("trial", {})).every((s) => s === "on")).toBe(true);
@@ -77,7 +79,14 @@ describe("menu for a plan", () => {
 
   it("drops a hidden feature entirely", () => {
     const groups = navForFeatures(NAV_GROUPS, resolveFeatures("pro", { bookings: "off" }));
-    expect(groups.map((g) => g.label)).not.toContain("Schedule");
+    const hrefs = groups.flatMap((g) => g.items.map((i) => i.href));
+    for (const page of ["/dashboard/bookings", "/dashboard/services", "/dashboard/staff", "/dashboard/availability"]) {
+      expect(hrefs).not.toContain(page);
+    }
+    // Events doesn't need bookings, so it stays (in the Schedule group).
+    expect(hrefs).toContain("/dashboard/events");
+    const none = navForFeatures(NAV_GROUPS, resolveFeatures("pro", { bookings: "off", events: "off" }));
+    expect(none.map((g) => g.label)).not.toContain("Schedule");
   });
 
   it("points locked items at the upgrade page", () => {

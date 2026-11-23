@@ -45,7 +45,9 @@ export default async function PayPage({
 
         {page.state === "paid" && (
           <>
-            <h1 className="font-heading text-2xl font-bold tracking-tight">Paid. You&apos;re booked</h1>
+            <h1 className="font-heading text-2xl font-bold tracking-tight">
+              {page.kind === "event" ? "Paid. You're signed up" : "Paid. You're booked"}
+            </h1>
             <p className="mt-2">
               {page.serviceName} with {page.businessName} on {page.when}.
             </p>
@@ -57,12 +59,12 @@ export default async function PayPage({
           <>
             <h1 className="font-heading text-2xl font-bold tracking-tight">This payment link has expired</h1>
             <p className="mt-2 text-muted-foreground">
-              The time to pay ran out, so the slot was released. You can book again, or contact {page.businessName}
+              The time to pay ran out, so {page.kind === "event" ? "the tickets were released. You can sign up again" : "the slot was released. You can book again"}, or contact {page.businessName}
               {page.contact ? ` (${page.contact})` : ""}.
             </p>
             {query.returned && (
               <p className="mt-2 text-sm text-muted-foreground">
-                If you did pay just now, {page.businessName} has been told and will rebook or refund you.
+                If you did pay just now, {page.businessName} has been told and will {page.kind === "event" ? "add you back" : "rebook you"} or refund you.
               </p>
             )}
           </>
@@ -91,13 +93,13 @@ export default async function PayPage({
             ) : (
               <>
                 <h1 className="font-heading text-2xl font-bold tracking-tight">
-                  Pay {rand(page.amountCents)} to secure your booking
+                  Pay {rand(page.amountCents)} to secure your {page.kind === "event" ? "tickets" : "booking"}
                 </h1>
                 <p className="mt-2">
                   {page.serviceName} with {page.businessName} on {page.when}.
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Reference {page.ref}. Your slot is held until {formatLocalTime(page.dueAt)}.
+                  Reference {page.ref}. {page.kind === "event" ? "Your tickets are" : "Your slot is"} held until {formatLocalTime(page.dueAt)}.
                 </p>
                 {query.cancelled && (
                   <p className="mt-3 text-sm text-amber-700 dark:text-amber-400">

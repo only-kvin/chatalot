@@ -19,7 +19,8 @@ export function summaryList(rows: [string, string | null | undefined][]): HTMLEl
 export type Details = {
   // Builds a fresh form; call when the details step opens.
   start: (fields: FormField[]) => void;
-  render: (o: { businessName: string; confirmLabel: string; submitting: boolean; onSubmit: () => void }) => HTMLElement;
+  // noun: what the consent line and button are about ("booking", "sign-up").
+  render: (o: { businessName: string; confirmLabel: string; submitting: boolean; onSubmit: () => void; noun?: string }) => HTMLElement;
   // The first problem (and focuses it), or null.
   check: () => string | null;
   payload: () => {
@@ -48,19 +49,19 @@ export function createDetails(shell: Shell): Details {
       idempotencyKey = crypto.randomUUID();
       shownAt = Date.now();
     },
-    render({ businessName, confirmLabel, submitting, onSubmit }) {
+    render({ businessName, confirmLabel, submitting, onSubmit, noun = "booking" }) {
       const consentRow = h(
         "label",
         { class: "check", for: `${shell.id}-consent` },
         consent!,
-        h("span", {}, `I agree to ${businessName || "the business"} saving my details to manage this booking.`),
+        h("span", {}, `I agree to ${businessName || "the business"} saving my details to manage this ${noun}.`),
       );
       const formEl = h(
         "form",
         { novalidate: true },
         h("div", { class: "fields" }, form!.element, consentRow),
         h("div", { class: "trap", "aria-hidden": "true" }, h("label", {}, "Leave this empty", trap!)),
-        h("button", { type: "submit", class: "primary", disabled: submitting }, submitting ? "Booking…" : confirmLabel),
+        h("button", { type: "submit", class: "primary", disabled: submitting }, submitting ? (noun === "booking" ? "Booking…" : "Sending…") : confirmLabel),
       );
       formEl.addEventListener("submit", (e) => {
         e.preventDefault();
@@ -102,11 +103,12 @@ function hhmm(iso: string): string {
 
 // Booked but not yet paid: the slot is held until the deadline. The pay page
 // opens in a new tab so the business's website stays open behind it.
-function renderPayDue(pay: PaymentDue, summary: HTMLElement): Node[] {
+// tickets: an event sign-up, where what's held is tickets rather than a time.
+function renderPayDue(pay: PaymentDue, summary: HTMLElement, tickets = false): Node[] {
   return [
     h("div", { class: "tick", "aria-hidden": "true" }, "…"),
-    h("h2", { tabindex: -1 }, "Pay to secure your booking"),
-    h("p", { class: "note" }, `Your time is held until ${hhmm(pay.dueAt)}. Pay ${rand(pay.amountCents)} before then or it's released.`),
+    h("h2", { tabindex: -1 }, tickets ? "Pay to secure your tickets" : "Pay to secure your booking"),
+    h("p", { class: "note" }, `${tickets ? "Your tickets are" : "Your time is"} held until ${hhmm(pay.dueAt)}. Pay ${rand(pay.amountCents)} before then or ${tickets ? "they're" : "it's"} released.`),
     summary,
     h(
       "div",
@@ -131,9 +133,11 @@ export function renderDone(
     again: { label: string; onClick: () => void } | null;
     // Held until paid: the pay link replaces the confirmation.
     pay?: PaymentDue | null;
+    // An event sign-up: word the pay step for tickets.
+    tickets?: boolean;
   },
 ): Node[] {
-  if (o.pay) return renderPayDue(o.pay, o.summary);
+  if (o.pay) return renderPayDue(o.pay, o.summary, o.tickets);
   let calendarLink: HTMLElement | null = null;
   if (!o.pending && o.calendar?.startsAt) {
     const ics = bookingIcs({

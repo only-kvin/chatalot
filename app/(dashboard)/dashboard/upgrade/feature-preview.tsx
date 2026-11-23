@@ -78,6 +78,20 @@ const PREVIEWS: Record<Feature, React.ReactNode> = {
       <span className="self-start rounded-full bg-tone-ok px-2.5 py-0.5 text-[11px] font-semibold text-tone-ok-foreground">Paid R100</span>
     </div>
   ),
+  events: (
+    <div className="grid grid-cols-2 gap-3">
+      {["Open day", "Wine tasting"].map((t, i) => (
+        <div key={t} className="overflow-hidden rounded-xl bg-card shadow-card">
+          <div className={`h-20 ${i ? "bg-amber-300/70" : "bg-primary/70"}`} />
+          <div className="flex flex-col gap-1 p-3">
+            <span className="text-[11px] font-semibold text-muted-foreground">SAT 14 DEC · 10:00</span>
+            <span className="text-sm font-semibold">{t}</span>
+            <span className="text-xs text-muted-foreground">{i ? "R150 · 6 spots left" : "Free"}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  ),
   reviews: (
     <div className="flex flex-col gap-3">
       <div className={`${bubble} self-start bg-card shadow-[0_0_0_1px_var(--border)]`}>
