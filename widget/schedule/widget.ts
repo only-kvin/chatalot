@@ -17,7 +17,7 @@ type ScheduleConfig = BaseConfig & { settings: { allowStaffChoice: boolean } };
 type Step = "pick" | "details" | "done";
 
 export function mountSchedule(host: HTMLElement, ctx: MountContext): void {
-  const api = createApi(ctx.apiOrigin, ctx.key);
+  const api = createApi(ctx.apiOrigin, ctx.key, ctx.widgetId);
   const shell = createShell(host, ctx, "schedule");
   const details = createDetails(shell);
   const where = createWhere(shell);

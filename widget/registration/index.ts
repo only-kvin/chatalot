@@ -56,6 +56,7 @@ function mountRegistration(host: HTMLElement, ctx: MountContext): void {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           key: ctx.key,
+          widgetId: ctx.widgetId,
           answers: form.values(),
           notifications: true,
           marketing: marketing.checked,
@@ -145,7 +146,7 @@ function mountRegistration(host: HTMLElement, ctx: MountContext): void {
   render();
   (async () => {
     try {
-      const res = await fetch(`${ctx.apiOrigin}/api/widget/config?${new URLSearchParams({ key: ctx.key, widget: "registration" })}`);
+      const res = await fetch(`${ctx.apiOrigin}/api/widget/config?${new URLSearchParams({ key: ctx.key, widget: "registration", ...(ctx.widgetId ? { id: ctx.widgetId } : {}) })}`);
       if (!res.ok) throw new Error(String(res.status));
       config = (await res.json()) as RegistrationConfig;
       shell.applyTheme(config.theme, config.copy.title);

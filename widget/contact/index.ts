@@ -57,6 +57,7 @@ function mountContact(host: HTMLElement, ctx: MountContext): void {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           key: ctx.key,
+          widgetId: ctx.widgetId,
           answers: values,
           newsletter: newsletter.checked,
           promotions: promotions.checked,
@@ -138,7 +139,7 @@ function mountContact(host: HTMLElement, ctx: MountContext): void {
   render();
   (async () => {
     try {
-      const res = await fetch(`${ctx.apiOrigin}/api/widget/config?${new URLSearchParams({ key: ctx.key, widget: "contact" })}`);
+      const res = await fetch(`${ctx.apiOrigin}/api/widget/config?${new URLSearchParams({ key: ctx.key, widget: "contact", ...(ctx.widgetId ? { id: ctx.widgetId } : {}) })}`);
       if (!res.ok) throw new Error(String(res.status));
       config = (await res.json()) as ContactConfig;
       shell.applyTheme(config.theme, config.copy.title);

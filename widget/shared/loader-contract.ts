@@ -7,6 +7,8 @@ export type MountContext = {
   apiOrigin: string;
   // "inline" (default) or "float" (a launcher bubble, like the chat).
   mode: "inline" | "float";
+  // data-widget: which of the business's widgets of this type; null = its default.
+  widgetId: string | null;
 };
 
 export type MountFn = (el: HTMLElement, ctx: MountContext) => void;

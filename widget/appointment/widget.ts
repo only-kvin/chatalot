@@ -24,7 +24,7 @@ type AppointmentConfig = BaseConfig & {
 const ANY = "";
 
 export function mountAppointment(host: HTMLElement, ctx: MountContext): void {
-  const api = createApi(ctx.apiOrigin, ctx.key);
+  const api = createApi(ctx.apiOrigin, ctx.key, ctx.widgetId);
   const shell = createShell(host, ctx, "appointment", APPOINTMENT_CSS);
   const details = createDetails(shell);
   const where = createWhere(shell);

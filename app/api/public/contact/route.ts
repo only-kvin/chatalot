@@ -12,6 +12,8 @@ export const OPTIONS = preflight;
 
 const bodySchema = z.object({
   key: z.string().min(1).max(100),
+  // Which of the business's widgets; omitted = its default.
+  widgetId: z.string().uuid().nullish(),
   answers: z.record(z.string(), z.unknown()),
   // The optional, unticked boxes; only offered ones are honoured.
   newsletter: z.boolean().default(false),
@@ -41,8 +43,12 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient();
-  const widget = await loadWidget(admin, tenantId, "contact");
+  const widget = await loadWidget(admin, tenantId, "contact", body.widgetId);
   if (!widget.active) return NextResponse.json({ error: "Not found" }, { status: 404, headers });
+  // A Draft (test) widget shows everything but takes nothing real.
+  if (widget.status === "draft") {
+    return NextResponse.json({ error: "This is a test widget, so it can't take real submissions yet." }, { status: 403, headers });
+  }
   const answers = submissionSchema(widget.fields, "contact").safeParse(body.answers);
   if (!answers.success) {
     return NextResponse.json({ error: answers.error.issues[0]?.message ?? "Please check your details." }, { status: 400, headers });

@@ -47,6 +47,12 @@ export default async function AdminPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Tenants</h1>
         <div className="flex gap-4">
+          <Link href="/studio" className="text-sm text-muted-foreground hover:underline">
+            Studio →
+          </Link>
+          <Link href="/admin/staff" className="text-sm text-muted-foreground hover:underline">
+            Staff →
+          </Link>
           <Link href="/admin/site-briefs" className="text-sm text-muted-foreground hover:underline">
             Site briefs →
           </Link>

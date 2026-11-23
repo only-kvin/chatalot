@@ -70,8 +70,9 @@ function scan(key: string, apiOrigin: string) {
     }
     el.dataset.chatalotMounted = "";
     const mode = el.dataset.mode === "float" ? "float" : "inline";
+    const widgetId = el.dataset.widget || null;
     loadBundle(name, apiOrigin)
-      .then(() => registeredWidget(name)?.(el, { key, apiOrigin, mode }))
+      .then(() => registeredWidget(name)?.(el, { key, apiOrigin, mode, widgetId }))
       .catch((err) => console.error("[ChatAlot]", err));
   }
 }

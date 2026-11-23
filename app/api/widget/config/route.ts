@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   if (widget === "schedule" || widget === "appointment" || widget === "contact" || widget === "registration") {
     const [theme, instance, { data: agentConfig }] = await Promise.all([
       loadWidgetTheme(admin, tenantId),
-      loadWidget(admin, tenantId, widget),
+      loadWidget(admin, tenantId, widget, url.searchParams.get("id")),
       admin.from("agent_configs").select("business_name, handoff_contact").eq("tenant_id", tenantId).single(),
     ]);
     if (!instance.active) return NextResponse.json({ error: "Not found" }, { status: 404, headers });
@@ -36,6 +36,9 @@ export async function GET(request: Request) {
         copy: instance.copy,
         settings: instance.settings,
         fields: instance.fields,
+        // Which widget this turned out to be (the default when no id, or
+        // an unknown one, was asked for), and whether it's a test.
+        widget: { id: instance.id, name: instance.name, status: instance.status },
       },
       { headers },
     );

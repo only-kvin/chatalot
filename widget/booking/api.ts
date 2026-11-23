@@ -77,7 +77,8 @@ async function post(url: string, body: unknown): Promise<{ ok: boolean; json: Re
 
 const OFFLINE = "We couldn't reach the booking system. Check your connection and try again.";
 
-export function createApi(apiOrigin: string, key: string) {
+// widgetId: which of the business's widgets (null = its default).
+export function createApi(apiOrigin: string, key: string, widgetId: string | null = null) {
   async function get<T>(path: string, params: Record<string, string> = {}): Promise<T> {
     const res = await fetch(`${apiOrigin}${path}?${new URLSearchParams({ key, ...params })}`);
     if (!res.ok) throw new Error(`${path}: ${res.status}`);
@@ -85,7 +86,7 @@ export function createApi(apiOrigin: string, key: string) {
   }
 
   return {
-    config: <T extends BaseConfig>(widget: BookingWidget) => get<T>("/api/widget/config", { widget }),
+    config: <T extends BaseConfig>(widget: BookingWidget) => get<T>("/api/widget/config", { widget, ...(widgetId ? { id: widgetId } : {}) }),
     services: () => get<{ services: Service[]; staff: Staff[]; business?: BusinessInfo }>("/api/public/services"),
     availability: (q: AvailabilityQuery) =>
       get<{ days: { date: string; slots: Slot[] }[] }>("/api/public/availability", {
@@ -98,7 +99,7 @@ export function createApi(apiOrigin: string, key: string) {
       }),
     async book(widget: BookingWidget, body: Record<string, unknown>): Promise<BookingResult> {
       try {
-        const { ok, json } = await post(`${apiOrigin}/api/public/appointments`, { key, widget, ...body });
+        const { ok, json } = await post(`${apiOrigin}/api/public/appointments`, { key, widget, widgetId, ...body });
         if (ok && json.ok) return json as BookingResult;
         return {
           ok: false,

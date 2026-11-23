@@ -1,14 +1,15 @@
 "use server";
 
 import { z } from "zod";
+import { saveWidget } from "@/lib/widgets/instances";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/db/supabase-server";
 import { createAdminClient } from "@/lib/db/supabase-admin";
 import { imageKind, MAX_PHOTO_BYTES, storedPhotoPath } from "@/lib/staff/photo";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
 import { whatsappContinueUrl } from "@/lib/channels/web-handoff";
-import { FORM_KIND, WIDGET_SCHEMAS, type WidgetType } from "@/lib/widgets/config";
-import { fieldsInputSchema, normalizeFields } from "@/lib/widgets/fields";
+import { WIDGET_SCHEMAS, type WidgetType } from "@/lib/widgets/config";
+import { fieldsInputSchema } from "@/lib/widgets/fields";
 import { featureError } from "@/lib/dashboard-features";
 import { WIDGET_FEATURE } from "@/lib/plans";
 
@@ -203,7 +204,8 @@ function inputSchema(type: WidgetType) {
   });
 }
 
-export async function saveBookingWidgetAction(type: WidgetType, input: unknown): Promise<{ error: string | null }> {
+// widgetId: one of the business's widgets of this type; omitted = its default.
+export async function saveBookingWidgetAction(type: WidgetType, input: unknown, widgetId?: string | null): Promise<{ error: string | null }> {
   const tenantId = await getCurrentTenantId();
   if (!tenantId) return { error: "Not authorized." };
   if (!widgetTypeSchema.safeParse(type).success) return { error: "Invalid widget." };
@@ -215,20 +217,10 @@ export async function saveBookingWidgetAction(type: WidgetType, input: unknown):
     return { error: issue?.path[0] === "copy" ? "Fill in every text, within its length." : (issue?.message ?? "Invalid input.") };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("widget_instances").upsert(
-    {
-      tenant_id: tenantId,
-      type,
-      active: parsed.data.active,
-      copy: parsed.data.copy,
-      settings: parsed.data.settings,
-      // Normalised for that widget's form (e.g. name always asked).
-      fields: normalizeFields(parsed.data.fields, FORM_KIND[type]),
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "tenant_id,type" },
-  );
+  if (widgetId && !z.string().uuid().safeParse(widgetId).success) return { error: "Invalid widget." };
+
+  // RLS keeps the signed-in user's client to their own business.
+  const { error } = await saveWidget(await createClient(), tenantId, type, parsed.data, widgetId);
   if (error) {
     console.error(`Saving the ${type} widget for ${tenantId} failed:`, error);
     return { error: "Couldn't save the widget. Please try again." };
