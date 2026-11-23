@@ -12,6 +12,7 @@ import {
   ContactRoundIcon,
   InboxIcon,
   UserRoundCogIcon,
+  TicketIcon,
   type LucideIcon,
 } from "lucide-react";
 import type { Feature, Features } from "@/lib/plans";
@@ -52,6 +53,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/dashboard/services", label: "Services", icon: BriefcaseIcon, keywords: "prices durations", feature: "bookings" },
       { href: "/dashboard/staff", label: "Staff", icon: UserRoundCogIcon, keywords: "team people", feature: "bookings" },
       { href: "/dashboard/availability", label: "Availability", icon: ClockIcon, keywords: "hours closures holidays", feature: "bookings" },
+      { href: "/dashboard/events", label: "Events", icon: TicketIcon, keywords: "workshops tickets sign-ups posters", feature: "events" },
     ],
   },
   {
