@@ -164,6 +164,10 @@ a.primary { display: flex; align-items: center; justify-content: center; text-de
 .link { background: none; border: none; padding: 8px 0; min-height: 44px; color: var(--ca-text); text-decoration: underline; text-align: left; }
 .alert { border-radius: calc(var(--ca-radius) / 1.6); padding: 10px 12px; font-size: 14px; background: #fef3f2; color: #b42318; animation: up .3s ease both; }
 .note { font-size: 14px; margin: 0; }
+.notice {
+  margin: 0; padding: 10px 12px; border-radius: calc(var(--ca-radius) / 1.6); font-size: 13px; line-height: 1.45;
+  background: color-mix(in srgb, #f59e0b 14%, var(--ca-surface)); color: var(--ca-text); border: 1px dashed color-mix(in srgb, #f59e0b 55%, var(--ca-line));
+}
 .done { text-align: center; align-items: center; }
 .done .tick {
   width: 60px; height: 60px; border-radius: 999px; color: var(--ca-on-primary);

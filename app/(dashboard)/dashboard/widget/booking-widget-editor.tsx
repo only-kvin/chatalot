@@ -179,10 +179,13 @@ type WidgetValues = {
 
 export function BookingWidgetForm({
   type,
+  widgetId = null,
   initial,
   onSaved,
 }: {
   type: WidgetType;
+  // Which of the business's widgets; null = the main one.
+  widgetId?: string | null;
   initial: WidgetValues;
   onSaved?: () => void;
 }) {
@@ -194,7 +197,7 @@ export function BookingWidgetForm({
   const [fields, setFields] = useState(initial.fields);
 
   return (
-    <form action={() => save(() => saveBookingWidgetAction(type, { active, copy, settings, fields }), onSaved)} className="flex flex-col gap-6">
+    <form action={() => save(() => saveBookingWidgetAction(type, { active, copy, settings, fields }, widgetId), onSaved)} className="flex flex-col gap-6">
       <label className="flex items-center gap-3 text-sm">
         <Switch checked={active} onChange={(e) => setActive(e.target.checked)} />
         {ui.name} is on
@@ -256,10 +259,12 @@ export function WidgetSnippet({ type, snippet }: { type: WidgetType; snippet: st
 // the saved settings), reloaded after each save.
 export function BookingWidgetTab({
   type,
+  widgetId = null,
   theme,
   initial,
 }: {
   type: WidgetType;
+  widgetId?: string | null;
   theme: WidgetTheme;
   initial: WidgetValues;
 }) {
@@ -284,7 +289,7 @@ export function BookingWidgetTab({
             <CardDescription>{ui.description}</CardDescription>
           </CardHeader>
           <CardContent>
-            <BookingWidgetForm type={type} initial={initial} onSaved={reload} />
+            <BookingWidgetForm type={type} widgetId={widgetId} initial={initial} onSaved={reload} />
           </CardContent>
         </Card>
       </div>
@@ -292,7 +297,7 @@ export function BookingWidgetTab({
         <Label>Live preview</Label>
         <iframe
           key={reloadKey}
-          src={`/dashboard/widget/preview?widget=${type}`}
+          src={`/dashboard/widget/preview?widget=${type}${widgetId ? `&id=${widgetId}` : ""}`}
           title={`${ui.name} preview`}
           className="h-[720px] w-full rounded-lg border bg-white"
         />

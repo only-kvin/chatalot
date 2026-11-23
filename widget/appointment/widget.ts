@@ -24,7 +24,7 @@ type AppointmentConfig = BaseConfig & {
 const ANY = "";
 
 export function mountAppointment(host: HTMLElement, ctx: MountContext): void {
-  const api = createApi(ctx.apiOrigin, ctx.key);
+  const api = createApi(ctx.apiOrigin, ctx.key, ctx.widgetId, ctx.preview);
   const shell = createShell(host, ctx, "appointment", APPOINTMENT_CSS);
   const details = createDetails(shell);
   const where = createWhere(shell);
@@ -404,8 +404,10 @@ export function mountAppointment(host: HTMLElement, ctx: MountContext): void {
       staff = catalogue.staff;
       where.setBusiness(catalogue.business);
       shell.applyTheme(cfg.theme, cfg.copy.title);
+      shell.setNotice(api.notice());
+      // Not set up yet (no services): customers see it's coming, not an error.
       if (!services.length) {
-        fatal = `Online booking isn't available right now.${cfg.contact ? ` Please contact ${cfg.businessName} on ${cfg.contact}.` : ""}`;
+        fatal = `Online booking is opening soon.${cfg.contact ? ` In the meantime, contact ${cfg.businessName} on ${cfg.contact}.` : ""}`;
       }
       render();
       emit(host, { widget: "appointment", action: "view" });

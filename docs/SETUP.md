@@ -537,3 +537,25 @@ in-memory Postgres with every migration applied); **not applied to the live data
    `payment_status = 'paid'`, a "Payment received" notification, the customer's confirmation email, and an
    `applied` row in `payment_events`.
 - `payments` feature in `lib/plans.ts`; Vitest tests for signatures, ITN verification and the SQL functions.
+
+## Studio, platform staff and several widgets per type (2026-11-23)
+
+Migration `20261123090000_widget_instances_and_studio.sql` (apply BEFORE deploying: the widget code reads the
+new columns).
+
+- **Platform staff** (`platform_staff`): the website-factory team. Admins add/remove them at `/admin/staff`
+  (by email; the person must have signed in once). Staff and admins use **`/studio`**: search any business by
+  name, slug or id, create its widgets before it has set anything up, switch them Draft/Live, and copy the
+  loader script plus one `<div>` per widget. Staff can't open `/admin`.
+- **Several widgets per type**: `widget_instances` now has `name`, `status` (draft|live), `is_default`. One
+  default per type (always live) is what embed codes without `data-widget`, the hosted booking page and
+  booking links use; existing widgets became the defaults. Embed a variant with
+  `<div data-chatalot="appointment" data-widget="<id>">`; a deleted id falls back to the default. Draft
+  widgets render with a "Test widget" note and the submit routes refuse them (403).
+- **Owners** manage their widgets in Dashboard -> Widgets: pick one, `+ New` (starts as Draft), rename,
+  Make live / Back to draft, delete (not the main one). The dashboard preview is `data-preview`, so nothing
+  is booked from it.
+- **Not set up yet**: a booking widget with no bookable services says "Online booking is opening soon" plus
+  the business's contact details. **`data-preview`** on a widget's box (for website builders) uses the
+  business's real look and services when it has them, sample ones when it hasn't, explains what's missing,
+  and never sends anything.

@@ -18,6 +18,7 @@ type RegistrationConfig = {
   fields: FormField[];
   copy: { title: string; submitButton: string; successTitle: string; successMessage: string; bookingUrl: string; bookLinkLabel: string };
   settings: { offerMarketing: boolean };
+  widget?: { status: "draft" | "live" };
 };
 
 function mountRegistration(host: HTMLElement, ctx: MountContext): void {
@@ -47,6 +48,13 @@ function mountRegistration(host: HTMLElement, ctx: MountContext): void {
       notifications.focus();
       return;
     }
+    // Preview: show the thank-you without sending anything.
+    if (ctx.preview) {
+      done = true;
+      render();
+      shell.focusFirst("h2");
+      return;
+    }
     sending = true;
     alert = null;
     render();
@@ -56,6 +64,7 @@ function mountRegistration(host: HTMLElement, ctx: MountContext): void {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           key: ctx.key,
+          widgetId: ctx.widgetId,
           answers: form.values(),
           notifications: true,
           marketing: marketing.checked,
@@ -145,10 +154,17 @@ function mountRegistration(host: HTMLElement, ctx: MountContext): void {
   render();
   (async () => {
     try {
-      const res = await fetch(`${ctx.apiOrigin}/api/widget/config?${new URLSearchParams({ key: ctx.key, widget: "registration" })}`);
+      const res = await fetch(`${ctx.apiOrigin}/api/widget/config?${new URLSearchParams({ key: ctx.key, widget: "registration", ...(ctx.widgetId ? { id: ctx.widgetId } : {}) })}`);
       if (!res.ok) throw new Error(String(res.status));
       config = (await res.json()) as RegistrationConfig;
       shell.applyTheme(config.theme, config.copy.title);
+      shell.setNotice(
+        ctx.preview
+          ? "Preview: this is the business's real form, but nothing here is sent."
+          : config.widget?.status === "draft"
+            ? "Test widget (Draft): sign-ups aren't sent until it's made Live."
+            : null,
+      );
       form = renderForm(config.fields, shell.id);
       shownAt = Date.now();
       render();

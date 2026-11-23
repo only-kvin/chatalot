@@ -5,7 +5,9 @@ import { cn } from "cn";
 import { createClient } from "@/lib/db/supabase-server";
 import { currentTenantFeatures } from "@/lib/dashboard-features";
 import { WIDGET_FEATURE } from "@/lib/plans";
-import { loadWidget, loadWidgetTheme } from "@/lib/widgets/config";
+import { loadWidget, loadWidgetTheme, WIDGET_TYPE_LABEL } from "@/lib/widgets/config";
+import { listWidgets, widgetBox } from "@/lib/widgets/instances";
+import { WidgetList, type ListedWidget } from "./widget-list";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { WidgetEditor } from "./widget-editor";
 import { BookingWidgetTab, WidgetSnippet } from "./booking-widget-editor";
@@ -19,13 +21,13 @@ const TABS = [
   { id: "registration", label: "Registration" },
 ] as const;
 
-export default async function WidgetPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+export default async function WidgetPage({ searchParams }: { searchParams: Promise<{ tab?: string; w?: string }> }) {
   const current = await currentTenantFeatures();
   if (!current) redirect("/");
   const { tenantId, features } = current;
   // Only widgets on their plan; the menu's lock is where the rest are offered.
   const tabs = TABS.filter((t) => features[WIDGET_FEATURE[t.id]] === "on");
-  const requested = (await searchParams).tab;
+  const { tab: requested, w: requestedWidget } = await searchParams;
   const tab = (tabs.find((t) => t.id === requested) ?? tabs[0])?.id;
   if (!tab) {
     return (
@@ -58,17 +60,25 @@ export default async function WidgetPage({ searchParams }: { searchParams: Promi
   );
 
   if (tab !== "chat") {
-    const [theme, instance] = await Promise.all([loadWidgetTheme(supabase, tenantId), loadWidget(supabase, tenantId, tab)]);
+    const all = (await listWidgets(supabase, tenantId)).filter((w) => w.type === tab);
+    // The main widget first (a business that never saved one still has it, on built-in settings).
+    const widgets: ListedWidget[] = all.some((w) => w.isDefault)
+      ? all.map((w) => ({ id: w.id, name: w.name, status: w.status, isDefault: w.isDefault }))
+      : [{ id: null, name: WIDGET_TYPE_LABEL[tab], status: "live", isDefault: true }, ...all.map((w) => ({ id: w.id, name: w.name, status: w.status, isDefault: w.isDefault }))];
+    const chosen = widgets.find((w) => w.id && w.id === requestedWidget && !w.isDefault) ?? null;
+    const [theme, instance] = await Promise.all([loadWidgetTheme(supabase, tenantId), loadWidget(supabase, tenantId, tab, chosen?.id)]);
     return (
       <div className={pageFrame("wide")}>
         <PageHeader title="Widgets" description="What customers see on your website." />
         {nav}
         <div className="flex flex-col gap-8">
-          <WidgetSnippet type={tab} snippet={`<div data-chatalot="${tab}"></div>
+          <WidgetList key={`${tab}-${chosen?.id ?? "main"}`} type={tab} widgets={widgets} selectedId={chosen?.id ?? widgets[0]?.id ?? null} />
+          <WidgetSnippet type={tab} snippet={`${widgetBox(tab, { widgetId: chosen?.id })}
 ${script}`} />
           <BookingWidgetTab
-            key={tab}
+            key={`${tab}-${chosen?.id ?? "main"}`}
             type={tab}
+            widgetId={chosen?.id ?? null}
             theme={theme}
             initial={{
               active: instance.active,

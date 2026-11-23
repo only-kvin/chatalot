@@ -1,14 +1,16 @@
 "use server";
 
 import { z } from "zod";
+import { createWidget, saveWidget } from "@/lib/widgets/instances";
+import { getSessionUser } from "@/lib/db/auth";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/db/supabase-server";
 import { createAdminClient } from "@/lib/db/supabase-admin";
 import { imageKind, MAX_PHOTO_BYTES, storedPhotoPath } from "@/lib/staff/photo";
 import { getCurrentTenantId } from "@/lib/db/current-tenant";
 import { whatsappContinueUrl } from "@/lib/channels/web-handoff";
-import { FORM_KIND, WIDGET_SCHEMAS, type WidgetType } from "@/lib/widgets/config";
-import { fieldsInputSchema, normalizeFields } from "@/lib/widgets/fields";
+import { WIDGET_SCHEMAS, type WidgetType } from "@/lib/widgets/config";
+import { fieldsInputSchema } from "@/lib/widgets/fields";
 import { featureError } from "@/lib/dashboard-features";
 import { WIDGET_FEATURE } from "@/lib/plans";
 
@@ -203,7 +205,8 @@ function inputSchema(type: WidgetType) {
   });
 }
 
-export async function saveBookingWidgetAction(type: WidgetType, input: unknown): Promise<{ error: string | null }> {
+// widgetId: one of the business's widgets of this type; omitted = its default.
+export async function saveBookingWidgetAction(type: WidgetType, input: unknown, widgetId?: string | null): Promise<{ error: string | null }> {
   const tenantId = await getCurrentTenantId();
   if (!tenantId) return { error: "Not authorized." };
   if (!widgetTypeSchema.safeParse(type).success) return { error: "Invalid widget." };
@@ -215,24 +218,93 @@ export async function saveBookingWidgetAction(type: WidgetType, input: unknown):
     return { error: issue?.path[0] === "copy" ? "Fill in every text, within its length." : (issue?.message ?? "Invalid input.") };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("widget_instances").upsert(
-    {
-      tenant_id: tenantId,
-      type,
-      active: parsed.data.active,
-      copy: parsed.data.copy,
-      settings: parsed.data.settings,
-      // Normalised for that widget's form (e.g. name always asked).
-      fields: normalizeFields(parsed.data.fields, FORM_KIND[type]),
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "tenant_id,type" },
-  );
+  if (widgetId && !z.string().uuid().safeParse(widgetId).success) return { error: "Invalid widget." };
+
+  // RLS keeps the signed-in user's client to their own business.
+  const { error } = await saveWidget(await createClient(), tenantId, type, parsed.data, widgetId);
   if (error) {
     console.error(`Saving the ${type} widget for ${tenantId} failed:`, error);
     return { error: "Couldn't save the widget. Please try again." };
   }
+  revalidatePath("/dashboard/widget");
+  return { error: null };
+}
+
+// ---------------------------------------------------------------------------
+// A business's widgets of a type: variants and test (Draft) widgets beside
+// the main one. Written with the signed-in user's client, so RLS keeps it to
+// their business; the main widget can't be deleted or made a draft.
+// ---------------------------------------------------------------------------
+
+const widgetIdSchema = z.string().uuid();
+
+async function widgetContext(type: WidgetType) {
+  const tenantId = await getCurrentTenantId();
+  if (!tenantId) return { error: "Not authorized." } as const;
+  if (!widgetTypeSchema.safeParse(type).success) return { error: "Invalid widget." } as const;
+  const blocked = await featureError(WIDGET_FEATURE[type]);
+  if (blocked) return { error: blocked } as const;
+  return { tenantId, supabase: await createClient() } as const;
+}
+
+// A new widget of a type, as a Draft (try it in the preview, then make it live).
+export async function createOwnWidgetAction(type: WidgetType, name: string): Promise<{ error: string | null; id?: string }> {
+  const ctx = await widgetContext(type);
+  if ("error" in ctx) return { error: ctx.error ?? "Not authorized." };
+  const user = await getSessionUser();
+  const created = await createWidget(ctx.supabase, ctx.tenantId, type, {
+    name: z.string().trim().max(60).catch("").parse(name),
+    status: "draft",
+    createdBy: user?.id ?? null,
+  });
+  if ("error" in created) {
+    console.error(`Creating a ${type} widget for ${ctx.tenantId} failed:`, created.error);
+    return { error: "Couldn't create the widget. Please try again." };
+  }
+  revalidatePath("/dashboard/widget");
+  return { error: null, id: created.id };
+}
+
+export async function updateOwnWidgetAction(
+  type: WidgetType,
+  widgetId: string,
+  change: { name?: string; status?: "draft" | "live" },
+): Promise<{ error: string | null }> {
+  const ctx = await widgetContext(type);
+  if ("error" in ctx) return { error: ctx.error ?? "Not authorized." };
+  if (!widgetIdSchema.safeParse(widgetId).success) return { error: "Invalid widget." };
+  const patch: Record<string, string> = { updated_at: new Date().toISOString() };
+  if (change.name !== undefined) {
+    const name = z.string().trim().min(1, "Give it a name.").max(60, "At most 60 characters.").safeParse(change.name);
+    if (!name.success) return { error: name.error.issues[0]?.message ?? "Invalid name." };
+    patch.name = name.data;
+  }
+  if (change.status !== undefined) {
+    if (!["draft", "live"].includes(change.status)) return { error: "Invalid status." };
+    patch.status = change.status;
+  }
+  let q = ctx.supabase.from("widget_instances").update(patch).eq("tenant_id", ctx.tenantId).eq("type", type).eq("id", widgetId);
+  // The main widget is what existing embed codes show: always live.
+  if (change.status) q = q.eq("is_default", false);
+  const { data, error } = await q.select("id");
+  if (error || !data?.length) return { error: "Couldn't save that. Please try again." };
+  revalidatePath("/dashboard/widget");
+  return { error: null };
+}
+
+export async function deleteOwnWidgetAction(type: WidgetType, widgetId: string): Promise<{ error: string | null }> {
+  const ctx = await widgetContext(type);
+  if ("error" in ctx) return { error: ctx.error ?? "Not authorized." };
+  if (!widgetIdSchema.safeParse(widgetId).success) return { error: "Invalid widget." };
+  const { data, error } = await ctx.supabase
+    .from("widget_instances")
+    .delete()
+    .eq("tenant_id", ctx.tenantId)
+    .eq("type", type)
+    .eq("id", widgetId)
+    .eq("is_default", false)
+    .select("id");
+  if (error || !data?.length) return { error: "Couldn't delete it. The main widget can't be deleted." };
   revalidatePath("/dashboard/widget");
   return { error: null };
 }

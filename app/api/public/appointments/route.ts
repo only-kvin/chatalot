@@ -17,6 +17,8 @@ function staffChoiceAllowed(settings: Record<string, unknown>, staffId: string |
 const bodySchema = z.object({
   key: z.string().min(1).max(100),
   widget: z.enum(["schedule", "appointment"]),
+  // Which of the business's widgets of that type; omitted = its default.
+  widgetId: z.string().uuid().nullish(),
   serviceId: z.string().uuid(),
   staffId: z.string().uuid().nullable().optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -76,7 +78,7 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
   const [widget, { data: service }] = await Promise.all([
-    loadWidget(admin, tenantId, body.widget),
+    loadWidget(admin, tenantId, body.widget, body.widgetId),
     admin
       .from("services")
       .select("id")
@@ -87,6 +89,10 @@ export async function POST(request: Request) {
       .maybeSingle(),
   ]);
   if (!widget.active || !service) return NextResponse.json({ error: "Not found" }, { status: 404, headers });
+  // A Draft (test) widget shows everything but takes nothing real.
+  if (widget.status === "draft") {
+    return NextResponse.json({ error: "This is a test widget, so it can't take real submissions yet." }, { status: 403, headers });
+  }
 
   const answers = submissionSchema(widget.fields).safeParse(body.answers);
   if (!answers.success) {

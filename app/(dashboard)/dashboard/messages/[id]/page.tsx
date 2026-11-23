@@ -21,7 +21,7 @@ export default async function MessagePage({ params }: { params: Promise<{ id: st
       .eq("id", id)
       .maybeSingle(),
     supabase.from("agent_configs").select("business_name").eq("tenant_id", tenantId).maybeSingle(),
-    supabase.from("widget_instances").select("fields").eq("tenant_id", tenantId).eq("type", "contact").maybeSingle(),
+    supabase.from("widget_instances").select("fields").eq("tenant_id", tenantId).eq("type", "contact").eq("is_default", true).maybeSingle(),
   ]);
   if (!m) notFound();
 

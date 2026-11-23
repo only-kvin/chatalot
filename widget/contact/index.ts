@@ -17,6 +17,7 @@ type ContactConfig = {
   fields: FormField[];
   copy: { title: string; submitButton: string; successTitle: string; successMessage: string; responseTime: string };
   settings: { offerNewsletter: boolean; offerPromotions: boolean };
+  widget?: { status: "draft" | "live" };
 };
 
 function mountContact(host: HTMLElement, ctx: MountContext): void {
@@ -48,6 +49,13 @@ function mountContact(host: HTMLElement, ctx: MountContext): void {
       if (!problem) shell.focusFirst('[name="email"], [name="phone"]');
       return;
     }
+    // Preview: show the thank-you without sending anything.
+    if (ctx.preview) {
+      sent = true;
+      render();
+      shell.focusFirst("h2");
+      return;
+    }
     sending = true;
     alert = null;
     render();
@@ -57,6 +65,7 @@ function mountContact(host: HTMLElement, ctx: MountContext): void {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           key: ctx.key,
+          widgetId: ctx.widgetId,
           answers: values,
           newsletter: newsletter.checked,
           promotions: promotions.checked,
@@ -138,10 +147,17 @@ function mountContact(host: HTMLElement, ctx: MountContext): void {
   render();
   (async () => {
     try {
-      const res = await fetch(`${ctx.apiOrigin}/api/widget/config?${new URLSearchParams({ key: ctx.key, widget: "contact" })}`);
+      const res = await fetch(`${ctx.apiOrigin}/api/widget/config?${new URLSearchParams({ key: ctx.key, widget: "contact", ...(ctx.widgetId ? { id: ctx.widgetId } : {}) })}`);
       if (!res.ok) throw new Error(String(res.status));
       config = (await res.json()) as ContactConfig;
       shell.applyTheme(config.theme, config.copy.title);
+      shell.setNotice(
+        ctx.preview
+          ? "Preview: this is the business's real form, but nothing here is sent."
+          : config.widget?.status === "draft"
+            ? "Test widget (Draft): messages aren't sent until it's made Live."
+            : null,
+      );
       form = renderForm(config.fields, shell.id);
       shownAt = Date.now();
       render();

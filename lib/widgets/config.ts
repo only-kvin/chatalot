@@ -144,32 +144,79 @@ export type WidgetConfig<T extends WidgetType> = {
   settings: WidgetSettings<T>;
   fields: Field[];
   active: boolean;
+  // Which widget this is. id is null for a business that has never saved
+  // this type (the built-in defaults, standing in for its default widget).
+  id: string | null;
+  name: string;
+  // draft: previews only, takes nothing real; live: works on websites.
+  status: "draft" | "live";
+  isDefault: boolean;
 };
 
-export function widgetFrom<T extends WidgetType>(
-  type: T,
-  row: { copy?: unknown; settings?: unknown; fields?: unknown; active?: boolean } | null,
-): WidgetConfig<T> {
+type InstanceRow = {
+  id?: string;
+  name?: string;
+  status?: string;
+  is_default?: boolean;
+  copy?: unknown;
+  settings?: unknown;
+  fields?: unknown;
+  active?: boolean;
+};
+
+export const WIDGET_COLUMNS = "id, name, status, is_default, copy, settings, fields, active";
+
+export function widgetFrom<T extends WidgetType>(type: T, row: InstanceRow | null): WidgetConfig<T> {
   const schemas = WIDGET_SCHEMAS[type];
   return {
     copy: merge(schemas.copy, { ...schemas.defaultCopy } as WidgetCopy<T>, row?.copy),
     settings: merge(schemas.settings, { ...schemas.defaultSettings } as WidgetSettings<T>, row?.settings),
     fields: normalizeFields(row?.fields ?? [], FORM_KIND[type]),
     active: row?.active ?? true,
+    id: row?.id ?? null,
+    name: row?.name || WIDGET_TYPE_LABEL[type],
+    status: row?.status === "draft" ? "draft" : "live",
+    // No row = the built-in defaults standing in for the default widget.
+    isDefault: row ? Boolean(row.is_default) : true,
   };
 }
 
+export const WIDGET_TYPE_LABEL: Record<WidgetType, string> = {
+  schedule: "Schedule",
+  appointment: "Appointment",
+  contact: "Contact",
+  registration: "Registration",
+};
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// A business's widget of a type: the one with this id, or its default. An
+// embed code naming a widget that's since been deleted falls back to the
+// default, so a website never ends up with an empty box.
 export async function loadWidget<T extends WidgetType>(
   client: SupabaseClient,
   tenantId: string,
   type: T,
+  widgetId?: string | null,
 ): Promise<WidgetConfig<T>> {
+  if (widgetId && UUID.test(widgetId)) {
+    const { data, error } = await client
+      .from("widget_instances")
+      .select(WIDGET_COLUMNS)
+      .eq("tenant_id", tenantId)
+      .eq("type", type)
+      .eq("id", widgetId)
+      .maybeSingle<InstanceRow>();
+    if (error) throw error;
+    if (data) return widgetFrom(type, data);
+  }
   const { data, error } = await client
     .from("widget_instances")
-    .select("copy, settings, fields, active")
+    .select(WIDGET_COLUMNS)
     .eq("tenant_id", tenantId)
     .eq("type", type)
-    .maybeSingle();
+    .eq("is_default", true)
+    .maybeSingle<InstanceRow>();
   if (error) throw error;
   return widgetFrom(type, data);
 }
